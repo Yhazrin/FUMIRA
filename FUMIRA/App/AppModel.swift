@@ -7,12 +7,15 @@ import SwiftUI
 final class AppModel {
     private let dependencies: AppDependencies
     private var hasPrepared = false
+    /// Single in-flight pipeline task — cancel stops URLSession poll/upload via stream termination.
+    private var pipelineTask: Task<Void, Never>?
 
     var phase: AppPhase = .connection
     var selectedTime: TimePosition = .now
     var understandingProgress = 0.0
     var storyProgress = 0.0
     var generationProgress = 0.0
+    var generationStage: GenerationProgressStage = .preparing
     var pipelineStatusText = ""
     var hardwareSnapshot: HardwareSnapshot?
     var activeSessionID: UUID?
@@ -20,9 +23,18 @@ final class AppModel {
     var sceneUnderstanding: SceneUnderstanding?
     var temporalStory: TemporalStory?
     var generatedFrame: GeneratedFrame?
+    /// One-level in-memory undo after result regeneration (not a history library).
+    var previousGeneratedFrame: GeneratedFrame?
     var failedStage: PipelineStage?
     var lastErrorMessage: String?
+    var lastGenerationError: GenerationError?
     var posterURL: URL?
+    /// Cached composed poster PNG for ShareLink / album save.
+    var shareImageData: Data?
+    var isPreparingPoster = false
+    var isSavingPoster = false
+    /// Non-error user feedback on the share screen (e.g. saved confirmation).
+    var shareFeedbackMessage: String?
     var modelCatalog: AIModelCatalog = .bundled
     var modelConfiguration: AIModelConfiguration = .demo
     /// Presents the user-facing Settings sheet (advanced model routing lives inside).
@@ -34,9 +46,11 @@ final class AppModel {
         supportsFlash: false
     )
     var isCameraGridEnabled = false
+    let motionField: MotionFieldModel
 
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
+        motionField = MotionFieldModel(service: dependencies.motionField)
     }
 
     var hasLiveCameraControls: Bool {
@@ -64,8 +78,16 @@ final class AppModel {
         }
     }
 
+    var canRetryFailedStage: Bool {
+        lastGenerationError?.isRetryable ?? true
+    }
+
     var isUsingLiveCamera: Bool {
         dependencies.cameraPreview.isLive
+    }
+
+    var canUndoGeneration: Bool {
+        previousGeneratedFrame != nil
     }
 
     var cameraPreview: AnyView {
@@ -179,23 +201,62 @@ final class AppModel {
 
     func capture() async {
         guard validateRunnableConfiguration() else { return }
+        guard !isPipelineBusy else { return }
+        invalidatePipelineWork()
         let sessionID = UUID()
         activeSessionID = sessionID
         clearPipelineResult()
+        dependencies.haptics.play(.shutter)
 
-        do {
-            let photo = try await dependencies.camera.capturePhoto()
-            guard activeSessionID == sessionID else { return }
-            capturedPhoto = photo
-            await dependencies.camera.stopPreview()
-            phase = .shuttered
-            dependencies.haptics.play(.shutter)
-            try? await Task.sleep(for: .milliseconds(180))
-            guard activeSessionID == sessionID else { return }
-            await startUnderstanding(photo: photo, sessionID: sessionID)
-        } catch {
-            presentFailure(stage: .capture, error: error, sessionID: sessionID)
+        let task = Task { [sessionID] in
+            do {
+                let photo = try await dependencies.camera.capturePhoto()
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                capturedPhoto = photo
+                await dependencies.camera.stopPreview()
+                phase = .shuttered
+                try? await Task.sleep(for: .milliseconds(180))
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                await startUnderstanding(photo: photo, sessionID: sessionID)
+            } catch is CancellationError {
+                return
+            } catch {
+                presentFailure(stage: .capture, error: error, sessionID: sessionID)
+            }
         }
+        pipelineTask = task
+        await task.value
+    }
+
+    /// Album import — same pipeline as shutter capture (understanding → story → generate).
+    func importPhoto(imageData: Data) async {
+        guard validateRunnableConfiguration() else { return }
+        guard !isPipelineBusy else { return }
+        invalidatePipelineWork()
+        let sessionID = UUID()
+        activeSessionID = sessionID
+        clearPipelineResult()
+        dependencies.haptics.play(.shutter)
+
+        let task = Task { [sessionID] in
+            do {
+                let photo = try PhotoImportAdapter.makeCapturedPhoto(from: imageData)
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                capturedPhoto = photo
+                await dependencies.camera.stopPreview()
+                phase = .shuttered
+                try? await Task.sleep(for: .milliseconds(180))
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                await startUnderstanding(photo: photo, sessionID: sessionID)
+            } catch is CancellationError {
+                return
+            } catch {
+                presentFailure(stage: .capture, error: error, sessionID: sessionID)
+                await resumeCameraPreview()
+            }
+        }
+        pipelineTask = task
+        await task.value
     }
 
     func startUnderstanding(photo: CapturedPhoto, sessionID: UUID) async {
@@ -216,7 +277,7 @@ final class AppModel {
                 )
             )
             for try await event in events {
-                guard activeSessionID == sessionID else { return }
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
                 switch event {
                 case let .progress(label, value):
                     pipelineStatusText = label
@@ -227,6 +288,8 @@ final class AppModel {
                     await startStoryWriting(understanding: value, sessionID: sessionID)
                 }
             }
+        } catch is CancellationError {
+            return
         } catch {
             presentFailure(stage: .understanding, error: error, sessionID: sessionID)
         }
@@ -253,7 +316,7 @@ final class AppModel {
                 )
             )
             for try await event in events {
-                guard activeSessionID == sessionID else { return }
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
                 switch event {
                 case let .progress(label, value):
                     pipelineStatusText = label
@@ -265,12 +328,16 @@ final class AppModel {
                     dependencies.haptics.play(.success)
                 }
             }
+        } catch is CancellationError {
+            return
         } catch {
             presentFailure(stage: .story, error: error, sessionID: sessionID)
         }
     }
 
     func generateStoryWorld() async {
+        // Debounce: ignore duplicate taps while already generating.
+        guard phase == .storyReady || phase == .pipelineFailure || phase == .result else { return }
         guard
             let photo = capturedPhoto,
             let understanding = sceneUnderstanding,
@@ -281,39 +348,54 @@ final class AppModel {
             return
         }
 
+        invalidatePipelineWork()
         let sessionID = UUID()
         activeSessionID = sessionID
         generationProgress = 0
-        pipelineStatusText = "准备生成故事画面"
+        generationStage = .preparing
+        pipelineStatusText = "准备让时间生长"
         failedStage = nil
+        lastGenerationError = nil
+        lastErrorMessage = nil
         phase = .generating
 
-        do {
-            let events = await dependencies.generation.generate(
-                request: ImageGenerationRequest(
-                    photo: photo,
-                    understanding: understanding,
-                    story: story,
-                    time: selectedTime,
-                    sessionID: sessionID,
-                    model: option
+        let task = Task { [photo, understanding, story, option, sessionID] in
+            do {
+                let events = await dependencies.generation.generate(
+                    request: ImageGenerationRequest(
+                        photo: photo,
+                        understanding: understanding,
+                        story: story,
+                        time: selectedTime,
+                        sessionID: sessionID,
+                        model: option
+                    )
                 )
-            )
-            for try await event in events {
-                guard activeSessionID == sessionID else { return }
-                switch event {
-                case let .progress(value):
-                    generationProgress = value
-                case let .completed(frame):
-                    generatedFrame = frame
-                    generationProgress = 1
-                    phase = .result
-                    dependencies.haptics.play(.success)
+                for try await event in events {
+                    try Task.checkCancellation()
+                    guard activeSessionID == sessionID else { return }
+                    switch event {
+                    case let .progress(label, value, stage):
+                        pipelineStatusText = label
+                        generationProgress = value
+                        generationStage = stage
+                    case let .completed(frame):
+                        generatedFrame = frame
+                        generationProgress = 1
+                        generationStage = .finishing
+                        pipelineStatusText = "这一帧已经长成"
+                        phase = .result
+                        dependencies.haptics.play(.reveal)
+                    }
                 }
+            } catch is CancellationError {
+                return
+            } catch {
+                presentFailure(stage: .imageGeneration, error: error, sessionID: sessionID)
             }
-        } catch {
-            presentFailure(stage: .imageGeneration, error: error, sessionID: sessionID)
         }
+        pipelineTask = task
+        await task.value
     }
 
     func regenerateStory() async {
@@ -321,21 +403,58 @@ final class AppModel {
             retake()
             return
         }
+        guard !isPipelineBusy else { return }
+        invalidatePipelineWork()
         let sessionID = UUID()
         activeSessionID = sessionID
         temporalStory = nil
-        await startStoryWriting(understanding: understanding, sessionID: sessionID)
+        let task = Task {
+            await startStoryWriting(understanding: understanding, sessionID: sessionID)
+        }
+        pipelineTask = task
+        await task.value
+    }
+
+    /// Re-run image generation with the same source photo + current time position.
+    /// Replaces the current result; keeps one previous frame in memory for undo.
+    func regenerateResult() async {
+        guard
+            capturedPhoto != nil,
+            sceneUnderstanding != nil,
+            temporalStory != nil
+        else {
+            retake()
+            return
+        }
+        previousGeneratedFrame = generatedFrame
+        await generateStoryWorld()
+    }
+
+    func undoLastGeneration() {
+        guard let previous = previousGeneratedFrame else { return }
+        generatedFrame = previous
+        previousGeneratedFrame = nil
+        phase = .result
+        dependencies.haptics.play(.selection)
     }
 
     func retryPipeline() async {
+        guard !isPipelineBusy else { return }
         guard let stage = failedStage else {
             retake()
             return
         }
+        guard canRetryFailedStage || stage == .configuration else {
+            // Non-retryable: send the user back to adjust story / time instead of re-hitting the API.
+            showOriginalNow()
+            return
+        }
+
         let sessionID = UUID()
         activeSessionID = sessionID
         failedStage = nil
         lastErrorMessage = nil
+        lastGenerationError = nil
 
         switch stage {
         case .configuration:
@@ -346,28 +465,84 @@ final class AppModel {
             await resumeCameraPreview()
         case .understanding:
             if let photo = capturedPhoto {
-                await startUnderstanding(photo: photo, sessionID: sessionID)
+                let task = Task {
+                    await startUnderstanding(photo: photo, sessionID: sessionID)
+                }
+                pipelineTask = task
+                await task.value
             } else {
                 retake()
             }
         case .story:
             if let understanding = sceneUnderstanding {
-                await startStoryWriting(understanding: understanding, sessionID: sessionID)
+                let task = Task {
+                    await startStoryWriting(understanding: understanding, sessionID: sessionID)
+                }
+                pipelineTask = task
+                await task.value
             } else if let photo = capturedPhoto {
-                await startUnderstanding(photo: photo, sessionID: sessionID)
+                let task = Task {
+                    await startUnderstanding(photo: photo, sessionID: sessionID)
+                }
+                pipelineTask = task
+                await task.value
             }
         case .imageGeneration:
             await generateStoryWorld()
         }
     }
 
-    func showOriginalNow() {
-        activeSessionID = nil
-        selectedTime = .now
+    /// Cancel in-flight generation (and stop remote poll/upload). Returns to storyReady when possible.
+    func cancelGeneration() {
+        guard phase == .generating else { return }
+        invalidatePipelineWork()
+        generationProgress = 0
+        generationStage = .preparing
+        pipelineStatusText = ""
+        failedStage = nil
+        lastGenerationError = nil
+        lastErrorMessage = nil
         if temporalStory != nil {
-            phase = .result
+            phase = .storyReady
+        } else {
+            phase = .viewfinder
+            Task { await resumeCameraPreview() }
+        }
+        dependencies.haptics.play(.selection)
+    }
+
+    /// Cancel any busy pipeline stage and land on a safe phase.
+    func cancelPipeline() {
+        switch phase {
+        case .generating:
+            cancelGeneration()
+        case .shuttered, .understanding, .storyWriting:
+            invalidatePipelineWork()
+            understandingProgress = 0
+            storyProgress = 0
+            pipelineStatusText = ""
+            failedStage = nil
+            lastGenerationError = nil
+            lastErrorMessage = nil
+            phase = .viewfinder
+            Task { await resumeCameraPreview() }
+            dependencies.haptics.play(.selection)
+        default:
+            break
+        }
+    }
+
+    func showOriginalNow() {
+        invalidatePipelineWork()
+        selectedTime = .now
+        failedStage = nil
+        lastGenerationError = nil
+        if temporalStory != nil {
+            // Prefer story gate over result when recovering from generation failure without a frame.
+            phase = generatedFrame != nil ? .result : .storyReady
         } else if sceneUnderstanding != nil {
-            phase = .storyWriting
+            phase = .viewfinder
+            Task { await resumeCameraPreview() }
         } else {
             phase = .viewfinder
             Task { await resumeCameraPreview() }
@@ -378,16 +553,122 @@ final class AppModel {
         selectedTime = TimePosition(normalized: normalized)
     }
 
+    func playTimeDetent(_ detent: WaveTimeDetent) {
+        dependencies.haptics.play(detent == .now ? .timeAnchor : .timeDetent)
+    }
+
+    func syncMotionField(
+        for phase: AppPhase,
+        reduceMotion: Bool,
+        lowPowerMode: Bool
+    ) {
+        let thermalState = ProcessInfo.processInfo.thermalState
+        let thermallyConstrained = thermalState == .serious || thermalState == .critical
+        guard Self.isMotionEligible(phase), !thermallyConstrained else {
+            motionField.deactivate()
+            return
+        }
+        motionField.activate(reduceMotion: reduceMotion, lowPowerMode: lowPowerMode)
+    }
+
+    private static func isMotionEligible(_ phase: AppPhase) -> Bool {
+        switch phase {
+        case .connection, .result, .share:
+            true
+        default:
+            false
+        }
+    }
+
     func openShare() {
+        dependencies.haptics.play(.save)
+        shareFeedbackMessage = nil
+        lastErrorMessage = nil
         phase = .share
+        Task { await prepareSharePoster() }
     }
 
     func returnToResult() {
         phase = .result
+        shareFeedbackMessage = nil
+    }
+
+    /// Minimal `fumira://` deep link. Hosts: `share`, `result`. No backend inventing.
+    func handleDeepLink(_ url: URL) {
+        guard url.scheme?.lowercased() == "fumira" else { return }
+        let host = (url.host ?? url.pathComponents.dropFirst().first)?.lowercased()
+        switch host {
+        case "share":
+            guard temporalStory != nil || generatedFrame != nil else { return }
+            openShare()
+        case "result":
+            guard generatedFrame != nil || temporalStory != nil else { return }
+            phase = .result
+        default:
+            break
+        }
+    }
+
+    var shareablePoster: ShareablePosterPNG? {
+        guard let shareImageData, !shareImageData.isEmpty else { return nil }
+        return ShareablePosterPNG(data: shareImageData)
+    }
+
+    func prepareSharePoster() async {
+        guard !isPreparingPoster else { return }
+        isPreparingPoster = true
+        defer { isPreparingPoster = false }
+        do {
+            shareImageData = try composePosterPNG()
+            if lastErrorMessage?.contains("海报") == true {
+                lastErrorMessage = nil
+            }
+        } catch {
+            shareImageData = nil
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func savePosterToLibrary() async {
+        guard !isSavingPoster else { return }
+        isSavingPoster = true
+        defer { isSavingPoster = false }
+        shareFeedbackMessage = nil
+        do {
+            let data = try shareImageData ?? composePosterPNG()
+            shareImageData = data
+            let snapshot = PosterSnapshot(
+                time: selectedTime,
+                title: temporalStory?.title ?? currentStoryBeat?.title ?? "这一刻的时间故事",
+                yearLabel: PosterComposer.yearLabel(for: selectedTime),
+                imageData: data
+            )
+            posterURL = try await dependencies.storage.save(snapshot)
+            dependencies.haptics.play(.success)
+            shareFeedbackMessage = "已保存到相册"
+            lastErrorMessage = nil
+        } catch {
+            shareFeedbackMessage = nil
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func playShareHaptic() {
+        dependencies.haptics.play(.save)
+    }
+
+    private func composePosterPNG() throws -> Data {
+        try PosterComposer.renderPNG(
+            time: selectedTime,
+            yearLabel: PosterComposer.yearLabel(for: selectedTime),
+            title: temporalStory?.title ?? currentStoryBeat?.title ?? "这一刻的时间故事",
+            narrative: currentNarrative,
+            sceneImageData: generatedFrame?.imageData
+        )
     }
 
     func retake() {
-        activeSessionID = nil
+        invalidatePipelineWork()
         clearPipelineResult()
         phase = .viewfinder
         Task { await resumeCameraPreview() }
@@ -398,9 +679,10 @@ final class AppModel {
     }
 
     func presentFailureForPreview() {
-        activeSessionID = nil
+        invalidatePipelineWork()
         failedStage = .imageGeneration
-        lastErrorMessage = "变迁图生成超时。识图结果和时间故事已经保留。"
+        lastGenerationError = .timedOut
+        lastErrorMessage = GenerationError.timedOut.errorDescription
         phase = .pipelineFailure
     }
 
@@ -448,8 +730,9 @@ final class AppModel {
     }
 
     private func presentConfigurationFailure() {
-        activeSessionID = nil
+        invalidatePipelineWork()
         failedStage = .configuration
+        lastGenerationError = nil
         lastErrorMessage = "当前模型组合尚未全部接通，请在设置 → 高级中选择可运行路由。"
         phase = .pipelineFailure
     }
@@ -460,10 +743,30 @@ final class AppModel {
         sessionID: UUID
     ) {
         guard activeSessionID == sessionID else { return }
+        if error is CancellationError { return }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return }
+
         activeSessionID = nil
+        pipelineTask = nil
         failedStage = stage
-        lastErrorMessage = error.localizedDescription
+        let classified = Self.classify(error)
+        lastGenerationError = classified
+        lastErrorMessage = classified.errorDescription ?? error.localizedDescription
         phase = .pipelineFailure
+    }
+
+    private static func classify(_ error: Error) -> GenerationError {
+        if let generationError = error as? GenerationError {
+            return generationError
+        }
+        return .generationFailed(message: error.localizedDescription)
+    }
+
+    /// Invalidate the active session and cancel the in-flight pipeline Task (stops remote poll).
+    private func invalidatePipelineWork() {
+        activeSessionID = nil
+        pipelineTask?.cancel()
+        pipelineTask = nil
     }
 
     private func resumeCameraPreview() async {
@@ -472,6 +775,7 @@ final class AppModel {
             await refreshCameraControls()
         } catch {
             lastErrorMessage = error.localizedDescription
+            lastGenerationError = Self.classify(error)
             failedStage = .capture
             phase = .pipelineFailure
         }
@@ -482,11 +786,19 @@ final class AppModel {
         sceneUnderstanding = nil
         temporalStory = nil
         generatedFrame = nil
+        previousGeneratedFrame = nil
         understandingProgress = 0
         storyProgress = 0
         generationProgress = 0
+        generationStage = .preparing
         pipelineStatusText = ""
         failedStage = nil
         lastErrorMessage = nil
+        lastGenerationError = nil
+        posterURL = nil
+        shareImageData = nil
+        shareFeedbackMessage = nil
+        isPreparingPoster = false
+        isSavingPoster = false
     }
 }

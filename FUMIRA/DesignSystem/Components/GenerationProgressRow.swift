@@ -15,7 +15,7 @@ struct GenerationProgressRow: View {
                 if isComplete {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(PosterPalette.moss)
+                        .foregroundStyle(PosterPalette.leafGreen)
                 }
             }
 
@@ -24,7 +24,7 @@ struct GenerationProgressRow: View {
                     Capsule()
                         .fill(PosterPalette.paperWhite.opacity(0.25))
                     Capsule()
-                        .fill(PosterPalette.moss)
+                        .fill(PosterPalette.leafGreen)
                         .frame(width: proxy.size.width * min(max(progress, 0), 1))
                         .animation(PosterMotion.flow, value: progress)
                 }

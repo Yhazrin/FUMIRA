@@ -92,7 +92,12 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
 
         return try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async { [self] in
-                let settings = AVCapturePhotoSettings()
+                // Make capture format explicit. Some devices otherwise return HEIC
+                // bytes from `fileDataRepresentation()`, which cannot truthfully be
+                // sent as the relay's JPEG multipart field.
+                let settings = AVCapturePhotoSettings(
+                    format: [AVVideoCodecKey: AVVideoCodecType.jpeg]
+                )
                 settings.photoQualityPrioritization = .quality
                 let flashMode = resolvedFlashMode()
                 if photoOutput.supportedFlashModes.contains(flashMode) {

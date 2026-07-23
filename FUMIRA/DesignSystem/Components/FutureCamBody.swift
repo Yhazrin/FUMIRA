@@ -18,7 +18,7 @@ struct FutureCamBody: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .stroke(PosterPalette.moss, lineWidth: 3)
+                                    .stroke(PosterPalette.leafGreen, lineWidth: 3)
                                     .frame(width: 52, height: 52)
                             }
                     }
@@ -28,7 +28,7 @@ struct FutureCamBody: View {
                         .fill(PosterPalette.pine)
                         .frame(width: 28, height: 8)
                     Circle()
-                        .fill(PosterPalette.moss)
+                        .fill(PosterPalette.leafGreen)
                         .frame(width: 20, height: 20)
                 }
             }
@@ -51,7 +51,7 @@ struct ShutterButton: View {
                     .frame(width: 62, height: 62)
                 // Moss as ≤5% accent ring — never a fluorescent / yellow full fill.
                 Circle()
-                    .stroke(PosterPalette.moss.opacity(0.75), lineWidth: 2)
+                    .stroke(PosterPalette.leafGreen.opacity(0.75), lineWidth: 2)
                     .frame(width: 54, height: 54)
             }
             .frame(width: 88, height: 88)

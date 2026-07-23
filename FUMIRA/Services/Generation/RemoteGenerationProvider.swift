@@ -8,6 +8,8 @@ actor RemoteGenerationProvider: GenerationProvider {
     private let session: URLSession
     private let pollIntervalNanoseconds: UInt64
     private let maxPollAttempts: Int
+    /// In-flight createGeneration requestIds — drop duplicate concurrent submits.
+    private var inFlightRequestIDs: Set<String> = []
 
     init(
         baseURL: URL,
@@ -27,21 +29,40 @@ actor RemoteGenerationProvider: GenerationProvider {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    continuation.yield(.progress(0.05))
+                    continuation.yield(.progress(
+                        label: "收集此刻的种子",
+                        value: 0.05,
+                        stage: .preparing
+                    ))
                     let assetId = try await upload(photo: request.photo)
-                    continuation.yield(.progress(0.2))
+                    try Task.checkCancellation()
+                    continuation.yield(.progress(
+                        label: "把时间埋进画面",
+                        value: 0.2,
+                        stage: .uploading
+                    ))
 
                     let generationId = try await createGeneration(
                         assetId: assetId,
                         request: request
                     )
-                    continuation.yield(.progress(0.35))
+                    try Task.checkCancellation()
+                    continuation.yield(.progress(
+                        label: "时间正在排队生长",
+                        value: 0.35,
+                        stage: .queued
+                    ))
 
-                    let resultURL = try await poll(generationId: generationId) { progress in
-                        continuation.yield(.progress(progress))
+                    let resultURL = try await poll(generationId: generationId) { label, progress, stage in
+                        continuation.yield(.progress(label: label, value: progress, stage: stage))
                     }
 
-                    continuation.yield(.progress(0.92))
+                    try Task.checkCancellation()
+                    continuation.yield(.progress(
+                        label: "收成这一帧",
+                        value: 0.92,
+                        stage: .finishing
+                    ))
                     let imageData = try await download(resultURL: resultURL)
 
                     let prompt = request.story.generationPrompt(
@@ -59,8 +80,14 @@ actor RemoteGenerationProvider: GenerationProvider {
                     continuation.finish()
                 } catch is CancellationError {
                     continuation.finish()
+                } catch let error as URLError where error.code == .cancelled {
+                    continuation.finish()
                 } catch {
-                    continuation.finish(throwing: Self.mapError(error))
+                    if Task.isCancelled {
+                        continuation.finish()
+                    } else {
+                        continuation.finish(throwing: Self.mapError(error))
+                    }
                 }
             }
             continuation.onTermination = { _ in task.cancel() }
@@ -68,12 +95,20 @@ actor RemoteGenerationProvider: GenerationProvider {
     }
 
     private func upload(photo: CapturedPhoto) async throws -> String {
+        try Task.checkCancellation()
+        let jpegData: Data
+        do {
+            jpegData = try UploadImageEncoder.jpegData(from: photo.data)
+        } catch {
+            throw GenerationError.uploadFailure
+        }
+
         let boundary = "fumira-\(UUID().uuidString)"
         var body = Data()
         body.append("--\(boundary)\r\n")
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"capture.jpg\"\r\n")
         body.append("Content-Type: image/jpeg\r\n\r\n")
-        body.append(photo.data)
+        body.append(jpegData)
         body.append("\r\n--\(boundary)--\r\n")
 
         var request = URLRequest(url: baseURL.appending(path: "v1/uploads"))
@@ -89,8 +124,12 @@ actor RemoteGenerationProvider: GenerationProvider {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            try Task.checkCancellation()
+            if Self.isCancellation(error) { throw CancellationError() }
             throw GenerationError.uploadFailure
         }
+
+        try Task.checkCancellation()
 
         guard let http = response as? HTTPURLResponse else {
             throw GenerationError.uploadFailure
@@ -111,6 +150,14 @@ actor RemoteGenerationProvider: GenerationProvider {
         assetId: String,
         request: ImageGenerationRequest
     ) async throws -> String {
+        try Task.checkCancellation()
+        let requestId = request.sessionID.uuidString
+        guard !inFlightRequestIDs.contains(requestId) else {
+            throw GenerationError.generationFailed(message: "同一请求仍在进行中，请稍候。")
+        }
+        inFlightRequestIDs.insert(requestId)
+        defer { inFlightRequestIDs.remove(requestId) }
+
         let storyText = request.story.generationPrompt(
             for: request.time,
             understanding: request.understanding
@@ -120,7 +167,7 @@ actor RemoteGenerationProvider: GenerationProvider {
             timePosition: TimePositionDTO(time: request.time),
             story: storyText,
             aspectRatio: Self.aspectRatio(for: request.photo),
-            requestId: request.sessionID.uuidString
+            requestId: requestId
         )
 
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/generations"))
@@ -133,8 +180,12 @@ actor RemoteGenerationProvider: GenerationProvider {
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
+            try Task.checkCancellation()
+            if Self.isCancellation(error) { throw CancellationError() }
             throw GenerationError.networkFailure
         }
+
+        try Task.checkCancellation()
 
         guard let http = response as? HTTPURLResponse else {
             throw GenerationError.networkFailure
@@ -153,18 +204,24 @@ actor RemoteGenerationProvider: GenerationProvider {
 
     private func poll(
         generationId: String,
-        onProgress: (Double) -> Void
+        onProgress: (String, Double, GenerationProgressStage) -> Void
     ) async throws -> URL {
         for attempt in 0..<maxPollAttempts {
             try Task.checkCancellation()
             let status = try await fetchStatus(generationId: generationId)
-            let fraction = min(0.9, 0.35 + Double(attempt) * 0.01)
-            onProgress(fraction)
+            try Task.checkCancellation()
 
             switch status.status {
-            case "queued", "processing":
+            case "queued":
+                let fraction = min(0.5, 0.35 + Double(attempt) * 0.008)
+                onProgress("时间正在排队生长", fraction, .queued)
+                try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+            case "processing":
+                let fraction = min(0.9, 0.5 + Double(attempt) * 0.01)
+                onProgress("时间正在生长", fraction, .processing)
                 try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
             case "succeeded":
+                onProgress("这一帧已经长成", 0.9, .finishing)
                 guard
                     let raw = status.resultUrl,
                     let url = URL(string: raw)
@@ -179,6 +236,8 @@ actor RemoteGenerationProvider: GenerationProvider {
                     retryable: status.retryable
                 )
             default:
+                let fraction = min(0.9, 0.35 + Double(attempt) * 0.01)
+                onProgress("时间正在生长", fraction, .processing)
                 try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
             }
         }
@@ -196,8 +255,12 @@ actor RemoteGenerationProvider: GenerationProvider {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            try Task.checkCancellation()
+            if Self.isCancellation(error) { throw CancellationError() }
             throw GenerationError.networkFailure
         }
+
+        try Task.checkCancellation()
 
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw GenerationError.networkFailure
@@ -206,17 +269,29 @@ actor RemoteGenerationProvider: GenerationProvider {
     }
 
     private func download(resultURL: URL) async throws -> Data {
+        try Task.checkCancellation()
         do {
             let (data, response) = try await session.data(from: resultURL)
+            try Task.checkCancellation()
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw GenerationError.generationFailed(message: "无法下载生成结果。")
             }
             return data
         } catch let error as GenerationError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            if Self.isCancellation(error) { throw CancellationError() }
+            try Task.checkCancellation()
             throw GenerationError.networkFailure
         }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+        return Task.isCancelled
     }
 
     private static func aspectRatio(for photo: CapturedPhoto) -> String {
@@ -241,6 +316,9 @@ actor RemoteGenerationProvider: GenerationProvider {
         }
         if error is DecodingError {
             return GenerationError.generationFailed(message: "服务返回格式异常。")
+        }
+        if isCancellation(error) {
+            return CancellationError()
         }
         return GenerationError.networkFailure
     }

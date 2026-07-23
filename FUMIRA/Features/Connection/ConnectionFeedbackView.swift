@@ -8,13 +8,13 @@ struct ConnectionFeedbackView: View {
 
     var body: some View {
         ZStack {
-            PosterPalette.paper.ignoresSafeArea()
+            PosterPalette.canvas.ignoresSafeArea()
 
             LinearGradient(
                 colors: [
-                    PosterPalette.sky.opacity(0.55),
-                    PosterPalette.paper,
-                    PosterPalette.grassLight.opacity(0.4)
+                    PosterPalette.sky.opacity(0.42),
+                    PosterPalette.canvas,
+                    PosterPalette.grassLight.opacity(0.28)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

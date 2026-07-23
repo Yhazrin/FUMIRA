@@ -71,6 +71,8 @@ a session ID so stale results cannot overwrite a newer scrub position.
 - `AIModelCatalogProvider`: backend-controlled route catalog.
 - `AIModelConfigurationStore`: selected route IDs only; never vendor credentials.
 - `PosterStorage`: rendering persistence boundary.
+  - `MockPosterStorage` (tests / preview)
+  - `PhotoLibraryPosterStorage` (runtime: temp PNG + Photos add-only)
 - `HapticsClient`: feedback boundary with accessibility-aware implementation.
 
 Every boundary has a deterministic mock. The camera boundary additionally has a

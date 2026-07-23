@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
 import { getMiniMaxAdapter } from "../queue.js";
+import { getMiniMaxIntelligenceAdapter } from "../intelligence.js";
 import { getSettings } from "../storage.js";
 
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
@@ -20,6 +21,10 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
           : config.minimaxMock
             ? "mock"
             : "live",
+      },
+      intelligence: {
+        ready: getMiniMaxIntelligenceAdapter() !== null,
+        provider: getMiniMaxIntelligenceAdapter() !== null ? "minimax" : "unavailable",
       },
       timestamp: new Date().toISOString(),
     };

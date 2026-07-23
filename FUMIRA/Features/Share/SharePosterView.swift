@@ -1,16 +1,23 @@
 import SwiftUI
+import UIKit
 
 struct SharePosterView: View {
     let model: AppModel
 
     private var yearLabel: String {
-        let years = model.selectedTime.offsetYears
-        if abs(years) < 0.5 { return "NOW" }
-        return String(format: "%+.0f 年", years)
+        PosterComposer.yearLabel(for: model.selectedTime)
+    }
+
+    private var posterTitle: String {
+        model.temporalStory?.title ?? model.currentStoryBeat?.title ?? "这一刻的时间故事"
+    }
+
+    private var sceneImage: UIImage? {
+        model.generatedFrame?.imageData.flatMap(UIImage.init(data:))
     }
 
     var body: some View {
-        PosterScreenContainer {
+        PosterScreenContainer(background: PosterPalette.canvas) {
             VStack(spacing: PosterSpacing.lg) {
                 PosterTitleView(
                     segments: ["带走", "这段", "时间"],
@@ -18,41 +25,31 @@ struct SharePosterView: View {
                     fontSize: 36
                 )
 
-                VStack(spacing: 0) {
-                    TemporalParkScene(time: model.selectedTime)
-                        .frame(height: 280)
-
-                    VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                        Text(yearLabel)
-                            .font(PosterTypography.display(32))
-                            .foregroundStyle(PosterPalette.sky)
-                        Text(model.temporalStory?.title ?? "这一刻的时间故事")
-                            .font(.headline)
-                            .foregroundStyle(PosterPalette.ink)
-                        Text(model.currentNarrative)
-                            .font(.footnote)
-                            .foregroundStyle(PosterPalette.mutedInk)
-                            .lineLimit(5)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(PosterSpacing.lg)
-                    .background(PosterPalette.paperWhite)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous))
+                PosterExportCard(
+                    time: model.selectedTime,
+                    yearLabel: yearLabel,
+                    title: posterTitle,
+                    narrative: model.currentNarrative,
+                    sceneImage: sceneImage
+                )
                 .shadow(color: PosterEffects.floating, radius: 16, y: 8)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("时间海报")
-                .accessibilityValue("\(model.selectedTime.compactLabel)，\(model.currentNarrative)")
+                .flatDecorationRotation(model.motionField)
 
-                Spacer()
+                feedbackRow
+
+                Spacer(minLength: PosterSpacing.sm)
 
                 VStack(spacing: PosterSpacing.md) {
                     PosterCapsuleButton(
-                        title: "分享海报",
-                        accessibilityHint: "Mock 模式下仅展示分享按钮样式"
+                        title: model.isSavingPoster ? "正在保存…" : "保存到相册",
+                        accessibilityHint: "将合成海报写入系统相册"
                     ) {
-                        // Mock share — no system sheet in MVP scope
+                        Task { await model.savePosterToLibrary() }
                     }
+                    .disabled(model.isSavingPoster || model.isPreparingPoster)
+                    .opacity(model.isSavingPoster ? 0.72 : 1)
+
+                    shareButton
 
                     PosterCapsuleButton(
                         title: "返回浏览",
@@ -64,9 +61,81 @@ struct SharePosterView: View {
                 }
             }
         }
+        .task(id: shareTaskID) {
+            if model.shareImageData == nil {
+                await model.prepareSharePoster()
+            }
+        }
+    }
+
+    private var shareTaskID: String {
+        "\(model.selectedTime.normalized)-\(model.generatedFrame?.id.uuidString ?? "none")"
+    }
+
+    @ViewBuilder
+    private var feedbackRow: some View {
+        if let message = model.shareFeedbackMessage {
+            StatusPill(icon: "checkmark.circle.fill", label: message, isActive: true)
+                .accessibilityLabel(message)
+        } else if let error = model.lastErrorMessage {
+            StatusPill(icon: "exclamationmark.triangle.fill", label: error)
+                .accessibilityLabel(error)
+        } else if model.isPreparingPoster {
+            StatusPill(icon: "hourglass", label: "正在合成海报…")
+        }
+    }
+
+    @ViewBuilder
+    private var shareButton: some View {
+        if let poster = model.shareablePoster {
+            ShareLink(
+                item: poster,
+                preview: SharePreview(
+                    "FUMIRA 时间海报",
+                    image: previewImage(for: poster.data)
+                )
+            ) {
+                Text("分享海报")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(PosterPalette.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 56)
+                    .background(PosterPalette.canvas)
+                    .clipShape(Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(PosterPalette.ink, lineWidth: 2)
+                    }
+            }
+            .simultaneousGesture(TapGesture().onEnded {
+                model.playShareHaptic()
+            })
+            .accessibilityLabel("分享海报")
+            .accessibilityHint("打开系统分享菜单")
+        } else {
+            PosterCapsuleButton(
+                title: model.isPreparingPoster ? "正在合成…" : "分享海报",
+                style: .secondary,
+                accessibilityHint: "海报准备好后可打开系统分享"
+            ) {
+                Task { await model.prepareSharePoster() }
+            }
+            .disabled(model.isPreparingPoster)
+        }
+    }
+
+    private func previewImage(for data: Data) -> Image {
+        if let uiImage = UIImage(data: data) {
+            return Image(uiImage: uiImage)
+        }
+        return Image(systemName: "photo")
     }
 }
 
-#Preview {
+#Preview("Share poster") {
     SharePosterView(model: PreviewFixtures.model(phase: .share, time: 0.35))
+}
+
+#Preview("Share poster · NOW") {
+    SharePosterView(model: PreviewFixtures.model(phase: .share, time: 0))
 }

@@ -20,6 +20,9 @@ export const config = {
     ""
   ),
   minimaxApiKey: process.env.MINIMAX_API_KEY?.trim() ?? "",
+  // Image understanding is a Token Plan MCP capability. Keep its credential
+  // independent from the pay-as-you-go key used for image generation and M2.7.
+  minimaxVlmApiKey: process.env.MINIMAX_VLM_API_KEY?.trim() ?? "",
   adminToken: process.env.ADMIN_TOKEN?.trim() ?? "",
   minimaxMock: boolEnv("MINIMAX_MOCK", false),
   remoteGenerationEnabled: boolEnv("REMOTE_GENERATION_ENABLED", true),
@@ -43,6 +46,9 @@ export const config = {
     "21:9",
   ] as const,
   modelName: "image-01",
+  minimaxApiBaseUrl: (process.env.MINIMAX_API_BASE_URL?.trim() || "https://api.minimaxi.com").replace(/\/$/, ""),
+  minimaxTextModel: process.env.MINIMAX_TEXT_MODEL?.trim() || "MiniMax-M2.7-highspeed",
+  minimaxStoryModel: process.env.MINIMAX_STORY_MODEL?.trim() || "MiniMax-M3",
   /**
    * Optional explicit HTTPS proxy for MiniMax outbound calls.
    * Prefer env HTTPS_PROXY / HTTP_PROXY / MINIMAX_HTTPS_PROXY.

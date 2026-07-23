@@ -4,6 +4,12 @@
 
 - Launch → phone-only → camera → capture → understanding → story → approval →
   generation → result.
+- Viewfinder album import (PhotosPicker) enters the same understanding → story →
+  generation pipeline as shutter capture; simulator-safe; silent center-crop to 3:4
+  JPEG with no crop editor.
+- Result「重新生成」re-runs image generation with the same source photo and current
+  time position, replacing the current frame; optional one-level in-memory「撤销」
+  restores the previous frame (not a history library).
 - Physical iPhone requests real camera permission and shows the rear-camera preview.
 - Denial returns readable recovery copy instead of opening a blank viewfinder.
 - The camera session stops after capture and resumes on retake.
@@ -27,13 +33,21 @@
 - Dragging reaches exactly -100 and +100 years; release may snap to date
   granularity (day/week/month/year) but never to landmark anchors.
 - Equal rail movement changes less time near NOW than near either endpoint.
-- WaveTimeRail shows a moss-selected bar/cursor with year above; idle bars stay
-  low-contrast and float without a white card.
+- WaveTimeRail shows a leafGreen active capsule/cursor with year above; ordinary
+  bars stay low-contrast, symmetric around the midline, and float without a white card.
 - Rapid direction changes never show a stale selected date.
 - Save opens the poster/share preview; return preserves the selected time.
+- Share screen composites a flat poster PNG (result JPEG when present, else park
+  scene + story copy) via `PosterComposer` / DesignSystem tokens — no AI gradients.
+- **保存到相册** writes through `PosterStorage` (`PhotoLibraryPosterStorage` at
+  runtime, `MockPosterStorage` in tests) and shows success / permission failure copy.
+- **分享海报** presents the system share sheet (`ShareLink` + PNG `Transferable`).
+- Minimal deep link: `fumira://share` / `fumira://result` when story/result exists.
+  Richer share URLs remain a product TODO (no invented backend).
 - Each pipeline failure exposes stage-specific recovery and preserves prior output.
-- Without `FUMIRA_API_BASE_URL`, generation stays on `MockGenerationProvider`.
-- With `FUMIRA_API_BASE_URL`, generation uploads → polls → shows remote JPEG bytes.
+- Without `FUMIRA_API_BASE_URL` (typical Release / Archive), generation stays on `MockGenerationProvider`.
+- Debug builds default to `http://127.0.0.1:8787` → `RemoteGenerationProvider` when the local server is up.
+- With `FUMIRA_API_BASE_URL` set (Info.plist / scheme env), generation uploads → polls → shows remote JPEG bytes.
 - Remote failures map to distinct copy: network / upload / invalid params / rate limit /
   generation failure / server unavailable.
 
@@ -50,21 +64,23 @@
 
 - Compare key screens against Figma nodes 116:8, 116:145, 116:237, 116:328, 116:631, 116:669.
 - Preserve flat large color blocks, handmade typography, illustrated park, pine
-  capsules, and moss accent marks (≤5% — never fluorescent full-bleed fills).
+  capsules, and leafGreen accent marks (≤5% — never fluorescent full-bleed fills).
 - Check compact and large iPhone simulators; no clipped controls or status-bar collisions.
 - When `GeneratedFrame.imageData` is present, the result screen shows that image
   instead of the local park mock.
 
 ### 首屏 / 相机视觉
 
-- Connection reads as a paper poster: centered keyword hero (ink/pine/moss +
-  hand underline), park vignette, no settings gear /「模型后台」.
-- Copy invites with「给时间，一张照片」or「把此刻，留给未来」; generation uses
+- Connection reads as a full-screen flat poster: centered keyword hero
+  (ink/pine/leafGreen + hand underline), `ParkPosterBackdrop`, no settings gear /
+  「模型后台」. Supporting copy does not repeat the hero headline.
+- Copy invites with「给时间，一张照片」; generation uses
   「时间正在生长」; result uses「未来的回信」.
 - Viewfinder has no bottom white control card; preview is full-bleed with
   top/bottom scrims only.
 - Viewfinder shows `WaveTimeRail` on the bottom scrim, centered shutter, circular
-  flip/grid chrome; time chip is minimal (`NOW · year`), not a slogan block.
+  album import / grid chrome (flip moves to top with flash when live-capable);
+  time chip is minimal (`NOW · year`), not a slogan block.
 - Feature code has no raw `Color(red:)` product tokens.
 
 ## Accessibility

@@ -15,11 +15,11 @@ struct StatusPill: View {
         .foregroundStyle(PosterPalette.ink)
         .padding(.horizontal, PosterSpacing.md)
         .padding(.vertical, PosterSpacing.sm)
-        .background(isActive ? PosterPalette.moss : PosterPalette.paperWhite)
+        .background(isActive ? PosterPalette.leafGreen : PosterPalette.canvas)
         .clipShape(Capsule())
         .overlay {
             Capsule()
-                .stroke(PosterPalette.ink.opacity(0.12), lineWidth: 1)
+                .stroke(isActive ? PosterPalette.leafGreen.opacity(0.35) : PosterPalette.line, lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(label)

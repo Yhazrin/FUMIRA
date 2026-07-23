@@ -20,7 +20,7 @@ struct StoryReadyView: View {
                             .foregroundStyle(PosterPalette.ink)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(PosterPalette.moss)
+                            .background(PosterPalette.leafGreen)
                             .clipShape(Capsule())
                             .padding(PosterSpacing.md)
                     }
@@ -35,7 +35,10 @@ struct StoryReadyView: View {
                             .foregroundStyle(PosterPalette.ink)
                     }
 
-                    TimeRail(value: model.selectedTime.normalized) { value in
+                    TimeRail(
+                        value: model.selectedTime.normalized,
+                        onDetent: model.playTimeDetent
+                    ) { value in
                         model.updateTime(normalized: value)
                     }
 
@@ -53,8 +56,12 @@ struct StoryReadyView: View {
                             .foregroundStyle(PosterPalette.ink)
                     }
                     .padding(PosterSpacing.lg)
-                    .background(PosterPalette.paperWhite)
+                    .background(PosterPalette.canvas)
                     .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: PosterRadius.card)
+                            .stroke(PosterPalette.line, lineWidth: 1)
+                    }
                 }
 
                 VStack(spacing: PosterSpacing.md) {

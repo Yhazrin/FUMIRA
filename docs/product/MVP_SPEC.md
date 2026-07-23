@@ -26,10 +26,11 @@ time, generate a story-aware transformation, and open a poster-ready share scree
 
 ## Not in scope
 
-- Production BLE, hosted AI backend, PhotoKit write, accounts,
+- Production BLE, hosted AI backend, accounts,
   history, video, AR, social graph, or editing tools. Those production integrations
   have executable protocol/API contracts but no credentials or server deployment
-  are bundled in the app.
+  are bundled in the app. Poster save/share is in-scope as pure software
+  (PhotoKit add-only + system share sheet).
 
 ## Product rule for time
 

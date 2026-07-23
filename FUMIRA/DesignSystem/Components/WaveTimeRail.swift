@@ -13,17 +13,23 @@ enum WaveTimeRailChrome {
 struct WaveTimeRail: View {
     let value: Double
     var chrome: WaveTimeRailChrome = .paper
+    var onDetent: (WaveTimeDetent) -> Void = { _ in }
     let onChange: (Double) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragValue: Double?
+    @State private var releaseValue: Double?
+    @State private var releaseImpact = 0.0
+    @State private var releaseTask: Task<Void, Never>?
+    @State private var dragStartValue: Double?
     @State private var isDragging = false
-    @State private var hapticBucket = 0
+    @State private var lastHapticYears: Double?
 
     private let horizontalInset: CGFloat = 16
     private let barMaxHeight: CGFloat = 40
     private let barMinHeight: CGFloat = 8
     private let railHeight: CGFloat = 88
+    private let barCount = WaveformGeometry.defaultBarCount
 
     private var idleBarColor: Color {
         switch chrome {
@@ -60,25 +66,8 @@ struct WaveTimeRail: View {
         }
     }
 
-    /// Deterministic waveform: densest / most distinctive rhythm near NOW (center).
-    private static let barHeights: [CGFloat] = {
-        let count = 33
-        return (0..<count).map { index in
-            let t = Double(index) / Double(count - 1)
-            let centered = (t - 0.5) * 2
-            let envelope = 0.42 + 0.58 * exp(-pow(centered * 1.65, 2))
-            let frequency = 2.4 + 9.0 * (1 - abs(centered))
-            let phase = Double(index) * 0.55 + centered * .pi
-            let wave = 0.28 + 0.72 * abs(sin(centered * .pi * frequency + phase))
-            let accent = abs(centered) < 0.1 ? 0.12 : 0
-            return CGFloat(min(1, envelope * wave + accent))
-        }
-    }()
-
-    private var barCount: Int { Self.barHeights.count }
-
     private var displayValue: Double {
-        dragValue ?? value
+        dragValue ?? releaseValue ?? value
     }
 
     private var timePosition: TimePosition {
@@ -90,9 +79,8 @@ struct WaveTimeRail: View {
         return "\(year)"
     }
 
-    private var selectedBarIndex: Int {
-        let t = (min(max(displayValue, -1), 1) + 1) / 2
-        return Int((t * Double(barCount - 1)).rounded())
+    private var continuousIndex: Double {
+        WaveformGeometry.continuousIndex(normalized: displayValue, barCount: barCount)
     }
 
     var body: some View {
@@ -101,11 +89,11 @@ struct WaveTimeRail: View {
                 let width = proxy.size.width
                 let thumbX = normalizedToX(displayValue, width: width)
 
-                ZStack(alignment: .bottom) {
-                    waveBars(width: width)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                ZStack {
+                    waveCanvas(width: width, height: proxy.size.height, thumbX: thumbX)
+                        .allowsHitTesting(false)
 
-                    cursor(at: thumbX, height: proxy.size.height)
+                    yearBadge(at: thumbX, height: proxy.size.height)
                         .allowsHitTesting(false)
 
                     sparseScale(width: width, height: proxy.size.height)
@@ -122,14 +110,16 @@ struct WaveTimeRail: View {
         .accessibilityValue(accessibilityValueText)
         .accessibilityHint("左右拖动浏览过去与未来，或使用调高减低手势微调")
         .accessibilityAdjustableAction { direction in
-            let step = accessibilityStep(for: value)
-            let delta = direction == .increment ? step : -step
-            let next = WaveTimeBrowseSnap.snap(
-                TimePosition(normalized: min(max(value + delta, -1), 1))
+            let adjusted = WaveTimeAccessibilityAdjustment.adjustedNormalized(
+                from: value,
+                direction: direction == .increment ? .increment : .decrement
             )
-            onChange(next.normalized)
+            onChange(adjusted)
+            emitAccessibilityDetent(from: value, to: adjusted)
         }
-        .sensoryFeedback(.selection, trigger: hapticBucket)
+        .onDisappear {
+            releaseTask?.cancel()
+        }
     }
 
     private var accessibilityValueText: String {
@@ -140,57 +130,80 @@ struct WaveTimeRail: View {
         return "\(timePosition.compactLabel)，目标 \(yearLabel) 年，\(direction)"
     }
 
-    private func waveBars(width: CGFloat) -> some View {
+    private func waveCanvas(width: CGFloat, height: CGFloat, thumbX: CGFloat) -> some View {
         let usable = max(1, width - horizontalInset * 2)
-        let spacing = usable / CGFloat(barCount)
+        let spacing = usable / CGFloat(max(1, barCount - 1))
         let barWidth = max(2.5, spacing * 0.42)
+        let centerY = height - 22 - barMaxHeight / 2
+        let u = continuousIndex
+        let impact = releaseImpact
 
-        return HStack(alignment: .bottom, spacing: 0) {
-            ForEach(0..<barCount, id: \.self) { index in
-                let relative = Self.barHeights[index]
-                let height = barMinHeight + (barMaxHeight - barMinHeight) * relative
-                let isSelected = index == selectedBarIndex
+        return Canvas { context, size in
+            var axle = Path()
+            axle.move(to: CGPoint(x: horizontalInset, y: centerY))
+            axle.addLine(to: CGPoint(x: width - horizontalInset, y: centerY))
+            context.stroke(
+                axle,
+                with: .color(idleBarColor.opacity(0.24)),
+                lineWidth: 1
+            )
 
-                RoundedRectangle(cornerRadius: PosterRadius.waveBar, style: .continuous)
-                    .fill(isSelected ? PosterPalette.moss : idleBarColor)
-                    .frame(width: barWidth, height: height)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .animation(
-                        isDragging || reduceMotion ? nil : PosterMotion.flow,
-                        value: selectedBarIndex
-                    )
+            for index in 0..<barCount {
+                let distance = abs(Double(index) - u)
+                let resonance = exp(-0.5 * pow(distance / 2.1, 2)) * impact * 0.14
+                let relative = min(
+                    WaveformGeometry.ordinaryCapRatio,
+                    WaveformGeometry.ordinaryRelativeHeight(at: index, selectedIndex: u) + resonance
+                )
+                let barHeight = barMinHeight + (barMaxHeight - barMinHeight) * relative
+                let x = horizontalInset + CGFloat(index) * spacing
+                let rect = CGRect(
+                    x: x - barWidth / 2,
+                    y: centerY - barHeight / 2,
+                    width: barWidth,
+                    height: barHeight
+                )
+                let path = RoundedRectangle(cornerRadius: PosterRadius.waveBar, style: .continuous)
+                    .path(in: rect)
+                context.fill(path, with: .color(idleBarColor))
             }
+
+            let activeHeight = barMaxHeight * (1 + impact * 0.14)
+            let activeRect = CGRect(
+                x: thumbX - barWidth / 2,
+                y: centerY - activeHeight / 2,
+                width: barWidth,
+                height: activeHeight
+            )
+            let activePath = Capsule(style: .continuous).path(in: activeRect)
+            context.fill(activePath, with: .color(PosterPalette.leafGreen))
         }
-        .padding(.horizontal, horizontalInset)
-        .padding(.bottom, 22)
+        .frame(width: width, height: height)
+        .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: displayValue)
+        .animation(reduceMotion ? nil : PosterMotion.timeRailKick, value: releaseImpact)
     }
 
-    private func cursor(at x: CGFloat, height: CGFloat) -> some View {
-        let cursorHeight = barMaxHeight + 10
+    private func yearBadge(at x: CGFloat, height: CGFloat) -> some View {
+        let centerY = height - 22 - barMaxHeight / 2
 
-        return ZStack {
-            Capsule()
-                .fill(PosterPalette.moss)
-                .frame(width: 3, height: cursorHeight)
-                .position(x: x, y: height - 22 - cursorHeight / 2)
-
-            Text(yearLabel)
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(yearLabelForeground)
-                .padding(.horizontal, PosterSpacing.sm)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(yearLabelFill)
-                )
-                .overlay {
-                    Capsule(style: .continuous)
-                        .stroke(PosterPalette.moss.opacity(0.55), lineWidth: 1)
-                }
-                .position(x: x, y: max(14, height - 22 - cursorHeight - 12))
-                .contentTransition(reduceMotion ? .identity : .numericText())
-                .animation(isDragging || reduceMotion ? nil : PosterMotion.flow, value: yearLabel)
-        }
+        return Text(yearLabel)
+            .font(.caption.weight(.semibold).monospacedDigit())
+            .foregroundStyle(yearLabelForeground)
+            .padding(.horizontal, PosterSpacing.sm)
+            .padding(.vertical, 2)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(yearLabelFill)
+            )
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(PosterPalette.leafGreen.opacity(0.55), lineWidth: 1)
+            }
+            .position(x: x, y: max(14, centerY - barMaxHeight / 2 - 12))
+            .offset(y: -3 * releaseImpact)
+            .contentTransition(reduceMotion ? .identity : .numericText())
+            .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: yearLabel)
+            .animation(reduceMotion ? nil : PosterMotion.timeRailKick, value: releaseImpact)
     }
 
     private func sparseScale(width: CGFloat, height: CGFloat) -> some View {
@@ -219,36 +232,108 @@ struct WaveTimeRail: View {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
                 if !isDragging {
+                    releaseTask?.cancel()
+                    releaseTask = nil
+                    releaseValue = nil
+                    releaseImpact = 0
                     isDragging = true
+                    lastHapticYears = nil
                 }
                 let normalized = xToNormalized(gesture.location.x, width: width)
+                if dragStartValue == nil {
+                    dragStartValue = normalized
+                }
                 dragValue = normalized
                 onChange(normalized)
-                updateHapticBucket(for: normalized)
+                updateHaptics(for: normalized)
             }
             .onEnded { gesture in
                 let normalized = xToNormalized(gesture.location.x, width: width)
+                let predicted = xToNormalized(gesture.predictedEndLocation.x, width: width)
                 let snapped = WaveTimeBrowseSnap.snap(TimePosition(normalized: normalized))
+                let didMove = abs(normalized - (dragStartValue ?? normalized)) > 0.001
+                let direction = WaveTimeRollPhysics.releaseDirection(
+                    current: normalized,
+                    predicted: predicted
+                )
+                let kick = WaveTimeRollPhysics.releaseKick(current: normalized, predicted: predicted)
+
+                releaseTask?.cancel()
                 dragValue = nil
                 isDragging = false
+                lastHapticYears = nil
+                dragStartValue = nil
+
+                guard didMove, !reduceMotion, direction != 0, kick > 0 else {
+                    releaseValue = nil
+                    releaseImpact = 0
+                    onChange(snapped.normalized)
+                    if didMove {
+                        emitReleaseDetent(for: snapped)
+                    }
+                    return
+                }
+
+                // The model snaps immediately; only the presentation layer gets
+                // a brief directional stroke before it locks back into position.
+                releaseValue = normalized
+                withAnimation(PosterMotion.timeRailKick) {
+                    releaseValue = WaveTimeRollPhysics.overshoot(
+                        target: snapped.normalized,
+                        direction: direction,
+                        kick: kick
+                    )
+                    releaseImpact = WaveTimeRollPhysics.impact(for: kick)
+                }
                 onChange(snapped.normalized)
-                updateHapticBucket(for: snapped.normalized)
+                emitReleaseDetent(for: snapped)
+
+                releaseTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(70))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(PosterMotion.timeRailSettle) {
+                        releaseValue = snapped.normalized
+                        releaseImpact = 0
+                    }
+
+                    try? await Task.sleep(for: .milliseconds(220))
+                    guard !Task.isCancelled else { return }
+                    releaseValue = nil
+                    releaseTask = nil
+                }
             }
     }
 
-    private func updateHapticBucket(for normalized: Double) {
-        // Sparse ticks: NOW band + decade crossings (MOTION_SPEC).
-        let years = TimePosition(normalized: normalized).offsetYears
-        let bucket: Int
-        if abs(years) < 0.5 {
-            bucket = 0
-        } else {
-            let decade = Int((years / 10).rounded()) * 10
-            bucket = decade == 0 ? (years < 0 ? -10 : 10) : decade
+    private func emitReleaseDetent(for snapped: TimePosition) {
+        onDetent(abs(snapped.offsetDays) < 0.5 ? .now : .decade)
+    }
+
+    private func updateHaptics(for normalized: Double) {
+        let currentYears = TimePosition(normalized: normalized).offsetYears
+        guard let previous = lastHapticYears else {
+            lastHapticYears = currentYears
+            return
         }
-        if hapticBucket != bucket {
-            hapticBucket = bucket
+        guard WaveTimeHapticCrossing.shouldTick(previousYears: previous, currentYears: currentYears) else {
+            lastHapticYears = currentYears
+            return
         }
+        let detent: WaveTimeDetent = WaveTimeHapticCrossing.crossedNow(
+            previousYears: previous,
+            currentYears: currentYears
+        ) ? .now : .decade
+        onDetent(detent)
+        lastHapticYears = currentYears
+    }
+
+    private func emitAccessibilityDetent(from oldValue: Double, to newValue: Double) {
+        let previous = TimePosition(normalized: oldValue).offsetYears
+        let current = TimePosition(normalized: newValue).offsetYears
+        let detent: WaveTimeDetent = WaveTimeHapticCrossing.crossedNow(
+            previousYears: previous,
+            currentYears: current
+        ) ? .now : .decade
+        onDetent(detent)
     }
 
     private func normalizedToX(_ normalized: Double, width: CGFloat) -> CGFloat {
@@ -261,13 +346,6 @@ struct WaveTimeRail: View {
         let usableWidth = max(1, width - horizontalInset * 2)
         let clamped = min(max((x - horizontalInset) / usableWidth, 0), 1)
         return Double(clamped * 2 - 1)
-    }
-
-    private func accessibilityStep(for normalized: Double) -> Double {
-        let magnitude = abs(normalized)
-        if magnitude < 0.15 { return 0.008 }
-        if magnitude < 0.5 { return 0.03 }
-        return 0.08
     }
 }
 
@@ -308,28 +386,7 @@ enum WaveTimeBrowseSnap {
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(PosterPalette.paper)
-        }
-    }
-    return PreviewWrapper()
-}
-
-#Preview("Wave on sky wash") {
-    struct PreviewWrapper: View {
-        @State private var value = 0.35
-
-        var body: some View {
-            ZStack {
-                LinearGradient(
-                    colors: [PosterPalette.sky.opacity(0.35), PosterPalette.paper],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                WaveTimeRail(value: value) { value = $0 }
-                    .padding(.horizontal, PosterSpacing.lg)
-            }
+            .background(PosterPalette.canvas)
         }
     }
     return PreviewWrapper()

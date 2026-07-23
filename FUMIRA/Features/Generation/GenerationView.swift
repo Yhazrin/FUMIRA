@@ -21,7 +21,7 @@ struct GenerationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Rectangle()
-                    .fill(PosterPalette.moss)
+                    .fill(PosterPalette.leafGreen)
                     .frame(height: 4)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(width: 120)
@@ -41,9 +41,14 @@ struct GenerationView: View {
                 .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.currentStoryBeat?.title ?? "时间正在改写画面")
+                    Text(model.pipelineStatusText.isEmpty
+                         ? (model.currentStoryBeat?.title ?? "时间正在生长")
+                         : model.pipelineStatusText)
                         .font(.headline)
                         .foregroundStyle(PosterPalette.paperWhite)
+                        .accessibilityLabel(model.pipelineStatusText.isEmpty
+                            ? "时间正在生长"
+                            : model.pipelineStatusText)
                     Text(model.currentNarrative)
                         .font(.footnote)
                         .foregroundStyle(PosterPalette.paperWhite.opacity(0.76))
@@ -53,18 +58,18 @@ struct GenerationView: View {
 
                 VStack(spacing: PosterSpacing.md) {
                     GenerationProgressRow(
-                        title: "锁定原图主体",
-                        progress: min(model.generationProgress * 1.4, 1),
-                        isComplete: model.generationProgress > 0.25
+                        title: "收集此刻的种子",
+                        progress: seedProgress,
+                        isComplete: model.generationProgress >= 0.35
                     )
                     GenerationProgressRow(
-                        title: "注入时间故事",
-                        progress: max(0, min((model.generationProgress - 0.2) * 1.5, 1)),
-                        isComplete: model.generationProgress > 0.55
+                        title: "时间正在生长",
+                        progress: growthProgress,
+                        isComplete: model.generationProgress >= 0.9
                     )
                     GenerationProgressRow(
-                        title: "生成同一地点的变迁图",
-                        progress: max(0, min((model.generationProgress - 0.5) * 2, 1)),
+                        title: "收成这一帧",
+                        progress: harvestProgress,
                         isComplete: model.generationProgress >= 1
                     )
                 }
@@ -72,18 +77,18 @@ struct GenerationView: View {
                 Spacer(minLength: PosterSpacing.sm)
 
                 HStack(spacing: PosterSpacing.md) {
-                    Button("返回故事") {
-                        model.activeSessionID = nil
-                        model.phase = .storyReady
+                    Button("取消生成") {
+                        model.cancelGeneration()
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PosterPalette.paperWhite)
                     .frame(minHeight: 44)
-                    .accessibilityLabel("返回故事")
-                    .accessibilityHint("停止当前生成并返回故事确认页")
+                    .accessibilityLabel("取消生成")
+                    .accessibilityHint("停止当前生成并返回故事确认页，不再继续请求")
 
                     Spacer()
 
+                    #if DEBUG
                     Button("模拟超时") {
                         model.presentFailureForPreview()
                     }
@@ -92,9 +97,25 @@ struct GenerationView: View {
                     .frame(minHeight: 44)
                     .accessibilityLabel("模拟超时")
                     .accessibilityHint("预览生成失败界面")
+                    #endif
                 }
             }
         }
+    }
+
+    /// Upload / prepare → queued threshold.
+    private var seedProgress: Double {
+        min(model.generationProgress / 0.35, 1)
+    }
+
+    /// Queued / processing growth band.
+    private var growthProgress: Double {
+        max(0, min((model.generationProgress - 0.35) / 0.55, 1))
+    }
+
+    /// Final download / finish band.
+    private var harvestProgress: Double {
+        max(0, min((model.generationProgress - 0.9) / 0.1, 1))
     }
 }
 

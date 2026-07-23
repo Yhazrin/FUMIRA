@@ -11,6 +11,7 @@ struct AppDependencies {
     let modelConfigurationStore: any AIModelConfigurationStore
     let storage: any PosterStorage
     let haptics: any HapticsClient
+    let motionField: any MotionFieldProviding
 
     static var preview: AppDependencies {
         AppDependencies(
@@ -23,7 +24,8 @@ struct AppDependencies {
             modelCatalog: BundledAIModelCatalogProvider(),
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
             storage: MockPosterStorage(),
-            haptics: MockHapticsClient()
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
         )
     }
 
@@ -38,30 +40,31 @@ struct AppDependencies {
             modelCatalog: BundledAIModelCatalogProvider(),
             modelConfigurationStore: InMemoryAIModelConfigurationStore(),
             storage: MockPosterStorage(),
-            haptics: MockHapticsClient()
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
         )
     }
 
+    @MainActor
     static var runtime: AppDependencies {
-        let generation: any GenerationProvider = {
-            if let baseURL = FUMIRAAPIConfiguration.baseURL {
-                return RemoteGenerationProvider(baseURL: baseURL)
-            }
-            return MockGenerationProvider()
-        }()
+        let baseURL = FUMIRAAPIConfiguration.baseURL
+        let generation: any GenerationProvider = baseURL.map { RemoteGenerationProvider(baseURL: $0) } ?? MockGenerationProvider()
+        let understanding: any ImageUnderstandingProvider = baseURL.map { RemoteUnderstandingProvider(baseURL: $0) } ?? MockImageUnderstandingProvider()
+        let story: any StoryProvider = baseURL.map { RemoteStoryProvider(baseURL: $0) } ?? MockStoryProvider()
 
         #if targetEnvironment(simulator)
         return AppDependencies(
             camera: MockCameraService(),
             cameraPreview: MockCameraPreviewFactory(),
             hardware: MockHardwareController(),
-            understanding: MockImageUnderstandingProvider(),
-            story: MockStoryProvider(),
+            understanding: understanding,
+            story: story,
             generation: generation,
             modelCatalog: BundledAIModelCatalogProvider(),
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
-            storage: MockPosterStorage(),
-            haptics: MockHapticsClient()
+            storage: PhotoLibraryPosterStorage(),
+            haptics: LiveHapticsClient(),
+            motionField: MockMotionFieldService()
         )
         #else
         let liveCamera = LiveCameraService()
@@ -69,13 +72,14 @@ struct AppDependencies {
             camera: liveCamera,
             cameraPreview: liveCamera,
             hardware: MockHardwareController(),
-            understanding: MockImageUnderstandingProvider(),
-            story: MockStoryProvider(),
+            understanding: understanding,
+            story: story,
             generation: generation,
             modelCatalog: BundledAIModelCatalogProvider(),
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
-            storage: MockPosterStorage(),
-            haptics: MockHapticsClient()
+            storage: PhotoLibraryPosterStorage(),
+            haptics: LiveHapticsClient(),
+            motionField: CoreMotionFieldService()
         )
         #endif
     }

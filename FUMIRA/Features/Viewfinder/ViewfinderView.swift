@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 struct ViewfinderView: View {
@@ -7,6 +8,7 @@ struct ViewfinderView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var controlsAreReady = false
     @State private var shutterFlash = 0.0
+    @State private var albumPickerItem: PhotosPickerItem?
 
     private var timeChipLabel: String {
         let year = Calendar.current.component(.year, from: model.selectedTime.targetDate())
@@ -73,9 +75,16 @@ struct ViewfinderView: View {
             guard !Task.isCancelled else { return }
             controlsAreReady = true
         }
+        .onChange(of: albumPickerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                await importAlbumItem(newItem)
+                albumPickerItem = nil
+            }
+        }
     }
 
-    /// Top: flash (when live) + status + minimal time chip — no slogan, no dead controls.
+    /// Top: flash / flip (when live) + status + minimal time chip — no slogan, no dead controls.
     private var topChrome: some View {
         HStack(alignment: .center, spacing: PosterSpacing.sm) {
             HStack(spacing: PosterSpacing.sm) {
@@ -86,6 +95,18 @@ struct ViewfinderView: View {
                         accessibilityHintText: "循环切换闪光灯模式"
                     ) {
                         Task { await model.cycleFlashMode() }
+                    }
+                }
+
+                if model.canSwitchCamera {
+                    CameraChromeButton(
+                        systemImage: "arrow.triangle.2.circlepath",
+                        accessibilityLabelText: model.cameraControlSnapshot.lensPosition == .front
+                            ? "切换到后置摄像头"
+                            : "切换到前置摄像头",
+                        accessibilityHintText: "翻转前后摄像头"
+                    ) {
+                        Task { await model.switchCameraLens() }
                     }
                 }
 
@@ -120,34 +141,20 @@ struct ViewfinderView: View {
         }
     }
 
-    /// Bottom: WaveTimeRail on scrim · flip (when live) · shutter · grid.
-    /// Conflict merge: immersive layout + real camera chrome + WaveTimeRail; no dead buttons.
+    /// Bottom: WaveTimeRail · album · shutter · grid.
     private var bottomChrome: some View {
         VStack(spacing: PosterSpacing.md) {
             WaveTimeRail(
                 value: model.selectedTime.normalized,
-                chrome: .immersive
+                chrome: .immersive,
+                onDetent: model.playTimeDetent
             ) { normalized in
                 model.updateTime(normalized: normalized)
             }
             .padding(.horizontal, PosterSpacing.xs)
 
             HStack(alignment: .center, spacing: PosterSpacing.xl) {
-                if model.canSwitchCamera {
-                    CameraChromeButton(
-                        systemImage: "arrow.triangle.2.circlepath",
-                        accessibilityLabelText: model.cameraControlSnapshot.lensPosition == .front
-                            ? "切换到后置摄像头"
-                            : "切换到前置摄像头",
-                        accessibilityHintText: "翻转前后摄像头"
-                    ) {
-                        Task { await model.switchCameraLens() }
-                    }
-                } else {
-                    Color.clear
-                        .frame(width: 48, height: 48)
-                        .accessibilityHidden(true)
-                }
+                albumPickerButton
 
                 ShutterButton {
                     fireShutterFlash()
@@ -166,6 +173,31 @@ struct ViewfinderView: View {
         }
     }
 
+    private var albumPickerButton: some View {
+        PhotosPicker(
+            selection: $albumPickerItem,
+            matching: .images,
+            photoLibrary: .shared()
+        ) {
+            Image(systemName: "photo.on.rectangle")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(PosterPalette.paperWhite)
+                .frame(width: 48, height: 48)
+                .background(PosterEffects.cameraChromeFill)
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .stroke(PosterEffects.cameraChromeStroke, lineWidth: 1)
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(PosterPressStyle())
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel("从相册导入")
+        .accessibilityHint("选择一张照片进入时间相机管线")
+        .disabled(model.isPipelineBusy)
+    }
+
     @ViewBuilder
     private var preview: some View {
         if reduceMotion {
@@ -173,6 +205,19 @@ struct ViewfinderView: View {
         } else {
             model.cameraPreview
                 .matchedGeometryEffect(id: "camera-photo", in: namespace)
+        }
+    }
+
+    private func importAlbumItem(_ item: PhotosPickerItem) async {
+        do {
+            guard let raw = try await item.loadTransferable(type: AlbumImageData.self) else {
+                model.lastErrorMessage = PhotoImportAdapter.ImportError.invalidImage.localizedDescription
+                return
+            }
+            fireShutterFlash()
+            await model.importPhoto(imageData: raw.data)
+        } catch {
+            model.lastErrorMessage = error.localizedDescription
         }
     }
 
@@ -190,6 +235,26 @@ struct ViewfinderView: View {
         }
         withAnimation(.linear(duration: PosterMotion.micro).delay(PosterMotion.micro * 0.55)) {
             shutterFlash = 0
+        }
+    }
+}
+
+/// PhotosPicker Transferable for JPEG / PNG / HEIC library bytes.
+private struct AlbumImageData: Transferable {
+    let data: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(importedContentType: .image) { data in
+            AlbumImageData(data: data)
+        }
+        DataRepresentation(importedContentType: .jpeg) { data in
+            AlbumImageData(data: data)
+        }
+        DataRepresentation(importedContentType: .png) { data in
+            AlbumImageData(data: data)
+        }
+        DataRepresentation(importedContentType: .heic) { data in
+            AlbumImageData(data: data)
         }
     }
 }

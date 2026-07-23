@@ -9,6 +9,10 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+packages:
+  Pow:
+    url: https://github.com/EmergeTools/Pow
+    from: 1.0.6
 targets:
   FUMIRA:
     type: application
@@ -22,34 +26,59 @@ targets:
           - Info.plist
           - Fonts/**/OFL.txt
         buildPhase: resources
+      - path: FUMIRA-icon.icon
+        buildPhase: resources
     info:
       path: FUMIRA/Resources/Info.plist
       properties:
-        CFBundleDisplayName: 时间相机
+        CFBundleDisplayName: FUMIRA
         UIAppFonts:
           - LXGWMarkerGothic-Regular.ttf
           - CaveatBrush-Regular.ttf
         UILaunchScreen:
           UIColorName: Paper
         NSCameraUsageDescription: 用于实时取景、拍照并生成过去与未来的场景。
+        NSMotionUsageDescription: 用于让海报装饰随设备轻微倾斜；开启“减少动态效果”或低电量模式时会自动停用。
         NSBluetoothAlwaysUsageDescription: 用于连接 FutureCam 的实体快门与连续时间旋钮。
         NSPhotoLibraryUsageDescription: 用于导入一张照片体验时间相机。
         NSPhotoLibraryAddUsageDescription: 用于保存生成的时间海报。
+        CFBundleURLTypes:
+          - CFBundleURLName: com.fumira.timecamera
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - fumira
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        # Optional. Empty = local Mock generation. Set to e.g. http://127.0.0.1:8787 for remote.
-        FUMIRA_API_BASE_URL: ""
+        # Build-setting expanded. Debug defaults to local backend; Release stays empty = Mock.
+        # Never put MINIMAX_API_KEY here — only the FUMIRA backend base URL.
+        FUMIRA_API_BASE_URL: "$(FUMIRA_API_BASE_URL)"
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          # Debug relay runs on the developer Mac over private LAN HTTP.
+          # Production must replace this with HTTPS before distribution.
+          NSExceptionDomains:
+            192.168.31.62:
+              NSExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera
         PRODUCT_NAME: FUMIRA
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        DEVELOPMENT_TEAM: 5CQ49A8XPZ
+        ASSETCATALOG_COMPILER_APPICON_NAME: FUMIRA-icon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
+      configs:
+        Debug:
+          # Current developer Mac relay. This works on both the simulator and
+          # the paired iPhone; change it when the Mac's LAN address changes.
+          FUMIRA_API_BASE_URL: "http://192.168.31.62:8787"
+        Release:
+          FUMIRA_API_BASE_URL: ""
+    dependencies:
+      - package: Pow
   FUMIRATests:
     type: bundle.unit-test
     platform: iOS

@@ -2,11 +2,14 @@ import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import { config, isGenerationReady } from "./config.js";
 import { LiveMiniMaxAdapter } from "./minimax/liveAdapter.js";
+import { LiveMiniMaxIntelligenceAdapter } from "./minimax/liveIntelligenceAdapter.js";
+import { setMiniMaxIntelligenceAdapter } from "./intelligence.js";
 import { MockMiniMaxAdapter } from "./minimax/mockAdapter.js";
 import { setMiniMaxAdapter } from "./queue.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerGenerationRoutes } from "./routes/generations.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerIntelligenceRoutes } from "./routes/intelligence.js";
 import { registerUploadRoutes } from "./routes/uploads.js";
 import { initStorage } from "./storage.js";
 import type { MiniMaxAdapter } from "./types.js";
@@ -14,6 +17,8 @@ import type { MiniMaxAdapter } from "./types.js";
 export interface BuildAppOptions {
   /** Force a specific adapter (tests). */
   adapter?: MiniMaxAdapter | null;
+  /** Force a specific image-understanding / story adapter (tests). */
+  intelligenceAdapter?: import("./types.js").MiniMaxIntelligenceAdapter | null;
   /** Skip binding listen — for inject() tests. */
   skipListen?: boolean;
 }
@@ -31,6 +36,17 @@ export async function buildApp(options: BuildAppOptions = {}) {
     setMiniMaxAdapter(null);
   }
 
+  if (options.intelligenceAdapter !== undefined) {
+    setMiniMaxIntelligenceAdapter(options.intelligenceAdapter);
+  } else if (config.minimaxApiKey) {
+    setMiniMaxIntelligenceAdapter(new LiveMiniMaxIntelligenceAdapter(
+      config.minimaxApiKey,
+      config.minimaxVlmApiKey
+    ));
+  } else {
+    setMiniMaxIntelligenceAdapter(null);
+  }
+
   const app = Fastify({
     logger: false,
     bodyLimit: config.maxUploadBytes + 1024 * 64,
@@ -44,6 +60,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   await registerHealthRoutes(app);
+  await registerIntelligenceRoutes(app);
   await registerUploadRoutes(app);
   await registerGenerationRoutes(app);
   await registerAdminRoutes(app);

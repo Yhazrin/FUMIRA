@@ -5,7 +5,7 @@ Camera Figma prototype. It captures a valid photo, understands its subjects and
 change clues, writes a continuous past/future story, and generates a selected
 time-world while preserving the original composition.
 
-## Run (iOS Mock — default)
+## Run (iOS)
 
 ```sh
 xcodegen generate
@@ -13,9 +13,16 @@ xcodebuild -project FUMIRA.xcodeproj -scheme FUMIRA -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-Without `FUMIRA_API_BASE_URL`, the app stays on local demo AI routes (Mock
-understanding / story / generation). Simulator builds use the deterministic
-camera fallback; physical devices use the live rear camera.
+**Debug** builds bake in `FUMIRA_API_BASE_URL=http://127.0.0.1:8787` so the app
+talks to the local FUMIRA backend (`RemoteGenerationProvider`). **Release** /
+Archive leave the URL empty → local Mock generation (safe default).
+
+Understanding / story stay on Mock in MVP either way. Simulator uses the
+deterministic camera fallback; physical devices use the live rear camera.
+
+MiniMax is **not** packaged into the app. The key lives only in `server/.env`.
+Packaging the iOS target never embeds vendor credentials — you run the backend
+alongside the Debug app.
 
 ## Run (remote MiniMax I2I demo)
 
@@ -37,14 +44,28 @@ npm install
 npm run dev
 ```
 
-2. Point the app at the backend (scheme env, or Info.plist `FUMIRA_API_BASE_URL`):
+2. Run a **Debug** app build (simulator default already points at
+   `http://127.0.0.1:8787`). Confirm remote mode:
 
 ```text
-FUMIRA_API_BASE_URL=http://127.0.0.1:8787
+# In LLDB / a Debug breakpoint:
+po FUMIRAAPIConfiguration.usesRemoteGeneration  // true
+po FUMIRAAPIConfiguration.baseURL               // http://127.0.0.1:8787
 ```
 
-On a physical device use your Mac’s LAN IP instead of `127.0.0.1`. Local HTTP is
-allowed via `NSAllowsLocalNetworking`.
+Or watch the server terminal for `POST /v1/uploads` when generation starts.
+If that never appears, the app is still on Mock (Release build, empty URL, or
+unreachable host).
+
+3. **Physical device:** `127.0.0.1` is the phone itself, not your Mac. Override
+   via Xcode scheme → Run → Arguments → Environment Variables:
+
+```text
+FUMIRA_API_BASE_URL=http://<Mac-LAN-IP>:8787
+```
+
+Scheme env wins over the Info.plist Debug default. Mac and phone must be on the
+same LAN; local HTTP is allowed via `NSAllowsLocalNetworking`.
 
 Flow: capture → (mock) understand/story → upload JPEG → queue MiniMax
 `image-01` I2I → poll → show generated JPEG on the result screen.
@@ -66,15 +87,29 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ## 首屏 / 相机视觉
 
-- **Connection** is a paper poster: centered `PosterKeywordHero` (ink / pine /
-  moss + hand underline), sky–grass layers, park vignette. Invite copy:
-  「给时间，一张照片」/「把此刻，留给未来」. No settings gear on first screen.
+- **Connection** is a full-screen flat poster: centered `PosterKeywordHero`
+  (ink / pine / leafGreen + hand underline) over `ParkPosterBackdrop` shapes.
+  Supporting copy explains hardware vs phone-only — it does not repeat the hero
+  headline. No settings gear on first screen.
 - **Viewfinder** is immersive: full-bleed preview, top/bottom scrims only (no
   large white control card). Top = flash when supported + `NOW · year` chip;
   bottom = `WaveTimeRail` + centered shutter + flip (when live) + grid. Shutter
-  uses paper fill with moss accent ring — never a solid yellow / energyLime button.
-- Palette: paper · sky · grassLight · pine · moss · ink (`energyLime` → moss).
+  uses paper fill with leafGreen accent ring.
+- Palette: paper · sky · grassLight · pine · leafGreen · ink.
 - Generation / result lettering:「时间正在生长」/「未来的回信」.
+- Decorative 2.5D parallax (connection / result / share only) moves flat
+  background planes at 1.5 / 3 / 5 pt; camera, waveform, text, and CTAs stay fixed.
+
+## 分享与保存
+
+- Result → **保存海报** opens the share preview (`SharePosterView`).
+- The app composites a flat poster PNG (`PosterComposer` + `PosterExportCard`):
+  generated JPEG when available, otherwise the park scene, plus year / story copy.
+- **保存到相册** uses `PhotoLibraryPosterStorage` (Photos add-only permission).
+- **分享海报** uses system `ShareLink` with PNG `Transferable`.
+- Deep link (minimal): `fumira://share` / `fumira://result` when a story exists.
+  No cloud share backend in MVP.
+- Tests / Preview keep `MockPosterStorage` for deterministic coverage.
 
 ## Settings information architecture
 

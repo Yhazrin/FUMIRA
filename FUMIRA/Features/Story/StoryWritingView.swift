@@ -36,7 +36,7 @@ struct StoryWritingView: View {
                     ForEach(years, id: \.self) { year in
                         VStack(spacing: 8) {
                             Circle()
-                                .fill(year == activeYear ? PosterPalette.moss : PosterPalette.paperWhite)
+                                .fill(year == activeYear ? PosterPalette.leafGreen : PosterPalette.paperWhite)
                                 .frame(width: year == activeYear ? 20 : 10, height: year == activeYear ? 20 : 10)
                             Text(year == 0 ? "NOW" : String(format: "%+d", year))
                                 .font(.caption2.weight(.bold))
@@ -60,7 +60,7 @@ struct StoryWritingView: View {
                         .font(.title2.weight(.bold))
                         .foregroundStyle(PosterPalette.paperWhite)
                     ProgressView(value: model.storyProgress)
-                        .tint(PosterPalette.moss)
+                        .tint(PosterPalette.leafGreen)
                         .scaleEffect(x: 1, y: 2, anchor: .center)
                     Text("故事模型正在把过去、现在与未来连成同一个地点的生命线。")
                         .font(.footnote)

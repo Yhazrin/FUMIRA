@@ -4,10 +4,10 @@ import Foundation
 /// from the local mock to `RemoteGenerationProvider`.
 ///
 /// Resolution order:
-/// 1. Process environment `FUMIRA_API_BASE_URL` (scheme launch / CI)
-/// 2. Info.plist `FUMIRA_API_BASE_URL` (optional build-time key)
+/// 1. Process environment `FUMIRA_API_BASE_URL` (scheme launch / CI / device LAN override)
+/// 2. Info.plist `FUMIRA_API_BASE_URL` (Debug build defaults to `http://127.0.0.1:8787`)
 ///
-/// Empty / missing → Mock path. Never holds vendor API keys.
+/// Empty / missing (typical Release) → Mock path. Never holds vendor API keys.
 enum FUMIRAAPIConfiguration {
     static var baseURL: URL? {
         if let env = ProcessInfo.processInfo.environment["FUMIRA_API_BASE_URL"]?

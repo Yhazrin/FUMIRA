@@ -4,10 +4,16 @@ import SwiftUI
 struct TimeRail: View {
     let value: Double
     var chrome: WaveTimeRailChrome = .paper
+    var onDetent: (WaveTimeDetent) -> Void = { _ in }
     let onChange: (Double) -> Void
 
     var body: some View {
-        WaveTimeRail(value: value, chrome: chrome, onChange: onChange)
+        WaveTimeRail(
+            value: value,
+            chrome: chrome,
+            onDetent: onDetent,
+            onChange: onChange
+        )
     }
 }
 
@@ -18,7 +24,7 @@ struct TimeRail: View {
         var body: some View {
             TimeRail(value: value) { value = $0 }
                 .padding()
-                .background(PosterPalette.paper)
+                .background(PosterPalette.canvas)
         }
     }
     return PreviewWrapper()

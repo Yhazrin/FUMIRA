@@ -12,7 +12,7 @@ struct GenerationFailureView: View {
                     Circle()
                         .fill(PosterPalette.errorCoral.opacity(0.18))
                         .frame(width: 120, height: 120)
-                    Image(systemName: "exclamationmark")
+                    Image(systemName: failureSymbol)
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(PosterPalette.errorCoral)
                 }
@@ -24,19 +24,31 @@ struct GenerationFailureView: View {
                     fontSize: 34
                 )
 
-                Text(model.lastErrorMessage ?? "这一阶段暂时没有完成，前面的结果已经保留。")
-                    .font(.body)
-                    .foregroundStyle(PosterPalette.ink)
-                    .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+                    if let category = errorCategoryLabel {
+                        Text(category)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(PosterPalette.pine)
+                            .textCase(.uppercase)
+                    }
+
+                    Text(model.lastErrorMessage ?? "这一阶段暂时没有完成，前面的结果已经保留。")
+                        .font(.body)
+                        .foregroundStyle(PosterPalette.ink)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer()
 
                 VStack(spacing: PosterSpacing.md) {
-                    PosterCapsuleButton(
-                        title: retryTitle,
-                        accessibilityHint: "从失败阶段继续，不重复已经完成的步骤"
-                    ) {
-                        Task { await model.retryPipeline() }
+                    if showsPrimaryRetry {
+                        PosterCapsuleButton(
+                            title: retryTitle,
+                            accessibilityHint: retryAccessibilityHint
+                        ) {
+                            Task { await model.retryPipeline() }
+                        }
                     }
 
                     PosterCapsuleButton(
@@ -48,6 +60,48 @@ struct GenerationFailureView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var showsPrimaryRetry: Bool {
+        model.failedStage == .configuration || model.canRetryFailedStage
+    }
+
+    private var failureSymbol: String {
+        switch model.lastGenerationError {
+        case .networkFailure, .serverUnavailable:
+            "wifi.exclamationmark"
+        case .rateLimited:
+            "hourglass"
+        case .timedOut:
+            "clock.badge.exclamationmark"
+        case .uploadFailure:
+            "arrow.up.circle.badge.exclamationmark"
+        case .invalidParameters:
+            "slider.horizontal.3"
+        default:
+            "exclamationmark"
+        }
+    }
+
+    private var errorCategoryLabel: String? {
+        switch model.lastGenerationError {
+        case .timedOut:
+            "超时 · 可重试"
+        case .networkFailure:
+            "网络 · 可重试"
+        case .uploadFailure:
+            "上传 · 可重试"
+        case .rateLimited:
+            "繁忙 · 稍后重试"
+        case .serverUnavailable:
+            "服务未就绪 · 可重试"
+        case .invalidParameters:
+            "参数无效 · 请先调整"
+        case .generationFailed:
+            model.canRetryFailedStage ? "生成失败 · 可重试" : "生成失败"
+        case .none:
+            nil
         }
     }
 
@@ -67,11 +121,27 @@ struct GenerationFailureView: View {
     }
 
     private var retryTitle: String {
-        model.failedStage == .configuration ? "打开设置" : "从这里继续"
+        if model.failedStage == .configuration {
+            return "打开设置"
+        }
+        if model.lastGenerationError == .rateLimited {
+            return "稍后再试一次"
+        }
+        return "从这里继续"
+    }
+
+    private var retryAccessibilityHint: String {
+        if model.failedStage == .configuration {
+            return "打开模型设置"
+        }
+        return "从失败阶段继续，不重复已经完成的步骤"
     }
 
     private var fallbackTitle: String {
-        model.temporalStory == nil ? "重新拍摄" : "查看已有故事"
+        if !model.canRetryFailedStage, model.temporalStory != nil {
+            return "回到故事调整"
+        }
+        return model.temporalStory == nil ? "重新拍摄" : "查看已有故事"
     }
 }
 

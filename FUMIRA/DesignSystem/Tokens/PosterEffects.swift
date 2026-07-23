@@ -9,7 +9,7 @@ enum PosterEffects {
     static let cameraBottomScrim = PosterPalette.ink.opacity(0.48)
     static let cameraTitleShadow = PosterPalette.ink.opacity(0.28)
     /// Legacy card surface — prefer chrome circles + scrims on viewfinder.
-    static let cameraControlSurface = PosterPalette.paper.opacity(0.95)
+    static let cameraControlSurface = PosterPalette.canvas.opacity(0.95)
     static let cameraTitleShadowRadius: CGFloat = 5
     static let cameraTitleShadowOffset: CGFloat = 2
 

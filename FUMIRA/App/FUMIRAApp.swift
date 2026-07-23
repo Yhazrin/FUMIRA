@@ -11,6 +11,9 @@ struct FUMIRAApp: App {
                 .task {
                     await model.prepare()
                 }
+                .onOpenURL { url in
+                    model.handleDeepLink(url)
+                }
         }
     }
 }

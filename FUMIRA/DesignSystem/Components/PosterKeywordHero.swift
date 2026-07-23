@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Poster hero lettering: ink / pine / moss segments, hand-drawn underline,
+/// Poster hero lettering: ink / pine / leafGreen segments, hand-drawn underline,
 /// and phase-based composition (center, not pinned top-leading).
 enum PosterHeroMoment: Equatable {
     /// Connection invite — "给时间，一张照片"
@@ -50,8 +50,8 @@ struct PosterKeywordHero: View {
         surface == .dark ? PosterPalette.grassLight : PosterPalette.pine
     }
 
-    private var mossTone: Color {
-        PosterPalette.moss
+    private var accentTone: Color {
+        PosterPalette.leafGreen
     }
 
     private var scriptTone: Color {
@@ -65,30 +65,30 @@ struct PosterKeywordHero: View {
                 PosterKeywordSegment(id: 0, "给", color: inkTone),
                 PosterKeywordSegment(id: 1, "时间", color: pineTone, underlined: true),
                 PosterKeywordSegment(id: 2, "一张", color: inkTone),
-                PosterKeywordSegment(id: 3, "照片", color: mossTone, underlined: true)
+                PosterKeywordSegment(id: 3, "照片", color: accentTone, underlined: true)
             ]
         case .connecting:
             [
                 PosterKeywordSegment(id: 0, "把", color: inkTone),
                 PosterKeywordSegment(id: 1, "此刻", color: pineTone, underlined: true),
                 PosterKeywordSegment(id: 2, "留给", color: inkTone),
-                PosterKeywordSegment(id: 3, "未来", color: mossTone, underlined: true)
+                PosterKeywordSegment(id: 3, "未来", color: accentTone, underlined: true)
             ]
         case .ready:
             [
                 PosterKeywordSegment(id: 0, "此刻", color: pineTone, underlined: true),
                 PosterKeywordSegment(id: 1, "去", color: inkTone),
-                PosterKeywordSegment(id: 2, "拍下", color: mossTone, underlined: true)
+                PosterKeywordSegment(id: 2, "拍下", color: accentTone, underlined: true)
             ]
         case .growing:
             [
                 PosterKeywordSegment(id: 0, "时间", color: pineTone, underlined: true),
                 PosterKeywordSegment(id: 1, "正在", color: inkTone),
-                PosterKeywordSegment(id: 2, "生长", color: mossTone, underlined: true)
+                PosterKeywordSegment(id: 2, "生长", color: accentTone, underlined: true)
             ]
         case .reply:
             [
-                PosterKeywordSegment(id: 0, "未来", color: mossTone, underlined: true),
+                PosterKeywordSegment(id: 0, "未来", color: accentTone, underlined: true),
                 PosterKeywordSegment(id: 1, "的", color: inkTone),
                 PosterKeywordSegment(id: 2, "回信", color: pineTone, underlined: true)
             ]
@@ -107,7 +107,8 @@ struct PosterKeywordHero: View {
 
     private var alignment: Alignment {
         switch moment {
-        case .invite, .growing: .center
+        case .invite: .leading
+        case .growing: .center
         case .connecting: .trailing
         case .ready, .reply: .leading
         }
@@ -121,17 +122,6 @@ struct PosterKeywordHero: View {
         }
     }
 
-    private var offset: CGSize {
-        guard !reduceMotion else { return .zero }
-        switch moment {
-        case .invite: return CGSize(width: 0, height: -6)
-        case .connecting: return CGSize(width: 10, height: 4)
-        case .ready: return CGSize(width: -8, height: 0)
-        case .growing: return CGSize(width: 0, height: 8)
-        case .reply: return CGSize(width: -4, height: -4)
-        }
-    }
-
     private var rotations: [Double] {
         reduceMotion ? [0, 0, 0, 0] : [-1.8, 2.4, -1.2, 1.6]
     }
@@ -139,17 +129,24 @@ struct PosterKeywordHero: View {
     var body: some View {
         VStack(alignment: stackAlignment, spacing: PosterSpacing.sm) {
             keywordStack
-            HandDrawnUnderline()
-                .stroke(PosterPalette.moss, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .frame(width: underlineWidth, height: 10)
-                .opacity(0.9)
+            if moment != .invite {
+                HandDrawnUnderline()
+                    .stroke(PosterPalette.leafGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .frame(width: underlineWidth, height: 10)
+                    .opacity(0.9)
 
-            Text(scriptLabel)
-                .font(PosterTypography.script(22))
-                .foregroundStyle(scriptTone)
+                Text(scriptLabel)
+                    .font(PosterTypography.script(22))
+                    .foregroundStyle(scriptTone)
+            } else {
+                Text("FUMIRA  /  FUTURE CAMERA")
+                    .font(.caption2.weight(.semibold))
+                    .tracking(1.7)
+                    .foregroundStyle(PosterPalette.pine.opacity(0.72))
+                    .padding(.top, PosterSpacing.xs)
+            }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
-        .offset(offset)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
         .accessibilityLabel(segments.map(\.text).joined())
@@ -158,8 +155,19 @@ struct PosterKeywordHero: View {
     @ViewBuilder
     private var keywordStack: some View {
         switch moment {
-        case .invite, .growing:
-            // Centered stacked rows — poster composition, not top-left pin.
+        case .invite:
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .lastTextBaseline, spacing: PosterSpacing.sm) {
+                    segmentView(segments[0], index: 0, size: fontSize * 0.78)
+                    segmentView(segments[1], index: 1, size: fontSize * 1.18)
+                }
+                HStack(alignment: .lastTextBaseline, spacing: PosterSpacing.sm) {
+                    segmentView(segments[2], index: 2, size: fontSize * 0.82)
+                    segmentView(segments[3], index: 3, size: fontSize * 1.28)
+                }
+                .padding(.leading, fontSize * 0.48)
+            }
+        case .growing:
             VStack(alignment: .center, spacing: PosterSpacing.xs) {
                 HStack(spacing: PosterSpacing.sm) {
                     segmentView(segments[0], index: 0)
@@ -186,15 +194,19 @@ struct PosterKeywordHero: View {
         }
     }
 
-    private func segmentView(_ segment: PosterKeywordSegment, index: Int) -> some View {
+    private func segmentView(
+        _ segment: PosterKeywordSegment,
+        index: Int,
+        size: CGFloat? = nil
+    ) -> some View {
         Text(segment.text)
-            .font(PosterTypography.display(fontSize))
+            .font(PosterTypography.display(size ?? fontSize))
             .foregroundStyle(segment.color)
             .rotationEffect(.degrees(rotation(for: index)))
             .overlay(alignment: .bottom) {
                 if segment.underlined {
                     HandDrawnUnderline()
-                        .stroke(PosterPalette.moss.opacity(0.85), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .stroke(PosterPalette.leafGreen.opacity(0.85), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                         .frame(height: 6)
                         .offset(y: 4)
                         .padding(.horizontal, 2)
@@ -236,16 +248,8 @@ struct HandDrawnUnderline: Shape {
 
 #Preview("Invite") {
     ZStack {
-        PosterPalette.paper.ignoresSafeArea()
+        PosterPalette.canvas.ignoresSafeArea()
         PosterKeywordHero(moment: .invite)
-            .padding()
-    }
-}
-
-#Preview("Connecting") {
-    ZStack {
-        PosterPalette.paper.ignoresSafeArea()
-        PosterKeywordHero(moment: .connecting)
             .padding()
     }
 }

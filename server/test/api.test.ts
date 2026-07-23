@@ -270,6 +270,75 @@ describe("fumira-server", () => {
     assert.ok(built.prompt.length <= 1500);
   });
 
+  it("runs understanding and seven-beat story through the configured intelligence adapter", async () => {
+    const { buildApp } = await import("../src/index.js");
+    const intelligence = {
+      async analyzeImage() {
+        return {
+          ok: true as const,
+          value: {
+            summary: "一条安静的公园步道。",
+            locationType: "公园",
+            visualMood: "清新",
+            timeClues: ["年轻树木"],
+            changeDrivers: ["植被生长"],
+            subjects: [{ name: "步道", confidence: 0.9, identityRule: "保持步道走向" }],
+          },
+        };
+      },
+      async writeStory() {
+        return {
+          ok: true as const,
+          value: {
+            title: "树影的年轮",
+            logline: "一条步道与树木共同生长。",
+            presentTruth: "步道安静而开阔。",
+            identityRules: ["保持步道走向"],
+            beats: [-100, -30, -10, 0, 10, 30, 100].map((anchorYears) => ({
+              anchorYears,
+              title: `${anchorYears} 年`,
+              narrative: "时间在树影间推进。",
+              visualPrompt: "保持步道走向与构图。",
+            })),
+          },
+        };
+      },
+    };
+    const intelligenceApp = await buildApp({
+      adapter: new MockMiniMaxAdapter(),
+      intelligenceAdapter: intelligence,
+    });
+    try {
+      const { payload, contentType } = multipartBody(
+        {},
+        { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+      );
+      const upload = await intelligenceApp.inject({
+        method: "POST",
+        url: "/v1/uploads",
+        headers: { "content-type": contentType },
+        payload,
+      });
+      const understand = await intelligenceApp.inject({
+        method: "POST",
+        url: "/v1/understand",
+        payload: { sourceAssetId: upload.json().assetId, requestId: "req-understand" },
+      });
+      assert.equal(understand.statusCode, 200);
+      assert.equal(understand.json().understanding.locationType, "公园");
+
+      const story = await intelligenceApp.inject({
+        method: "POST",
+        url: "/v1/stories",
+        payload: { understanding: understand.json().understanding, requestId: "req-story" },
+      });
+      assert.equal(story.statusCode, 200);
+      assert.deepEqual(story.json().story.beats.map((beat: { anchorYears: number }) => beat.anchorYears), [-100, -30, -10, 0, 10, 30, 100]);
+    } finally {
+      await intelligenceApp.close();
+    }
+  });
+
   it("admin generations requires bearer token and redacts secrets", async () => {
     const denied = await app.inject({
       method: "GET",

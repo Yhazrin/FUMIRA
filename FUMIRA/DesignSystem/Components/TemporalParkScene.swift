@@ -9,6 +9,7 @@ struct TemporalParkScene: View {
     var namespace: Namespace.ID?
     var sceneID: String = "park-scene"
     var cornerRadius: CGFloat = PosterRadius.card
+    var motionField: MotionFieldModel?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -19,11 +20,17 @@ struct TemporalParkScene: View {
             let size = proxy.size
             ZStack {
                 sky(in: size)
+                    .flatParallax(motionField, depth: .back)
                 backHill(in: size)
+                    .flatParallax(motionField, depth: .back)
                 midHill(in: size)
+                    .flatParallax(motionField, depth: .mid)
                 pathCone(in: size)
+                    .flatParallax(motionField, depth: .mid)
                 trees(in: size)
+                    .flatParallax(motionField, depth: .front)
                 monolith(in: size)
+                    .flatParallax(motionField, depth: .front)
                 timeOverlay(in: size)
             }
             .frame(width: size.width, height: size.height)
@@ -31,7 +38,7 @@ struct TemporalParkScene: View {
             .overlay {
                 if showBorder {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(PosterPalette.moss, lineWidth: 4)
+                        .stroke(PosterPalette.leafGreen, lineWidth: 4)
                 }
             }
             .modifier(SceneIdentityModifier(namespace: namespace, id: sceneID, reduceMotion: reduceMotion))

@@ -9,7 +9,7 @@ struct ShutterFeedbackView: View {
 
     var body: some View {
         ZStack {
-            PosterPalette.paper.ignoresSafeArea()
+            PosterPalette.canvas.ignoresSafeArea()
 
             CapturedPhotoView(photo: model.capturedPhoto, cornerRadius: 0)
             .modifier(CapturedPhotoGeometry(
@@ -19,7 +19,7 @@ struct ShutterFeedbackView: View {
             .opacity(reduceMotion ? 0.85 : 0.7)
             .ignoresSafeArea()
 
-            PosterPalette.paperWhite
+            PosterPalette.canvas
                 .opacity(flashOpacity)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)

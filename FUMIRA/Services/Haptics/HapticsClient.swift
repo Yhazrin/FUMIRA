@@ -2,7 +2,11 @@ import Foundation
 
 enum HapticEvent: Sendable {
     case selection
+    case timeDetent
+    case timeAnchor
     case shutter
+    case reveal
+    case save
     case success
 }
 

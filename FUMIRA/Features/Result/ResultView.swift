@@ -12,7 +12,7 @@ struct ResultView: View {
 
             VStack {
                 LinearGradient(
-                    colors: [PosterPalette.paper.opacity(0.92), PosterPalette.paper.opacity(0)],
+                    colors: [PosterPalette.canvas.opacity(0.92), PosterPalette.canvas.opacity(0)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -47,7 +47,10 @@ struct ResultView: View {
                     .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
                     .padding(.horizontal, PosterSpacing.lg)
 
-                    TimeRail(value: model.selectedTime.normalized) { normalized in
+                    TimeRail(
+                        value: model.selectedTime.normalized,
+                        onDetent: model.playTimeDetent
+                    ) { normalized in
                         model.updateTime(normalized: normalized)
                     }
                     .padding(.horizontal, PosterSpacing.lg)
@@ -56,17 +59,38 @@ struct ResultView: View {
                     HStack(spacing: PosterSpacing.md) {
                         PosterCapsuleButton(
                             title: "保存海报",
-                            accessibilityHint: "打开分享预览"
+                            accessibilityHint: "打开海报预览，可保存到相册或系统分享"
                         ) {
                             model.openShare()
                         }
 
                         PosterCapsuleButton(
+                            title: "重新生成",
+                            style: .lime,
+                            accessibilityHint: "用同一张原图和当前时间位再生成一张"
+                        ) {
+                            Task { await model.regenerateResult() }
+                        }
+                    }
+                    .padding(.horizontal, PosterSpacing.lg)
+
+                    HStack(spacing: PosterSpacing.md) {
+                        PosterCapsuleButton(
                             title: "重拍",
                             style: .secondary,
-                            accessibilityHint: "返回取景器重新拍摄"
+                            accessibilityHint: "返回取景器重新拍摄或导入"
                         ) {
                             model.retake()
+                        }
+
+                        if model.canUndoGeneration {
+                            PosterCapsuleButton(
+                                title: "撤销",
+                                style: .secondary,
+                                accessibilityHint: "恢复上一张生成结果"
+                            ) {
+                                model.undoLastGeneration()
+                            }
                         }
                     }
                     .padding(.horizontal, PosterSpacing.lg)
@@ -74,7 +98,7 @@ struct ResultView: View {
                 .padding(.bottom, PosterSpacing.lg)
                 .background(
                     LinearGradient(
-                        colors: [PosterPalette.paper.opacity(0), PosterPalette.paper.opacity(0.95)],
+                        colors: [PosterPalette.canvas.opacity(0), PosterPalette.canvas.opacity(0.95)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -91,12 +115,14 @@ struct ResultView: View {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
+                .flatParallax(model.motionField, depth: .back)
                 .accessibilityLabel("生成的时间场景")
         } else {
             TemporalParkScene(
                 time: model.selectedTime,
                 namespace: namespace,
-                cornerRadius: 0
+                cornerRadius: 0,
+                motionField: model.motionField
             )
         }
     }

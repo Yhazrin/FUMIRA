@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>时间相机</string>
+	<string>FUMIRA</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,20 +21,45 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>FUMIRA_API_BASE_URL</key>
-	<string></string>
+	<string>$(FUMIRA_API_BASE_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>192.168.31.62</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>用于连接 FutureCam 的实体快门与连续时间旋钮。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>用于实时取景、拍照并生成过去与未来的场景。</string>
+	<key>NSMotionUsageDescription</key>
+	<string>用于让海报装饰随设备轻微倾斜；开启“减少动态效果”或低电量模式时会自动停用。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>用于保存生成的时间海报。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于导入一张照片体验时间相机。</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.fumira.timecamera</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fumira</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>LXGWMarkerGothic-Regular.ttf</string>

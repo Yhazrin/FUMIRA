@@ -5,6 +5,7 @@ struct RootView: View {
 
     @Namespace private var sceneNamespace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -31,11 +32,11 @@ struct RootView: View {
 
             case .viewfinder:
                 ViewfinderView(model: model, namespace: sceneNamespace)
-                    .transition(.posterPhase(reduceMotion: reduceMotion))
+                    .transition(.cameraAperture(reduceMotion: reduceMotion))
 
             case .shuttered:
                 ShutterFeedbackView(model: model, namespace: sceneNamespace)
-                    .transition(.posterPhase(reduceMotion: reduceMotion))
+                    .transition(.cameraSnapshot(reduceMotion: reduceMotion))
 
             case .understanding:
                 UnderstandingView(model: model)
@@ -55,7 +56,7 @@ struct RootView: View {
 
             case .result:
                 ResultView(model: model, namespace: sceneNamespace)
-                    .transition(.posterPhase(reduceMotion: reduceMotion))
+                    .transition(.generatedReveal(reduceMotion: reduceMotion))
 
             case .share:
                 SharePosterView(model: model)
@@ -79,8 +80,12 @@ struct RootView: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(PosterPalette.ink.opacity(0.72))
                         .frame(width: 44, height: 44)
-                        .background(PosterPalette.paperWhite.opacity(0.72))
+                        .background(PosterPalette.canvas.opacity(0.88))
                         .clipShape(Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(PosterPalette.line, lineWidth: 1)
+                        }
                 }
                 .padding(.trailing, PosterSpacing.lg)
                 .padding(.top, PosterSpacing.sm)
@@ -92,6 +97,39 @@ struct RootView: View {
             SettingsView(model: model)
         }
         .animation(.posterPhaseChange(reduceMotion: reduceMotion), value: model.phase)
+        .onAppear {
+            syncMotionField()
+        }
+        .onDisappear {
+            model.motionField.deactivate()
+        }
+        .onChange(of: model.phase) { _, _ in
+            syncMotionField()
+        }
+        .onChange(of: reduceMotion) { _, _ in
+            syncMotionField()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                syncMotionField()
+            } else {
+                model.motionField.deactivate()
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .NSProcessInfoPowerStateDidChange
+            )
+        ) { _ in
+            syncMotionField()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: ProcessInfo.thermalStateDidChangeNotification
+            )
+        ) { _ in
+            syncMotionField()
+        }
     }
 
     /// Low-disruption Settings entry on non-immersive phases only.
@@ -115,6 +153,18 @@ struct RootView: View {
              .disconnected:
             !model.isPipelineBusy
         }
+    }
+
+    private func syncMotionField() {
+        guard scenePhase == .active else {
+            model.motionField.deactivate()
+            return
+        }
+        model.syncMotionField(
+            for: model.phase,
+            reduceMotion: reduceMotion,
+            lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled
+        )
     }
 }
 

@@ -32,7 +32,8 @@ enum PreviewFixtures {
         }
         if phase == .pipelineFailure || phase == .disconnected {
             model.failedStage = .imageGeneration
-            model.lastErrorMessage = "目标时间生成超时，当前结果仍然可用。"
+            model.lastGenerationError = .timedOut
+            model.lastErrorMessage = GenerationError.timedOut.errorDescription
         }
         return model
     }
@@ -44,7 +45,7 @@ enum PreviewFixtures {
         case .storyWriting:
             "把七个年代连成故事"
         case .generating:
-            "注入时间故事"
+            "时间正在生长"
         default:
             ""
         }

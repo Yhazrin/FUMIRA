@@ -1,8 +1,13 @@
 # Design System
 
-Direction H — **公园时间海报版**：米白纸张、青蓝天空、草地分层、深松绿、
-手写墨色、克制苔黄点睛。平面大色块，动态海报。禁止蓝紫 AI 渐变，禁止大面积
-荧光黄作为主视觉。
+Direction H — **公园时间海报版**：纯白画布、青蓝天空、草地分层、深松绿、
+手写墨色、清新叶绿点睛。平面大色块，动态海报。禁止蓝紫 AI 渐变，禁止大面积
+荧光黄作为主视觉。**不以米色作 App 主背景**；米色纸感仅保留在海报合成 /
+公园装饰形局部。
+
+视觉基准屏：**Connection「时间开口」** — 青蓝天空 + 草绿丘陵 + 松绿 CTA +
+叶绿点睛 + 关键词排版。其余 chrome / 设置 / 结果留白对齐纯白画布，点睛色从
+Connection 气质延伸，而不是回到大面积 energyLime。
 
 ## Palette
 
@@ -12,19 +17,20 @@ Raw hex values live only in `PosterPalette`. Features must use semantic tokens.
 
 | Token | Hex | Role |
 |---|---|---|
-| `paper` | `#F6F3E8` | 米白纸张 — 主画布 |
-| `paperWhite` | `#FFFDF7` | 卡片与浅色控件填充 |
-| `sky` | `#7BC8EB` | 天空青蓝 — 大面积背景、相机叠层、时间强调 |
+| `canvas` / `pageBackground` | `#FFFFFF` | **纯白画布** — App chrome、设置、结果留白、默认页背景 |
+| `paper` | `#F6F3E8` | 米白纸张 — **仅**海报合成区 / 公园装饰形 / 场景叠色 |
+| `paperWhite` | `#FFFFFF` | 浅色控件填充（同 `canvas`）；白底靠描边建立层级 |
+| `sky` | `#7BC8EB` | 天空青蓝 — Connection 基准、相机叠层、时间强调 |
 | `skySoft` | `#B8E0F5` | 天空近地 / 底部渐变 |
 | `skyDeep` | `#3D8BB5` | 深青蓝 — 叠层、理解页大色块 |
 | `grassLight` | `#8FCB7E` | 草地浅绿 — 分层地形近层 |
 | `pine` | `#2A5A3C` | 深松绿 — 地形深部、主按钮、生成页大色块 |
-| `moss` | `#C9B35A` | 苔黄 — **仅 ≤5%** 选中态 / 下划线 / 游标 |
+| `leafGreen` | `#5FA868` | 清新叶绿 — **仅 ≤5%** 选中态 / 下划线 / 游标 |
 | `ink` | `#111111` | 深墨黑 — 标题与重要操作 |
-| `mutedInk` | `#A5A39B` | 次要标签 |
+| `mutedInk` | `#6E6C64` | 次要标签（白底约 4.6:1 AA） |
 | `waveIdle` | `ink @ 22%` | 波形时间轴非选中竖条 |
 | `errorCoral` | `#E95E52` | 可恢复错误 |
-| `line` | `#C9C6BC` | 分割线 |
+| `line` | `#D2D0C8` | 分割线 / 白底卡片细描边 |
 
 ### Scene temporal variants
 
@@ -45,22 +51,28 @@ Used by `TemporalParkScene` interpolation — do not hardcode in Features.
 | `deepTimeBlue` | `skyDeep` | Prefer `skyDeep` |
 | `parkGreen` | `pine` | Prefer `pine` |
 | `growthGreen` | `pine` | Generation surfaces use deep pine blocks |
-| `energyLime` | `moss` | **Deprecated / accent-only.** Never page bg or full primary fill |
 
 ### Usage rules
 
-- `moss`（苔黄）is an accent, never a page background or solid primary button fill.
-- Primary buttons prefer `pine` or `ink`; secondary is stroke + `ink` on clear.
+- Page / chrome backgrounds use `canvas` (or `pageBackground`). Do **not** use
+  `paper` as a full-screen App background.
+- `paper` is allowed only for poster synthesis caption blocks, park decorative
+  shapes (`ParkPosterBackdrop`), and temporal scene overlays.
+- `leafGreen` is an accent, never a page background or solid primary button fill.
+- Primary buttons prefer `pine` or `ink`; secondary is stroke + `ink` on `canvas`.
+- White-on-white cards need `line` stroke (or shadow) for edge definition.
 - Photo / park scene remains the visual hero; tokens support it, not compete with it.
 - No raw `Color(red:…)` product colors outside `PosterPalette`.
 
 ## Continuous time rail (`WaveTimeRail`)
 
-- Visual: ~33 rounded vertical bars (audio-waveform); densest rhythm near NOW.
-  No white card chrome — floats on `paper` / sky gradients / camera scrims.
-- Selected bar + cursor use `moss` (≤5%); idle bars use `waveIdle` (paper) or
-  light paperWhite tint (`.immersive` chrome on camera scrim).
-- Calendar year floats above the moss cursor; sparse labels are only
+- Visual: ~33 rounded vertical bars (audio-waveform); deterministic envelope +
+  rhythm morph continuously with drag. No white card chrome — floats on `canvas` /
+  sky gradients / camera scrims.
+- Selected thumb capsule + cursor use `leafGreen` (≤5%) at full height as the
+  unique tallest peak; ordinary bars stay below 78% of peak and are centered on
+  the rail midline (symmetric ±Y).
+- Calendar year floats above the leafGreen cursor; sparse labels are only
   `-100` / `NOW` / `+100`.
 - Drag maps rail X linearly to `TimePosition.normalized` (−1…1). Day/year mapping
   stays nonlinear via `TimePosition` (finer near NOW). Never snaps to historic
@@ -91,19 +103,22 @@ The supplied prototype uses a flat illustrated park. The MVP recreates this as
 native shapes so it can respond continuously to time: sky tint, hill position,
 tree density/scale, sun/moon, path width, grain, and overlay color interpolate
 from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
-`pine` tokens; active rail / NOW marker uses `moss`.
+`pine` tokens; active rail / NOW marker uses `leafGreen`.
 
 ## 首屏 / 相机视觉
 
-### Connection（纸张海报首屏）
+### Connection（时间开口 · 视觉基准）
 
-- Composition is a **centered poster**, not a top-leading title stack.
-- Keyword hero (`PosterKeywordHero`) uses ink / pine / moss segments plus a
-  hand-drawn moss underline. Copy invites entry:「给时间，一张照片」/
-  「把此刻，留给未来」— avoid repeating「把现在拍下来」.
-- Background: paper + sky wash + layered grass ellipses + `TemporalParkScene`
-  vignette. No settings gear, no「模型后台」, no developer chrome.
-- Primary CTA prefers `pine`; moss stays accent-only.
+- Composition is a **full-screen flat poster** (`ParkPosterBackdrop`), not a
+  rounded inset card. This screen sets the product color temperature:
+  sky / grassLight / pine / leafGreen — not beige chrome.
+- Keyword hero (`PosterKeywordHero`) uses ink / pine / leafGreen segments plus a
+  hand-drawn leafGreen underline. One invite headline only — supporting copy must
+  not repeat「给时间，一张照片」.
+- Background: custom sky / hill / river / botanical shapes with optional device
+  tilt on decorative planes only. Local `paper` shapes are decorative only.
+  No settings gear.
+- Primary CTA prefers `pine`; leafGreen stays accent-only.
 
 ### Viewfinder（沉浸相机）
 
@@ -113,5 +128,11 @@ from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
 - Top: flash (when supported) + optional simulator chip + minimal time chip
   (`NOW · 2026` or selected year). No large slogan.
 - Bottom: `WaveTimeRail` (`.immersive` chrome) floating on the scrim; centered
-  paper-white shutter with moss accent ring; circular chrome flip + grid.
-- All colors via DesignSystem tokens; shutter must not be a solid moss/yellow fill.
+  paper-white shutter with leafGreen accent ring; circular chrome flip + grid.
+
+### Chrome screens（权限 / 故事就绪 / 设置 / 失败）
+
+- Default `PosterScreenContainer` background is `canvas` (`#FFFFFF`).
+- Narrative / status cards on white use `canvas` fill + `line` stroke.
+- Share poster **caption block** may use local `paper` for mild paper feel;
+  the page chrome around it stays white.

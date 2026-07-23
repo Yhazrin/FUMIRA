@@ -36,9 +36,9 @@ struct PosterCapsuleButton: View {
     private var foregroundColor: Color {
         switch style {
         case .primary:
-            PosterPalette.paperWhite
+            PosterPalette.canvas
         case .lime:
-            // Accent chip style: moss fill + ink label (never fluorescent full-bleed)
+            // Accent chip style: leaf-green fill + ink label (never fluorescent full-bleed)
             PosterPalette.ink
         case .secondary:
             PosterPalette.ink
@@ -52,9 +52,9 @@ struct PosterCapsuleButton: View {
             // Direction H: primary prefers pine; ink remains available via secondary stroke + ink text
             PosterPalette.pine
         case .secondary:
-            Color.clear
+            PosterPalette.canvas
         case .lime:
-            PosterPalette.moss
+            PosterPalette.leafGreen
         }
     }
 }
