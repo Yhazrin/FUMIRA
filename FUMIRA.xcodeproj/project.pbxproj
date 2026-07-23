@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0214A77A0FFCB9ED57DB2183 /* LiveCameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0ADCB3A58FBEC5C0450A059 /* LiveCameraService.swift */; };
+		07CE3DA12048AD23FC41D2EC /* RemoteUnderstandingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720A705BCC018533FA13CAD9 /* RemoteUnderstandingProvider.swift */; };
 		0EBB9147A09ED73A0B3166DB /* FutureCamBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5823D95D80053245EE90DC6 /* FutureCamBody.swift */; };
 		0F7F38450F6A3BA034C6FC94 /* PosterEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422AD39779F43E2D65A911F8 /* PosterEffects.swift */; };
 		1245BDCD7EC1C8CB446A703A /* FUMIRAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39E84C5D38FBD2F94A20BD0 /* FUMIRAApp.swift */; };
@@ -20,7 +21,10 @@
 		23CCFD4E047B40C404BD4F16 /* ImageUnderstandingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */; };
 		29D9DC65D7062DCCB884557B /* TimePositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965576AD9AA198B9925C4116 /* TimePositionTests.swift */; };
 		32A7E40906ED936B1936AE68 /* PosterMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3C5474B0B8D27C0DDBB963 /* PosterMotion.swift */; };
+		346647DD342F7ADBF2D8EA3C /* RemoteGenerationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */; };
+		38831A33FFE897593276E173 /* CameraControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ACAAB097318CD718D04F680 /* CameraControlTests.swift */; };
 		3A6F24EB11DF17E741B25BBF /* PosterStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2FEAF2D6EE3D56DFAFAC63 /* PosterStorage.swift */; };
+		3B29195E9A9CB95EFECDD2A0 /* GenerationErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC3A6EA4A95C7C7FE8503E2 /* GenerationErrorTests.swift */; };
 		4703F97A2A735586256C0748 /* TemporalParkScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */; };
 		471CB52A9E6D9398A217FDBC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DCD765D349D795C07B9A771 /* Assets.xcassets */; };
 		4E26490CC1A2F57B62812901 /* SharePosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C17BFDA29992D70384CE0E3 /* SharePosterView.swift */; };
@@ -38,11 +42,13 @@
 		76EA13255D436214BDC7113E /* AIModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */; };
 		790C43F80CBE7459040C84C2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DBB78BA18D4224BAAA62DB /* AppModel.swift */; };
 		79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */; };
+		9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */; };
 		9865BA30CD7BC5E71C3EDDD8 /* GenerationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04EFD2BAB24C56390FE1422 /* GenerationView.swift */; };
 		9CFA5CCAED0C6B13D9E5DDAA /* GenerationFailureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B5279CAFEEC36FF61D3AF1D /* GenerationFailureView.swift */; };
 		9E8E3FC2EE80DC814A175CAC /* AIPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5250C5671C43027FE916EC91 /* AIPipeline.swift */; };
 		A105B28967391BB722D2F221 /* CameraPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB587C2F53ADF0E74815B86D /* CameraPermissionView.swift */; };
 		A1427FB05CE0F83DA5D1B137 /* GenerationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 243297E75BDC73D76502065F /* GenerationProvider.swift */; };
+		A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */; };
 		AC3DE3CD08F90EB6BBDD424C /* PosterCapsuleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A795369647DCD3796D878054 /* PosterCapsuleButton.swift */; };
 		AD3677B64872529BD54AAB06 /* LXGWMarkerGothic-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ABAE834AFA62AF7D1C532131 /* LXGWMarkerGothic-Regular.ttf */; };
 		B136E911C8319B079CD18F7B /* PhaseTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */; };
@@ -53,17 +59,21 @@
 		CC9564F3F5A7240742019CC3 /* ViewfinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */; };
 		D634280455F3F1B7470120B4 /* StatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A9D8D00C482FFD912D66F /* StatusPill.swift */; };
 		D6343860654B84A0E7610C59 /* PosterRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F813C0AC9E3A3902A11C9EF /* PosterRadius.swift */; };
+		D95241D281492B368518AA4D /* PosterKeywordHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */; };
 		DAC5CF90465E60FE3F7964FA /* TimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */; };
 		DB1FFB0E6083B353899FA1E0 /* BluetoothPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E18BF1C7346B1EED368BA24 /* BluetoothPermissionView.swift */; };
 		E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD55939FA9AED9CA1F176218 /* RootView.swift */; };
 		E234B574678CF28B21321117 /* PosterTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */; };
+		E37BC06098613AAFAD117F89 /* WaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8765ECEB8AD104AC0655B09E /* WaveTimeRail.swift */; };
 		EB3F790DACC707A6A7CDE9FD /* ConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0827B783C9AB999B8B2F7667 /* ConnectionView.swift */; };
+		EF91FA15A8DA811F2A27B032 /* WaveTimeBrowseSnapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC18E6851860DBA0AF463F12 /* WaveTimeBrowseSnapTests.swift */; };
 		F18F38D349BDDA6576DCE0B5 /* UnderstandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4475858E4BF39355D62646C5 /* UnderstandingView.swift */; };
 		F1B0C35BDB2E3132AD68B709 /* ModelSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9AAD2C14EDA1F4E2C259F8 /* ModelSettingsView.swift */; };
 		F3A064B6FCA1C2D795F91FC5 /* GenerationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DDDE905B093FADE1CBA842 /* GenerationState.swift */; };
 		F4F3244AEDAFBD874E8A516E /* PosterScreenContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */; };
 		F52BB40AD845207CF1B3A517 /* PosterPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */; };
 		F6B7AE94AF7E3431AA213088 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */; };
+		F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */; };
 		FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */; };
 		FF2048F8237E37B5C20D977E /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2029A8DCB17762A2BA51821F /* AppDependencies.swift */; };
 /* End PBXBuildFile section */
@@ -80,6 +90,7 @@
 
 /* Begin PBXFileReference section */
 		008AB16B3E586143B6C32988 /* HapticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticsClient.swift; sourceTree = "<group>"; };
+		01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraChromeButton.swift; sourceTree = "<group>"; };
 		042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTitleView.swift; sourceTree = "<group>"; };
 		0827B783C9AB999B8B2F7667 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
 		09DDDE905B093FADE1CBA842 /* GenerationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationState.swift; sourceTree = "<group>"; };
@@ -87,15 +98,18 @@
 		1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRail.swift; sourceTree = "<group>"; };
 		2029A8DCB17762A2BA51821F /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
 		243297E75BDC73D76502065F /* GenerationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationProvider.swift; sourceTree = "<group>"; };
+		2ACAAB097318CD718D04F680 /* CameraControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraControlTests.swift; sourceTree = "<group>"; };
 		32DC55D3AB69BA24981B65BA /* ShutterFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShutterFeedbackView.swift; sourceTree = "<group>"; };
 		38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseTransition.swift; sourceTree = "<group>"; };
 		3B3EFE914BB920EA3A5D9353 /* ConnectionFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFeedbackView.swift; sourceTree = "<group>"; };
 		3C17BFDA29992D70384CE0E3 /* SharePosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePosterView.swift; sourceTree = "<group>"; };
 		3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPalette.swift; sourceTree = "<group>"; };
 		3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterScreenContainer.swift; sourceTree = "<group>"; };
+		3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterKeywordHero.swift; sourceTree = "<group>"; };
 		422AD39779F43E2D65A911F8 /* PosterEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterEffects.swift; sourceTree = "<group>"; };
 		426AD81CA8813B1754B8E854 /* StoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryProvider.swift; sourceTree = "<group>"; };
 		4475858E4BF39355D62646C5 /* UnderstandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnderstandingView.swift; sourceTree = "<group>"; };
+		46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRAAPIConfiguration.swift; sourceTree = "<group>"; };
 		4713B2304639B23F842E56AF /* AIModelCatalogProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelCatalogProvider.swift; sourceTree = "<group>"; };
 		4C0A9D8D00C482FFD912D66F /* StatusPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPill.swift; sourceTree = "<group>"; };
 		4F62345CBFEE6F4C9C8552DE /* AIModelConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelConfigurationStore.swift; sourceTree = "<group>"; };
@@ -106,19 +120,24 @@
 		6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewFixtures.swift; sourceTree = "<group>"; };
 		6DCD765D349D795C07B9A771 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6F813C0AC9E3A3902A11C9EF /* PosterRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterRadius.swift; sourceTree = "<group>"; };
+		720A705BCC018533FA13CAD9 /* RemoteUnderstandingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteUnderstandingProvider.swift; sourceTree = "<group>"; };
 		7679B4DA494ADD2A005C24BF /* AppPhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPhase.swift; sourceTree = "<group>"; };
 		7C2FEAF2D6EE3D56DFAFAC63 /* PosterStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStorage.swift; sourceTree = "<group>"; };
+		7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGenerationProvider.swift; sourceTree = "<group>"; };
 		8031BC5C221FD8B69A35917F /* FUMIRATests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FUMIRATests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8765ECEB8AD104AC0655B09E /* WaveTimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveTimeRail.swift; sourceTree = "<group>"; };
 		8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalParkScene.swift; sourceTree = "<group>"; };
 		8DB1CEF2A388FCB57CEF5828 /* TimePosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePosition.swift; sourceTree = "<group>"; };
 		8E9AAD2C14EDA1F4E2C259F8 /* ModelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSettingsView.swift; sourceTree = "<group>"; };
 		8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelConfiguration.swift; sourceTree = "<group>"; };
 		91DBB78BA18D4224BAAA62DB /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		92A1E412E1C3188F58E64045 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationError.swift; sourceTree = "<group>"; };
 		965576AD9AA198B9925C4116 /* TimePositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePositionTests.swift; sourceTree = "<group>"; };
 		9A04C9FAD2A09C3D5C8F8EE7 /* StoryReadyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryReadyView.swift; sourceTree = "<group>"; };
 		9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUnderstandingProvider.swift; sourceTree = "<group>"; };
 		9B5279CAFEEC36FF61D3AF1D /* GenerationFailureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationFailureView.swift; sourceTree = "<group>"; };
+		9EC3A6EA4A95C7C7FE8503E2 /* GenerationErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationErrorTests.swift; sourceTree = "<group>"; };
 		A5823D95D80053245EE90DC6 /* FutureCamBody.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FutureCamBody.swift; sourceTree = "<group>"; };
 		A795369647DCD3796D878054 /* PosterCapsuleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterCapsuleButton.swift; sourceTree = "<group>"; };
 		ABAE834AFA62AF7D1C532131 /* LXGWMarkerGothic-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "LXGWMarkerGothic-Regular.ttf"; sourceTree = "<group>"; };
@@ -129,7 +148,7 @@
 		BB587C2F53ADF0E74815B86D /* CameraPermissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPermissionView.swift; sourceTree = "<group>"; };
 		BC3C5474B0B8D27C0DDBB963 /* PosterMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterMotion.swift; sourceTree = "<group>"; };
 		BEA2A9A9092D954539CE47D8 /* PosterSpacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSpacing.swift; sourceTree = "<group>"; };
-		C07F63FE6C3A1582391397E6 /* FUMIRA.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FUMIRA.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C07F63FE6C3A1582391397E6 /* FUMIRA.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FUMIRA.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C371B539FFA0941C4F55F0F2 /* CaveatBrush-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CaveatBrush-Regular.ttf"; sourceTree = "<group>"; };
 		CD55939FA9AED9CA1F176218 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSession.swift; sourceTree = "<group>"; };
@@ -139,6 +158,7 @@
 		F04EFD2BAB24C56390FE1422 /* GenerationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationView.swift; sourceTree = "<group>"; };
 		F48A9778F8AA6121B7B3623F /* CameraPreviewFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewFactory.swift; sourceTree = "<group>"; };
 		F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewfinderView.swift; sourceTree = "<group>"; };
+		FC18E6851860DBA0AF463F12 /* WaveTimeBrowseSnapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveTimeBrowseSnapTests.swift; sourceTree = "<group>"; };
 		FE41698ABAA3DB4B8FB3DB7F /* ResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -198,7 +218,10 @@
 			isa = PBXGroup;
 			children = (
 				92A1E412E1C3188F58E64045 /* AppModelTests.swift */,
+				2ACAAB097318CD718D04F680 /* CameraControlTests.swift */,
+				9EC3A6EA4A95C7C7FE8503E2 /* GenerationErrorTests.swift */,
 				965576AD9AA198B9925C4116 /* TimePositionTests.swift */,
+				FC18E6851860DBA0AF463F12 /* WaveTimeBrowseSnapTests.swift */,
 			);
 			path = FUMIRATests;
 			sourceTree = "<group>";
@@ -207,6 +230,7 @@
 			isa = PBXGroup;
 			children = (
 				243297E75BDC73D76502065F /* GenerationProvider.swift */,
+				7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */,
 			);
 			path = Generation;
 			sourceTree = "<group>";
@@ -225,6 +249,7 @@
 				8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */,
 				5250C5671C43027FE916EC91 /* AIPipeline.swift */,
 				CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */,
+				964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */,
 				09DDDE905B093FADE1CBA842 /* GenerationState.swift */,
 				8DB1CEF2A388FCB57CEF5828 /* TimePosition.swift */,
 			);
@@ -305,6 +330,7 @@
 			isa = PBXGroup;
 			children = (
 				9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */,
+				720A705BCC018533FA13CAD9 /* RemoteUnderstandingProvider.swift */,
 			);
 			path = Understanding;
 			sourceTree = "<group>";
@@ -395,15 +421,18 @@
 		D1EB2FE27089FA0240971C55 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */,
 				AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */,
 				A5823D95D80053245EE90DC6 /* FutureCamBody.swift */,
 				670990386321679E71318ECF /* GenerationProgressRow.swift */,
 				A795369647DCD3796D878054 /* PosterCapsuleButton.swift */,
+				3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */,
 				3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */,
 				042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */,
 				4C0A9D8D00C482FFD912D66F /* StatusPill.swift */,
 				8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */,
 				1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */,
+				8765ECEB8AD104AC0655B09E /* WaveTimeRail.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -448,6 +477,7 @@
 			children = (
 				4713B2304639B23F842E56AF /* AIModelCatalogProvider.swift */,
 				4F62345CBFEE6F4C9C8552DE /* AIModelConfigurationStore.swift */,
+				46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -530,8 +560,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2600;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = E383A91F0EFB5C162D22F065 /* Build configuration list for PBXProject "FUMIRA" */;
 			developmentRegion = en;
@@ -572,7 +600,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				153899DEFBC77D8742FE41F3 /* AppModelTests.swift in Sources */,
+				38831A33FFE897593276E173 /* CameraControlTests.swift in Sources */,
+				3B29195E9A9CB95EFECDD2A0 /* GenerationErrorTests.swift in Sources */,
 				29D9DC65D7062DCCB884557B /* TimePositionTests.swift in Sources */,
+				EF91FA15A8DA811F2A27B032 /* WaveTimeBrowseSnapTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -588,6 +619,7 @@
 				790C43F80CBE7459040C84C2 /* AppModel.swift in Sources */,
 				7098042EC676833F21DE70EE /* AppPhase.swift in Sources */,
 				DB1FFB0E6083B353899FA1E0 /* BluetoothPermissionView.swift in Sources */,
+				F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */,
 				A105B28967391BB722D2F221 /* CameraPermissionView.swift in Sources */,
 				5392923DA5EB8A68A1E21131 /* CameraPreviewFactory.swift in Sources */,
 				C5779E4D103E1FC70AE578DC /* CameraService.swift in Sources */,
@@ -596,8 +628,10 @@
 				61CFA8E20BD704C3C5C87A4C /* ConnectionFeedbackView.swift in Sources */,
 				EB3F790DACC707A6A7CDE9FD /* ConnectionView.swift in Sources */,
 				1530F190F2B4FA42E6129688 /* DisconnectedView.swift in Sources */,
+				A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */,
 				1245BDCD7EC1C8CB446A703A /* FUMIRAApp.swift in Sources */,
 				0EBB9147A09ED73A0B3166DB /* FutureCamBody.swift in Sources */,
+				9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */,
 				9CFA5CCAED0C6B13D9E5DDAA /* GenerationFailureView.swift in Sources */,
 				C4D3B86795A57B78A821B0BC /* GenerationProgressRow.swift in Sources */,
 				A1427FB05CE0F83DA5D1B137 /* GenerationProvider.swift in Sources */,
@@ -611,6 +645,7 @@
 				B136E911C8319B079CD18F7B /* PhaseTransition.swift in Sources */,
 				AC3DE3CD08F90EB6BBDD424C /* PosterCapsuleButton.swift in Sources */,
 				0F7F38450F6A3BA034C6FC94 /* PosterEffects.swift in Sources */,
+				D95241D281492B368518AA4D /* PosterKeywordHero.swift in Sources */,
 				32A7E40906ED936B1936AE68 /* PosterMotion.swift in Sources */,
 				F52BB40AD845207CF1B3A517 /* PosterPalette.swift in Sources */,
 				6BEEF715C8AC2E660E4EDEA3 /* PosterPressStyle.swift in Sources */,
@@ -621,6 +656,8 @@
 				E234B574678CF28B21321117 /* PosterTitleView.swift in Sources */,
 				583EE574E6A1116210347351 /* PosterTypography.swift in Sources */,
 				FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */,
+				346647DD342F7ADBF2D8EA3C /* RemoteGenerationProvider.swift in Sources */,
+				07CE3DA12048AD23FC41D2EC /* RemoteUnderstandingProvider.swift in Sources */,
 				55FD4A836D87F4FDD4E2EE97 /* ResultView.swift in Sources */,
 				E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */,
 				4E26490CC1A2F57B62812901 /* SharePosterView.swift in Sources */,
@@ -634,6 +671,7 @@
 				DAC5CF90465E60FE3F7964FA /* TimeRail.swift in Sources */,
 				F18F38D349BDDA6576DCE0B5 /* UnderstandingView.swift in Sources */,
 				CC9564F3F5A7240742019CC3 /* ViewfinderView.swift in Sources */,
+				E37BC06098613AAFAD117F89 /* WaveTimeRail.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -671,6 +709,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5CQ49A8XPZ;
 				INFOPLIST_FILE = FUMIRA/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -706,6 +745,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 5CQ49A8XPZ;
 				INFOPLIST_FILE = FUMIRA/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

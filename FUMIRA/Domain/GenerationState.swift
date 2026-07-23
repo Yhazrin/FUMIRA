@@ -32,11 +32,3 @@ enum GenerationEvent: Sendable {
     case progress(Double)
     case completed(GeneratedFrame)
 }
-
-enum GenerationError: LocalizedError, Sendable {
-    case timedOut
-
-    var errorDescription: String? {
-        "目标时间生成超时，其他结果仍然可用。"
-    }
-}

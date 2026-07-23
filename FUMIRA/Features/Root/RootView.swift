@@ -71,36 +71,62 @@ struct RootView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !model.isPipelineBusy && model.phase != .share {
+            if showsSettingsEntry {
                 Button {
-                    model.isModelSettingsPresented = true
+                    model.openSettings()
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.headline)
-                        .foregroundStyle(PosterPalette.ink)
+                    Image(systemName: "gearshape")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(PosterPalette.ink.opacity(0.72))
                         .frame(width: 44, height: 44)
-                        .background(PosterPalette.paperWhite.opacity(0.9))
+                        .background(PosterPalette.paperWhite.opacity(0.72))
                         .clipShape(Circle())
-                        .shadow(color: PosterEffects.floating, radius: 8, y: 4)
                 }
                 .padding(.trailing, PosterSpacing.lg)
                 .padding(.top, PosterSpacing.sm)
-                .accessibilityLabel("模型后台")
-                .accessibilityHint("查看和选择识图、故事与生图模型路由")
+                .accessibilityLabel("设置")
+                .accessibilityHint("打开通用设置；模型路由在高级选项中")
             }
         }
         .sheet(isPresented: Bindable(model).isModelSettingsPresented) {
-            ModelSettingsView(model: model)
+            SettingsView(model: model)
         }
         .animation(.posterPhaseChange(reduceMotion: reduceMotion), value: model.phase)
     }
+
+    /// Low-disruption Settings entry on non-immersive phases only.
+    /// Connection and camera/pipeline immersive phases never show this control.
+    private var showsSettingsEntry: Bool {
+        switch model.phase {
+        case .connection,
+             .viewfinder,
+             .shuttered,
+             .understanding,
+             .storyWriting,
+             .generating,
+             .share:
+            false
+        case .bluetoothPermission,
+             .connected,
+             .cameraPermission,
+             .storyReady,
+             .result,
+             .pipelineFailure,
+             .disconnected:
+            !model.isPipelineBusy
+        }
+    }
 }
 
-#Preview("Connection") {
+#Preview("Connection — 无设置入口") {
     RootView(model: PreviewFixtures.model(phase: .connection))
 }
 
-#Preview("Viewfinder") {
+#Preview("Camera Permission — 有设置入口") {
+    RootView(model: PreviewFixtures.model(phase: .cameraPermission))
+}
+
+#Preview("Viewfinder — 无全局设置") {
     RootView(model: PreviewFixtures.model(phase: .viewfinder))
 }
 

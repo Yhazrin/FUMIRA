@@ -5,6 +5,55 @@ enum CameraAuthorization: Sendable {
     case authorized
 }
 
+enum CameraLensPosition: Sendable, Equatable {
+    case back
+    case front
+}
+
+enum CameraFlashMode: Sendable, Equatable, CaseIterable {
+    case off
+    case on
+    case auto
+
+    var next: CameraFlashMode {
+        switch self {
+        case .off: .on
+        case .on: .auto
+        case .auto: .off
+        }
+    }
+
+    var systemImageName: String {
+        switch self {
+        case .off: "bolt.slash.fill"
+        case .on: "bolt.fill"
+        case .auto: "bolt.badge.automatic.fill"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .off: "闪光灯关闭"
+        case .on: "闪光灯打开"
+        case .auto: "闪光灯自动"
+        }
+    }
+}
+
+struct CameraControlSnapshot: Sendable, Equatable {
+    var lensPosition: CameraLensPosition
+    var flashMode: CameraFlashMode
+    var canSwitchCamera: Bool
+    var supportsFlash: Bool
+}
+
+/// Optional live-camera controls. Mock / simulator cameras do not adopt this.
+protocol CameraControlProviding: Sendable {
+    func currentControls() async -> CameraControlSnapshot
+    func switchCamera() async throws -> CameraControlSnapshot
+    func setFlashMode(_ mode: CameraFlashMode) async throws -> CameraControlSnapshot
+}
+
 protocol CameraService: Sendable {
     func requestAuthorization() async throws -> CameraAuthorization
     func startPreview() async throws

@@ -10,6 +10,7 @@ enum LiveCameraError: LocalizedError, Sendable {
     case inputUnavailable
     case outputUnavailable
     case captureFailed
+    case switchUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -23,11 +24,13 @@ enum LiveCameraError: LocalizedError, Sendable {
             "无法建立照片输出。"
         case .captureFailed:
             "这次快门没有得到完整照片，请再拍一次。"
+        case .switchUnavailable:
+            "当前设备无法切换前后摄像头。"
         }
     }
 }
 
-final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @unchecked Sendable {
+final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraPreviewFactory, @unchecked Sendable {
     let isLive = true
 
     private let session = AVCaptureSession()
@@ -35,6 +38,9 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
     private let sessionQueue = DispatchQueue(label: "com.fumira.camera.session")
     private var isConfigured = false
     private var captureDelegates: [Int64: PhotoCaptureDelegate] = [:]
+    private var videoDeviceInput: AVCaptureDeviceInput?
+    private var currentPosition: AVCaptureDevice.Position = .back
+    private var preferredFlashMode: AVCaptureDevice.FlashMode = .auto
 
     func requestAuthorization() async throws -> CameraAuthorization {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -88,8 +94,9 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
             sessionQueue.async { [self] in
                 let settings = AVCapturePhotoSettings()
                 settings.photoQualityPrioritization = .quality
-                if photoOutput.supportedFlashModes.contains(.auto) {
-                    settings.flashMode = .auto
+                let flashMode = resolvedFlashMode()
+                if photoOutput.supportedFlashModes.contains(flashMode) {
+                    settings.flashMode = flashMode
                 }
 
                 if
@@ -122,6 +129,57 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
         }
     }
 
+    func currentControls() async -> CameraControlSnapshot {
+        await withCheckedContinuation { continuation in
+            sessionQueue.async { [self] in
+                continuation.resume(returning: makeSnapshot())
+            }
+        }
+    }
+
+    func switchCamera() async throws -> CameraControlSnapshot {
+        try await withCheckedThrowingContinuation { continuation in
+            sessionQueue.async { [self] in
+                do {
+                    try configureIfNeeded()
+                    let nextPosition: AVCaptureDevice.Position =
+                        currentPosition == .back ? .front : .back
+                    guard Self.device(for: nextPosition) != nil else {
+                        throw LiveCameraError.switchUnavailable
+                    }
+
+                    session.beginConfiguration()
+                    defer { session.commitConfiguration() }
+
+                    if let videoDeviceInput {
+                        session.removeInput(videoDeviceInput)
+                        self.videoDeviceInput = nil
+                    }
+
+                    try installInput(position: nextPosition)
+                    currentPosition = nextPosition
+                    continuation.resume(returning: makeSnapshot())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func setFlashMode(_ mode: CameraFlashMode) async throws -> CameraControlSnapshot {
+        try await withCheckedThrowingContinuation { continuation in
+            sessionQueue.async { [self] in
+                do {
+                    try configureIfNeeded()
+                    preferredFlashMode = mode.avFlashMode
+                    continuation.resume(returning: makeSnapshot())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     @MainActor
     func makePreview() -> AnyView {
         AnyView(LiveCameraPreviewView(session: session))
@@ -129,11 +187,24 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
 
     private func configureIfNeeded() throws {
         guard !isConfigured else { return }
-        guard let device = AVCaptureDevice.default(
-            .builtInWideAngleCamera,
-            for: .video,
-            position: .back
-        ) else {
+
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        session.sessionPreset = .photo
+
+        try installInput(position: .back)
+
+        guard session.canAddOutput(photoOutput) else {
+            throw LiveCameraError.outputUnavailable
+        }
+        session.addOutput(photoOutput)
+        photoOutput.maxPhotoQualityPrioritization = .quality
+        currentPosition = .back
+        isConfigured = true
+    }
+
+    private func installInput(position: AVCaptureDevice.Position) throws {
+        guard let device = Self.device(for: position) else {
             throw LiveCameraError.cameraUnavailable
         }
 
@@ -144,21 +215,42 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
             throw LiveCameraError.inputUnavailable
         }
 
-        session.beginConfiguration()
-        defer { session.commitConfiguration() }
-        session.sessionPreset = .photo
-
         guard session.canAddInput(input) else {
             throw LiveCameraError.inputUnavailable
         }
         session.addInput(input)
+        videoDeviceInput = input
+        currentPosition = position
+    }
 
-        guard session.canAddOutput(photoOutput) else {
-            throw LiveCameraError.outputUnavailable
+    private func makeSnapshot() -> CameraControlSnapshot {
+        CameraControlSnapshot(
+            lensPosition: currentPosition == .front ? .front : .back,
+            flashMode: CameraFlashMode(avFlashMode: preferredFlashMode),
+            canSwitchCamera: Self.canSwitchBetweenCameras,
+            supportsFlash: currentDeviceSupportsFlash
+        )
+    }
+
+    private var currentDeviceSupportsFlash: Bool {
+        guard let device = videoDeviceInput?.device else { return false }
+        return device.hasFlash && !photoOutput.supportedFlashModes.isEmpty
+    }
+
+    private func resolvedFlashMode() -> AVCaptureDevice.FlashMode {
+        guard currentDeviceSupportsFlash else { return .off }
+        if photoOutput.supportedFlashModes.contains(preferredFlashMode) {
+            return preferredFlashMode
         }
-        session.addOutput(photoOutput)
-        photoOutput.maxPhotoQualityPrioritization = .quality
-        isConfigured = true
+        return .off
+    }
+
+    private static var canSwitchBetweenCameras: Bool {
+        device(for: .back) != nil && device(for: .front) != nil
+    }
+
+    private static func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
     }
 
     private static func pixelDimensions(for data: Data) -> (width: Int, height: Int) {
@@ -172,6 +264,25 @@ final class LiveCameraService: NSObject, CameraService, CameraPreviewFactory, @u
         let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
         let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
         return (width, height)
+    }
+}
+
+private extension CameraFlashMode {
+    var avFlashMode: AVCaptureDevice.FlashMode {
+        switch self {
+        case .off: .off
+        case .on: .on
+        case .auto: .auto
+        }
+    }
+
+    init(avFlashMode: AVCaptureDevice.FlashMode) {
+        switch avFlashMode {
+        case .on: self = .on
+        case .auto: self = .auto
+        case .off: self = .off
+        @unknown default: self = .off
+        }
     }
 }
 

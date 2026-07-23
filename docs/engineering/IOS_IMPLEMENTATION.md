@@ -42,3 +42,8 @@ after explicit approval, never submit a request for every drag event.
 The shipped configuration uses deterministic demo providers. Route options for
 major providers are visible but disabled until a backend catalog marks them ready.
 Feature views never construct a provider client.
+
+When `FUMIRA_API_BASE_URL` is set (process environment or Info.plist),
+`AppDependencies.runtime` injects `RemoteGenerationProvider` for image generation
+while understanding and story stay on mocks. Empty / missing URL keeps
+`MockGenerationProvider`. Vendor API keys never appear in the iOS target.

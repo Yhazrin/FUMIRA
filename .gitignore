@@ -1,0 +1,42 @@
+# macOS
+.DS_Store
+
+# Xcode / user state
+**/xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Secrets & local env
+.env
+.env.local
+.env.*.local
+**/.env
+
+# Server runtime data
+server/node_modules/
+server/dist/
+server/uploads/
+server/generated/
+server/data/
+server/coverage/
+*.log
+
+# Binary / captured media (never commit originals or base64 dumps)
+*.heic
+*.HEIC
+**/fixtures/private/
+**/tmp-base64/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved

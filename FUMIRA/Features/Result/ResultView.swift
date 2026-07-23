@@ -1,28 +1,14 @@
 import SwiftUI
+import UIKit
 
 struct ResultView: View {
     let model: AppModel
     var namespace: Namespace.ID
 
-    private var titleSegments: [String] {
-        let years = model.selectedTime.offsetYears
-        if abs(years) < 0.5 {
-            return ["现在", "的", "这里"]
-        }
-        if years < 0 {
-            return ["过去", "的", "这里"]
-        }
-        return ["未来", "的", "这里"]
-    }
-
     var body: some View {
         ZStack {
-            TemporalParkScene(
-                time: model.selectedTime,
-                namespace: namespace,
-                cornerRadius: 0
-            )
-            .ignoresSafeArea()
+            resultBackground
+                .ignoresSafeArea()
 
             VStack {
                 LinearGradient(
@@ -31,21 +17,10 @@ struct ResultView: View {
                     endPoint: .bottom
                 )
                 .frame(height: 220)
-                .overlay(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                        PosterTitleView(
-                            segments: titleSegments,
-                            color: PosterPalette.timeBlue,
-                            fontSize: 34
-                        )
+                .overlay(alignment: .top) {
+                    PosterKeywordHero(moment: .reply, fontSize: 34)
                         .padding(.horizontal, PosterSpacing.lg)
                         .padding(.top, PosterSpacing.xl)
-
-                        Rectangle()
-                            .fill(PosterPalette.energyLime)
-                            .frame(width: 80, height: 4)
-                            .padding(.horizontal, PosterSpacing.lg)
-                    }
                 }
 
                 Spacer()
@@ -55,11 +30,11 @@ struct ResultView: View {
                         HStack {
                             Text(model.currentStoryBeat?.title ?? "今天的这里")
                                 .font(.headline)
-                                .foregroundStyle(PosterPalette.deepTimeBlue)
+                                .foregroundStyle(PosterPalette.skyDeep)
                             Spacer()
                             Text(model.selectedTime.compactLabel)
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(PosterPalette.timeBlue)
+                                .foregroundStyle(PosterPalette.sky)
                         }
                         Text(model.currentNarrative)
                             .font(.footnote)
@@ -76,9 +51,7 @@ struct ResultView: View {
                         model.updateTime(normalized: normalized)
                     }
                     .padding(.horizontal, PosterSpacing.lg)
-                    .padding(.vertical, PosterSpacing.md)
-                    .background(PosterPalette.paper.opacity(0.94))
-                    .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous))
+                    .padding(.vertical, PosterSpacing.sm)
 
                     HStack(spacing: PosterSpacing.md) {
                         PosterCapsuleButton(
@@ -107,6 +80,24 @@ struct ResultView: View {
                     )
                 )
             }
+        }
+    }
+
+    @ViewBuilder
+    private var resultBackground: some View {
+        if let data = model.generatedFrame?.imageData,
+           let image = UIImage(data: data)
+        {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .accessibilityLabel("生成的时间场景")
+        } else {
+            TemporalParkScene(
+                time: model.selectedTime,
+                namespace: namespace,
+                cornerRadius: 0
+            )
         }
     }
 }

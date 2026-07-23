@@ -8,7 +8,7 @@ struct StoryReadyView: View {
             VStack(alignment: .leading, spacing: PosterSpacing.lg) {
                 PosterTitleView(
                     segments: ["故事", "已经", "醒来"],
-                    color: PosterPalette.timeBlue,
+                    color: PosterPalette.sky,
                     fontSize: 36
                 )
 
@@ -20,7 +20,7 @@ struct StoryReadyView: View {
                             .foregroundStyle(PosterPalette.ink)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(PosterPalette.energyLime)
+                            .background(PosterPalette.moss)
                             .clipShape(Capsule())
                             .padding(PosterSpacing.md)
                     }
@@ -29,7 +29,7 @@ struct StoryReadyView: View {
                     VStack(alignment: .leading, spacing: PosterSpacing.sm) {
                         Text(story.title)
                             .font(PosterTypography.display(32))
-                            .foregroundStyle(PosterPalette.deepTimeBlue)
+                            .foregroundStyle(PosterPalette.skyDeep)
                         Text(story.logline)
                             .font(.body.weight(.medium))
                             .foregroundStyle(PosterPalette.ink)
@@ -46,7 +46,7 @@ struct StoryReadyView: View {
                             Spacer()
                             Text(model.selectedTime.compactLabel)
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(PosterPalette.timeBlue)
+                                .foregroundStyle(PosterPalette.sky)
                         }
                         Text(model.currentNarrative)
                             .font(.body)

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PosterTitleView: View {
     let segments: [String]
-    var color: Color = PosterPalette.timeBlue
+    var color: Color = PosterPalette.sky
     var fontSize: CGFloat = 42
     var rotations: [Double] = [-2, 3, -1.5, 2.5]
 

@@ -43,8 +43,26 @@ struct AppDependencies {
     }
 
     static var runtime: AppDependencies {
+        let generation: any GenerationProvider = {
+            if let baseURL = FUMIRAAPIConfiguration.baseURL {
+                return RemoteGenerationProvider(baseURL: baseURL)
+            }
+            return MockGenerationProvider()
+        }()
+
         #if targetEnvironment(simulator)
-        return .preview
+        return AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(),
+            story: MockStoryProvider(),
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient()
+        )
         #else
         let liveCamera = LiveCameraService()
         return AppDependencies(
@@ -53,7 +71,7 @@ struct AppDependencies {
             hardware: MockHardwareController(),
             understanding: MockImageUnderstandingProvider(),
             story: MockStoryProvider(),
-            generation: MockGenerationProvider(),
+            generation: generation,
             modelCatalog: BundledAIModelCatalogProvider(),
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
             storage: MockPosterStorage(),

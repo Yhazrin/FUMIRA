@@ -7,11 +7,11 @@ struct UnderstandingView: View {
     @State private var scanPosition = -0.8
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.deepTimeBlue) {
+        PosterScreenContainer(background: PosterPalette.skyDeep) {
             VStack(alignment: .leading, spacing: PosterSpacing.lg) {
                 PosterTitleView(
                     segments: ["先", "读懂", "这一刻"],
-                    color: PosterPalette.energyLime,
+                    color: PosterPalette.moss,
                     fontSize: 36
                 )
 
@@ -21,9 +21,9 @@ struct UnderstandingView: View {
 
                     GeometryReader { proxy in
                         Rectangle()
-                            .fill(PosterPalette.energyLime)
+                            .fill(PosterPalette.moss)
                             .frame(height: 4)
-                            .shadow(color: PosterPalette.energyLime, radius: 12)
+                            .shadow(color: PosterPalette.moss, radius: 12)
                             .offset(y: proxy.size.height * scanPosition)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
@@ -40,7 +40,7 @@ struct UnderstandingView: View {
                             .foregroundStyle(PosterPalette.ink)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(PosterPalette.energyLime)
+                            .background(PosterPalette.moss)
                             .clipShape(Capsule())
                             Spacer()
                         }
@@ -54,7 +54,7 @@ struct UnderstandingView: View {
                         .foregroundStyle(PosterPalette.paperWhite)
 
                     ProgressView(value: model.understandingProgress)
-                        .tint(PosterPalette.energyLime)
+                        .tint(PosterPalette.moss)
                         .scaleEffect(x: 1, y: 2, anchor: .center)
 
                     Text("\(Int(model.understandingProgress * 100))% · 正在识别主体、空间与变化线索")

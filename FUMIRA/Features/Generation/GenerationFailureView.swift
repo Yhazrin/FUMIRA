@@ -67,7 +67,7 @@ struct GenerationFailureView: View {
     }
 
     private var retryTitle: String {
-        model.failedStage == .configuration ? "打开模型后台" : "从这里继续"
+        model.failedStage == .configuration ? "打开设置" : "从这里继续"
     }
 
     private var fallbackTitle: String {

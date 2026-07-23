@@ -31,7 +31,7 @@ struct TemporalParkScene: View {
             .overlay {
                 if showBorder {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(PosterPalette.energyLime, lineWidth: 4)
+                        .stroke(PosterPalette.moss, lineWidth: 4)
                 }
             }
             .modifier(SceneIdentityModifier(namespace: namespace, id: sceneID, reduceMotion: reduceMotion))
@@ -55,17 +55,19 @@ struct TemporalParkScene: View {
     }
 
     private func skyTop(pastBlend: Double, futureBlend: Double) -> Color {
-        let base = Color(red: 0.55, green: 0.78, blue: 0.95)
-        let past = Color(red: 0.82, green: 0.72, blue: 0.58)
-        let future = Color(red: 0.42, green: 0.55, blue: 0.82)
-        return lerpColor(lerpColor(base, past, pastBlend * 0.7), future, futureBlend * 0.65)
+        lerpColor(
+            lerpColor(PosterPalette.sky, PosterPalette.skyPastTop, pastBlend * 0.7),
+            PosterPalette.skyFutureTop,
+            futureBlend * 0.65
+        )
     }
 
     private func skyBottom(pastBlend: Double, futureBlend: Double) -> Color {
-        let base = Color(red: 0.72, green: 0.88, blue: 0.96)
-        let past = Color(red: 0.90, green: 0.82, blue: 0.70)
-        let future = Color(red: 0.58, green: 0.70, blue: 0.90)
-        return lerpColor(lerpColor(base, past, pastBlend * 0.6), future, futureBlend * 0.5)
+        lerpColor(
+            lerpColor(PosterPalette.skySoft, PosterPalette.skyPastBottom, pastBlend * 0.6),
+            PosterPalette.skyFutureBottom,
+            futureBlend * 0.5
+        )
     }
 
     private func backHill(in size: CGSize) -> some View {
@@ -106,7 +108,7 @@ struct TemporalParkScene: View {
 
     private var pathColor: Color {
         if t < -0.2 { return PosterPalette.mutedInk }
-        if t > 0.2 { return PosterPalette.timeBlue }
+        if t > 0.2 { return PosterPalette.skyDeep }
         return PosterPalette.paperWhite
     }
 
@@ -148,8 +150,8 @@ struct TemporalParkScene: View {
 
     private var treeCrownColor: Color {
         if t < -0.3 { return PosterPalette.mutedInk.opacity(0.8) }
-        if t > 0.3 { return PosterPalette.parkGreen.opacity(0.6) }
-        return PosterPalette.parkGreen
+        if t > 0.3 { return PosterPalette.grassLight.opacity(0.75) }
+        return PosterPalette.pine
     }
 
     private func monolith(in size: CGSize) -> some View {
@@ -157,7 +159,7 @@ struct TemporalParkScene: View {
         return RoundedRectangle(cornerRadius: 6, style: .continuous)
             .fill(
                 LinearGradient(
-                    colors: [PosterPalette.timeBlue, PosterPalette.deepTimeBlue],
+                    colors: [PosterPalette.sky, PosterPalette.skyDeep],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -175,15 +177,15 @@ struct TemporalParkScene: View {
                 PosterPalette.paper.opacity(pastOverlay)
             }
             if futureOverlay > 0 {
-                PosterPalette.timeBlue.opacity(futureOverlay * 0.35)
+                PosterPalette.sky.opacity(futureOverlay * 0.35)
             }
         }
     }
 
     private func hillColor(depth: Double) -> Color {
-        let nowGreen = PosterPalette.parkGreen
+        let nowGreen = depth < 0.45 ? PosterPalette.grassLight : PosterPalette.pine
         let pastGreen = PosterPalette.mutedInk.opacity(0.7)
-        let futureGreen = PosterPalette.parkGreen.opacity(0.55 + depth * 0.2)
+        let futureGreen = PosterPalette.pine.opacity(0.55 + depth * 0.2)
         if t < 0 {
             return lerpColor(nowGreen, pastGreen, min(1, abs(t) * 1.2))
         }

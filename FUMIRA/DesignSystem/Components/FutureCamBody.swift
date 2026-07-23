@@ -4,7 +4,7 @@ struct FutureCamBody: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                .fill(PosterPalette.timeBlue)
+                .fill(PosterPalette.sky)
                 .frame(width: 220, height: 160)
                 .shadow(color: PosterEffects.floating, radius: 12, y: 8)
 
@@ -18,17 +18,17 @@ struct FutureCamBody: View {
                             .frame(width: 44, height: 44)
                             .overlay {
                                 Circle()
-                                    .stroke(PosterPalette.energyLime, lineWidth: 3)
+                                    .stroke(PosterPalette.moss, lineWidth: 3)
                                     .frame(width: 52, height: 52)
                             }
                     }
 
                 HStack(spacing: PosterSpacing.lg) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(PosterPalette.parkGreen)
+                        .fill(PosterPalette.pine)
                         .frame(width: 28, height: 8)
                     Circle()
-                        .fill(PosterPalette.energyLime)
+                        .fill(PosterPalette.moss)
                         .frame(width: 20, height: 20)
                 }
             }
@@ -44,14 +44,19 @@ struct ShutterButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .stroke(PosterPalette.ink, lineWidth: 3)
-                    .frame(width: 76, height: 76)
+                    .stroke(PosterEffects.cameraShutterRing, lineWidth: 4)
+                    .frame(width: 78, height: 78)
                 Circle()
-                    .fill(PosterPalette.energyLime)
-                    .frame(width: 60, height: 60)
+                    .fill(PosterEffects.cameraShutterFill)
+                    .frame(width: 62, height: 62)
+                // Moss as ≤5% accent ring — never a fluorescent / yellow full fill.
+                Circle()
+                    .stroke(PosterPalette.moss.opacity(0.75), lineWidth: 2)
+                    .frame(width: 54, height: 54)
             }
             .frame(width: 88, height: 88)
             .contentShape(Circle())
+            .shadow(color: PosterEffects.floating, radius: 10, y: 4)
         }
         .buttonStyle(PosterPressStyle())
         .accessibilityLabel("快门")

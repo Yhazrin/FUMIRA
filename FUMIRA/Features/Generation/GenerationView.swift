@@ -11,13 +11,9 @@ struct GenerationView: View {
     }
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.growthGreen) {
+        PosterScreenContainer(background: PosterPalette.pine) {
             VStack(spacing: PosterSpacing.lg) {
-                PosterTitleView(
-                    segments: ["时间", "正在", "生长"],
-                    color: PosterPalette.deepTimeBlue,
-                    fontSize: 36
-                )
+                PosterKeywordHero(moment: .growing, fontSize: 36, surface: .dark)
 
                 Text(yearText)
                     .font(PosterTypography.display(72))
@@ -25,7 +21,7 @@ struct GenerationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Rectangle()
-                    .fill(PosterPalette.energyLime)
+                    .fill(PosterPalette.moss)
                     .frame(height: 4)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(width: 120)
@@ -47,10 +43,10 @@ struct GenerationView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.currentStoryBeat?.title ?? "时间正在改写画面")
                         .font(.headline)
-                        .foregroundStyle(PosterPalette.deepTimeBlue)
+                        .foregroundStyle(PosterPalette.paperWhite)
                     Text(model.currentNarrative)
                         .font(.footnote)
-                        .foregroundStyle(PosterPalette.ink.opacity(0.76))
+                        .foregroundStyle(PosterPalette.paperWhite.opacity(0.76))
                         .lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

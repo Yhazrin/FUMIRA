@@ -17,7 +17,20 @@ final class AppModelTests: XCTestCase {
         #if targetEnvironment(simulator)
         let model = AppModel(dependencies: .runtime)
         XCTAssertFalse(model.isUsingLiveCamera)
+        XCTAssertFalse(model.hasLiveCameraControls)
         #endif
+    }
+
+    func testMockCameraHidesUnsupportedLiveControls() async {
+        let model = AppModel(dependencies: .test)
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        XCTAssertFalse(model.hasLiveCameraControls)
+        XCTAssertFalse(model.canSwitchCamera)
+        XCTAssertFalse(model.supportsCameraFlash)
+        model.toggleCameraGrid()
+        XCTAssertTrue(model.isCameraGridEnabled)
     }
 
     func testHardwarePathReachesCameraPermission() async {

@@ -39,6 +39,10 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Optional. Empty = local Mock generation. Set to e.g. http://127.0.0.1:8787 for remote.
+        FUMIRA_API_BASE_URL: ""
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera

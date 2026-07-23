@@ -25,10 +25,34 @@ final class AppModel {
     var posterURL: URL?
     var modelCatalog: AIModelCatalog = .bundled
     var modelConfiguration: AIModelConfiguration = .demo
+    /// Presents the user-facing Settings sheet (advanced model routing lives inside).
     var isModelSettingsPresented = false
+    var cameraControlSnapshot = CameraControlSnapshot(
+        lensPosition: .back,
+        flashMode: .auto,
+        canSwitchCamera: false,
+        supportsFlash: false
+    )
+    var isCameraGridEnabled = false
 
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
+    }
+
+    var hasLiveCameraControls: Bool {
+        cameraControlProvider != nil
+    }
+
+    var canSwitchCamera: Bool {
+        cameraControlSnapshot.canSwitchCamera
+    }
+
+    var supportsCameraFlash: Bool {
+        cameraControlSnapshot.supportsFlash
+    }
+
+    private var cameraControlProvider: (any CameraControlProviding)? {
+        dependencies.camera as? any CameraControlProviding
     }
 
     var isPipelineBusy: Bool {
@@ -101,10 +125,56 @@ final class AppModel {
     func grantCameraAccess() async {
         do {
             _ = try await dependencies.camera.requestAuthorization()
+            await refreshCameraControls()
             phase = .viewfinder
         } catch {
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    func openSettings() {
+        isModelSettingsPresented = true
+    }
+
+    func refreshCameraControls() async {
+        guard let provider = cameraControlProvider else {
+            cameraControlSnapshot = CameraControlSnapshot(
+                lensPosition: .back,
+                flashMode: .auto,
+                canSwitchCamera: false,
+                supportsFlash: false
+            )
+            return
+        }
+        cameraControlSnapshot = await provider.currentControls()
+    }
+
+    func switchCameraLens() async {
+        guard let provider = cameraControlProvider else { return }
+        do {
+            cameraControlSnapshot = try await provider.switchCamera()
+            dependencies.haptics.play(.selection)
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func cycleFlashMode() async {
+        guard let provider = cameraControlProvider else { return }
+        guard cameraControlSnapshot.supportsFlash else { return }
+        do {
+            cameraControlSnapshot = try await provider.setFlashMode(
+                cameraControlSnapshot.flashMode.next
+            )
+            dependencies.haptics.play(.selection)
+        } catch {
+            lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func toggleCameraGrid() {
+        isCameraGridEnabled.toggle()
+        dependencies.haptics.play(.selection)
     }
 
     func capture() async {
@@ -380,7 +450,7 @@ final class AppModel {
     private func presentConfigurationFailure() {
         activeSessionID = nil
         failedStage = .configuration
-        lastErrorMessage = "当前模型组合尚未全部接通，请在模型后台选择可运行路由。"
+        lastErrorMessage = "当前模型组合尚未全部接通，请在设置 → 高级中选择可运行路由。"
         phase = .pipelineFailure
     }
 
@@ -399,6 +469,7 @@ final class AppModel {
     private func resumeCameraPreview() async {
         do {
             try await dependencies.camera.startPreview()
+            await refreshCameraControls()
         } catch {
             lastErrorMessage = error.localizedDescription
             failedStage = .capture

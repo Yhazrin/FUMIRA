@@ -10,7 +10,7 @@ struct BluetoothPermissionView: View {
 
                 PosterTitleView(
                     segments: ["连上", "FutureCam"],
-                    color: PosterPalette.timeBlue,
+                    color: PosterPalette.sky,
                     fontSize: 40
                 )
 
@@ -18,7 +18,7 @@ struct BluetoothPermissionView: View {
 
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 64))
-                    .foregroundStyle(PosterPalette.parkGreen)
+                    .foregroundStyle(PosterPalette.pine)
                     .padding(.vertical, PosterSpacing.xl)
                     .accessibilityHidden(true)
 

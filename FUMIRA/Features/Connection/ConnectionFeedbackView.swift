@@ -4,27 +4,44 @@ struct ConnectionFeedbackView: View {
     let model: AppModel
     let snapshot: HardwareSnapshot
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        PosterScreenContainer {
+        ZStack {
+            PosterPalette.paper.ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    PosterPalette.sky.opacity(0.55),
+                    PosterPalette.paper,
+                    PosterPalette.grassLight.opacity(0.4)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
             VStack(spacing: PosterSpacing.xl) {
-                Spacer()
+                Spacer(minLength: PosterSpacing.lg)
 
-                PosterTitleView(
-                    segments: ["已连接"],
-                    color: PosterPalette.parkGreen,
-                    fontSize: 44
-                )
-
-                PosterScriptSubtitle(text: snapshot.name)
+                PosterKeywordHero(moment: .connecting, fontSize: 42)
+                    .padding(.horizontal, PosterSpacing.lg)
 
                 HStack(spacing: PosterSpacing.md) {
                     StatusPill(icon: "checkmark.circle.fill", label: "已连接", isActive: true)
                     StatusPill(icon: "battery.75", label: "\(snapshot.batteryLevel)%")
                 }
-                .padding(.top, PosterSpacing.lg)
 
-                FutureCamBody()
-                    .padding(.vertical, PosterSpacing.xl)
+                Text(snapshot.name)
+                    .font(PosterTypography.script(24))
+                    .foregroundStyle(PosterPalette.mutedInk)
+
+                TemporalParkScene(time: .now, cornerRadius: PosterRadius.card)
+                    .frame(height: 180)
+                    .padding(.horizontal, PosterSpacing.xl)
+                    .shadow(color: PosterEffects.floating, radius: 14, y: 8)
+                    .accessibilityHidden(true)
 
                 Spacer()
 
@@ -34,8 +51,16 @@ struct ConnectionFeedbackView: View {
                 ) {
                     model.continueFromConnection()
                 }
+                .padding(.horizontal, PosterSpacing.lg)
+                .padding(.bottom, PosterSpacing.xl)
             }
         }
+        .animation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : .spring(response: PosterMotion.poster, dampingFraction: 0.86),
+            value: snapshot.batteryLevel
+        )
     }
 }
 

@@ -35,8 +35,11 @@ struct PosterCapsuleButton: View {
 
     private var foregroundColor: Color {
         switch style {
-        case .primary, .lime:
-            style == .lime ? PosterPalette.ink : PosterPalette.paperWhite
+        case .primary:
+            PosterPalette.paperWhite
+        case .lime:
+            // Accent chip style: moss fill + ink label (never fluorescent full-bleed)
+            PosterPalette.ink
         case .secondary:
             PosterPalette.ink
         }
@@ -46,11 +49,12 @@ struct PosterCapsuleButton: View {
     private var background: some View {
         switch style {
         case .primary:
-            PosterPalette.ink
+            // Direction H: primary prefers pine; ink remains available via secondary stroke + ink text
+            PosterPalette.pine
         case .secondary:
             Color.clear
         case .lime:
-            PosterPalette.energyLime
+            PosterPalette.moss
         }
     }
 }

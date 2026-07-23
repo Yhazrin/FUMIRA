@@ -7,6 +7,6 @@ globs:
 - Do not hardcode product colors, radii, spacing, shadows, or motion durations in Features.
 - Use PosterPalette, PosterSpacing, PosterRadius, PosterMotion, and PosterEffects.
 - Functional text uses system typography; poster display text uses PosterTypography.
-- Energy Lime is an accent, never a page background.
+- Direction H: paper / sky / grassLight / pine / moss / ink. Moss (苔黄) is ≤5% accent only — never a page background or solid primary button fill. Prefer pine or ink for primary buttons. energyLime is deprecated → moss.
 - The scene/photo remains the primary visual subject.
 - The time rail is continuous ±100 years and must not snap to landmarks.

@@ -8,17 +8,11 @@ struct CameraPermissionView: View {
             VStack(spacing: PosterSpacing.xl) {
                 Spacer()
 
-                PosterTitleView(
-                    segments: ["打开", "取景器"],
-                    color: PosterPalette.timeBlue,
-                    fontSize: 40
-                )
-
-                PosterScriptSubtitle(text: "Camera")
+                PosterKeywordHero(moment: .ready, fontSize: 40)
 
                 Image(systemName: "camera.viewfinder")
                     .font(.system(size: 64))
-                    .foregroundStyle(PosterPalette.parkGreen)
+                    .foregroundStyle(PosterPalette.pine)
                     .padding(.vertical, PosterSpacing.xl)
                     .accessibilityHidden(true)
 

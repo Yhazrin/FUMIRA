@@ -14,7 +14,7 @@ struct SharePosterView: View {
             VStack(spacing: PosterSpacing.lg) {
                 PosterTitleView(
                     segments: ["带走", "这段", "时间"],
-                    color: PosterPalette.timeBlue,
+                    color: PosterPalette.sky,
                     fontSize: 36
                 )
 
@@ -25,7 +25,7 @@ struct SharePosterView: View {
                     VStack(alignment: .leading, spacing: PosterSpacing.sm) {
                         Text(yearLabel)
                             .font(PosterTypography.display(32))
-                            .foregroundStyle(PosterPalette.timeBlue)
+                            .foregroundStyle(PosterPalette.sky)
                         Text(model.temporalStory?.title ?? "这一刻的时间故事")
                             .font(.headline)
                             .foregroundStyle(PosterPalette.ink)
