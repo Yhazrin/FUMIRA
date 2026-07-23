@@ -1,0 +1,12 @@
+---
+globs:
+  - "FUMIRA/DesignSystem/**/*.swift"
+  - "FUMIRA/Features/**/*.swift"
+---
+
+- Do not hardcode product colors, radii, spacing, shadows, or motion durations in Features.
+- Use PosterPalette, PosterSpacing, PosterRadius, PosterMotion, and PosterEffects.
+- Functional text uses system typography; poster display text uses PosterTypography.
+- Energy Lime is an accent, never a page background.
+- The scene/photo remains the primary visual subject.
+- The time rail is continuous ±100 years and must not snap to landmarks.
