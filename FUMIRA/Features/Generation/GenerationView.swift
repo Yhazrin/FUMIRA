@@ -4,14 +4,18 @@ struct GenerationView: View {
     let model: AppModel
     var namespace: Namespace.ID
 
+    private var photoAspectRatio: CGFloat {
+        CGFloat(model.capturedPhoto?.displayAspectRatio ?? 3.0 / 4.0)
+    }
+
     private var yearText: String {
-        let years = model.selectedTime.offsetYears
+        let years = model.generationTargetTime.offsetYears
         if abs(years) < 0.5 { return "NOW" }
         return String(format: "%+.0f", years)
     }
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.pine) {
+        PosterScreenContainer(background: PosterPalette.skyDeep) {
             VStack(spacing: PosterSpacing.lg) {
                 PosterKeywordHero(moment: .growing, fontSize: 36, surface: .dark)
 
@@ -26,19 +30,24 @@ struct GenerationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(width: 120)
 
-                ZStack {
-                    CapturedPhotoView(photo: model.capturedPhoto)
-                        .frame(height: 190)
-                        .opacity(1 - model.generationProgress * 0.45)
+                PhotoAspectContainer(
+                    aspectRatio: photoAspectRatio,
+                    maximumHeight: 260
+                ) {
+                    ZStack {
+                        CapturedPhotoView(photo: model.capturedPhoto)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .opacity(1 - model.generationProgress * 0.45)
 
-                    TemporalParkScene(
-                        time: model.selectedTime,
-                        namespace: namespace
-                    )
-                    .frame(height: 190)
-                    .opacity(0.2 + model.generationProgress * 0.8)
+                        TemporalParkScene(
+                            time: model.selectedTime,
+                            namespace: namespace
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .opacity(0.2 + model.generationProgress * 0.8)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.pipelineStatusText.isEmpty
@@ -89,13 +98,13 @@ struct GenerationView: View {
                     Spacer()
 
                     #if DEBUG
-                    Button("模拟超时") {
+                    Button("测试超时") {
                         model.presentFailureForPreview()
                     }
                     .font(.caption.weight(.medium))
                     .foregroundStyle(PosterPalette.paperWhite.opacity(0.7))
                     .frame(minHeight: 44)
-                    .accessibilityLabel("模拟超时")
+                    .accessibilityLabel("测试超时")
                     .accessibilityHint("预览生成失败界面")
                     #endif
                 }

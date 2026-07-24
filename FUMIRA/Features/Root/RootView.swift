@@ -137,6 +137,9 @@ struct RootView: View {
     private var showsSettingsEntry: Bool {
         switch model.phase {
         case .connection,
+             .bluetoothPermission,
+             .connected,
+             .cameraPermission,
              .viewfinder,
              .shuttered,
              .understanding,
@@ -144,10 +147,7 @@ struct RootView: View {
              .generating,
              .share:
             false
-        case .bluetoothPermission,
-             .connected,
-             .cameraPermission,
-             .storyReady,
+        case .storyReady,
              .result,
              .pipelineFailure,
              .disconnected:
@@ -172,7 +172,7 @@ struct RootView: View {
     RootView(model: PreviewFixtures.model(phase: .connection))
 }
 
-#Preview("Camera Permission — 有设置入口") {
+#Preview("Camera Permission — 无设置入口") {
     RootView(model: PreviewFixtures.model(phase: .cameraPermission))
 }
 

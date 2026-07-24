@@ -29,7 +29,7 @@ enum AIModelRole: String, Codable, CaseIterable, Hashable, Sendable {
 }
 
 enum AIProviderKind: String, Codable, CaseIterable, Hashable, Sendable {
-    case fumiraDemo
+    case fumira
     case openAI
     case google
     case anthropic
@@ -38,8 +38,8 @@ enum AIProviderKind: String, Codable, CaseIterable, Hashable, Sendable {
 
     var displayName: String {
         switch self {
-        case .fumiraDemo:
-            "FUMIRA Demo"
+        case .fumira:
+            "FUMIRA"
         case .openAI:
             "OpenAI"
         case .google:
@@ -101,11 +101,11 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
     static let bundled = AIModelCatalog(
         options: [
             AIModelOption(
-                id: "demo.vision.context",
+                id: "fumira.vision.context",
                 role: .understanding,
-                provider: .fumiraDemo,
+                provider: .fumira,
                 modelID: "fumira-vision-context-v1",
-                displayName: "上下文识图 Demo",
+                displayName: "场景理解",
                 detail: "主体、空间、时代线索与变化驱动",
                 availability: .ready
             ),
@@ -137,11 +137,11 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
                 availability: .requiresBackend
             ),
             AIModelOption(
-                id: "demo.story.cinematic",
+                id: "fumira.story.cinematic",
                 role: .story,
-                provider: .fumiraDemo,
+                provider: .fumira,
                 modelID: "fumira-story-cinematic-v1",
-                displayName: "时间编剧 Demo",
+                displayName: "时间叙事",
                 detail: "七个时间锚点与连续叙事提示词",
                 availability: .ready
             ),
@@ -173,12 +173,12 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
                 availability: .requiresBackend
             ),
             AIModelOption(
-                id: "demo.image.identity",
+                id: "fumira.image.identity",
                 role: .image,
-                provider: .fumiraDemo,
+                provider: .fumira,
                 modelID: "fumira-image-identity-v1",
-                displayName: "主体一致性 Demo",
-                detail: "用 SwiftUI 时间世界模拟基于原图的变迁",
+                displayName: "时间影像",
+                detail: "基于原图主体与构图生成时间变迁",
                 availability: .ready
             ),
             AIModelOption(
@@ -248,9 +248,9 @@ struct AIModelConfiguration: Hashable, Codable, Sendable {
         }
     }
 
-    static let demo = AIModelConfiguration(
-        understandingOptionID: "demo.vision.context",
-        storyOptionID: "demo.story.cinematic",
-        imageOptionID: "demo.image.identity"
+    static let standard = AIModelConfiguration(
+        understandingOptionID: "fumira.vision.context",
+        storyOptionID: "fumira.story.cinematic",
+        imageOptionID: "fumira.image.identity"
     )
 }

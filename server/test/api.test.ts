@@ -272,17 +272,18 @@ describe("fumira-server", () => {
 
   it("runs understanding and seven-beat story through the configured intelligence adapter", async () => {
     const { buildApp } = await import("../src/index.js");
+    const overlong = "这是一段故意超过页面字符预算的动态故事文字".repeat(8);
     const intelligence = {
       async analyzeImage() {
         return {
           ok: true as const,
           value: {
-            summary: "一条安静的公园步道。",
-            locationType: "公园",
-            visualMood: "清新",
-            timeClues: ["年轻树木"],
-            changeDrivers: ["植被生长"],
-            subjects: [{ name: "步道", confidence: 0.9, identityRule: "保持步道走向" }],
+            summary: overlong,
+            locationType: overlong,
+            visualMood: overlong,
+            timeClues: [overlong],
+            changeDrivers: [overlong],
+            subjects: [{ name: overlong, confidence: 0.9, identityRule: overlong }],
           },
         };
       },
@@ -290,15 +291,15 @@ describe("fumira-server", () => {
         return {
           ok: true as const,
           value: {
-            title: "树影的年轮",
-            logline: "一条步道与树木共同生长。",
-            presentTruth: "步道安静而开阔。",
-            identityRules: ["保持步道走向"],
+            title: overlong,
+            logline: overlong,
+            presentTruth: overlong,
+            identityRules: [overlong],
             beats: [-100, -30, -10, 0, 10, 30, 100].map((anchorYears) => ({
               anchorYears,
-              title: `${anchorYears} 年`,
-              narrative: "时间在树影间推进。",
-              visualPrompt: "保持步道走向与构图。",
+              title: overlong,
+              narrative: overlong,
+              visualPrompt: overlong,
             })),
           },
         };
@@ -322,18 +323,60 @@ describe("fumira-server", () => {
       const understand = await intelligenceApp.inject({
         method: "POST",
         url: "/v1/understand",
-        payload: { sourceAssetId: upload.json().assetId, requestId: "req-understand" },
+        payload: {
+          sourceAssetId: upload.json().assetId,
+          copyConstraints: {
+            summary: 32,
+            locationType: 8,
+            visualMood: 16,
+            timeClue: 10,
+            changeDriver: 10,
+            subjectName: 6,
+            identityRule: 20,
+          },
+          requestId: "req-understand",
+        },
       });
       assert.equal(understand.statusCode, 200);
-      assert.equal(understand.json().understanding.locationType, "公园");
+      const understandBody = understand.json();
+      assert.equal(understandBody.copyConstraints.locationType, 8);
+      assert.ok(Array.from(understandBody.understanding.summary).length <= 32);
+      assert.ok(Array.from(understandBody.understanding.locationType).length <= 8);
+      assert.ok(Array.from(understandBody.understanding.visualMood).length <= 16);
+      assert.ok(Array.from(understandBody.understanding.timeClues[0]).length <= 10);
+      assert.ok(Array.from(understandBody.understanding.changeDrivers[0]).length <= 10);
+      assert.ok(Array.from(understandBody.understanding.subjects[0].name).length <= 6);
+      assert.ok(Array.from(understandBody.understanding.subjects[0].identityRule).length <= 20);
 
       const story = await intelligenceApp.inject({
         method: "POST",
         url: "/v1/stories",
-        payload: { understanding: understand.json().understanding, requestId: "req-story" },
+        payload: {
+          understanding: understandBody.understanding,
+          targetTime: { offsetYears: 25, compactLabel: "25 年后" },
+          copyConstraints: {
+            title: 8,
+            logline: 24,
+            presentTruth: 30,
+            identityRule: 20,
+            beatTitle: 6,
+            beatNarrative: 28,
+            visualPrompt: 44,
+          },
+          requestId: "req-story",
+        },
       });
       assert.equal(story.statusCode, 200);
-      assert.deepEqual(story.json().story.beats.map((beat: { anchorYears: number }) => beat.anchorYears), [-100, -30, -10, 0, 10, 30, 100]);
+      const storyBody = story.json();
+      assert.deepEqual(storyBody.story.beats.map((beat: { anchorYears: number }) => beat.anchorYears), [-100, -30, -10, 0, 10, 30, 100]);
+      assert.equal(storyBody.copyConstraints.title, 8);
+      assert.ok(Array.from(storyBody.story.title).length <= 8);
+      assert.ok(Array.from(storyBody.story.logline).length <= 24);
+      assert.ok(Array.from(storyBody.story.presentTruth).length <= 30);
+      assert.ok(Array.from(storyBody.story.identityRules[0]).length <= 20);
+      assert.ok(Array.from(storyBody.story.beats[0].title).length <= 6);
+      assert.ok(Array.from(storyBody.story.beats[0].narrative).length <= 28);
+      assert.ok(Array.from(storyBody.story.beats[0].visualPrompt).length <= 44);
     } finally {
       await intelligenceApp.close();
     }

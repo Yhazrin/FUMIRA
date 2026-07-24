@@ -55,6 +55,7 @@
 		790C43F80CBE7459040C84C2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DBB78BA18D4224BAAA62DB /* AppModel.swift */; };
 		79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */; };
 		7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEB5A8653918B8E3544BFC /* RemoteStoryProvider.swift */; };
+		893ED3BD26DACA8A44490226 /* ShutterWaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */; };
 		9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */; };
 		980D4299B93AD7FD75419F55 /* MotionFieldProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34902E8D8AD5DD5B2AA85E04 /* MotionFieldProviding.swift */; };
 		9865BA30CD7BC5E71C3EDDD8 /* GenerationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04EFD2BAB24C56390FE1422 /* GenerationView.swift */; };
@@ -113,6 +114,7 @@
 		042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTitleView.swift; sourceTree = "<group>"; };
 		0827B783C9AB999B8B2F7667 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
 		09DDDE905B093FADE1CBA842 /* GenerationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationState.swift; sourceTree = "<group>"; };
+		197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShutterWaveTimeRail.swift; sourceTree = "<group>"; };
 		1A868C0364905B23A4930097 /* DisconnectedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisconnectedView.swift; sourceTree = "<group>"; };
 		1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRail.swift; sourceTree = "<group>"; };
 		2029A8DCB17762A2BA51821F /* AppDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDependencies.swift; sourceTree = "<group>"; };
@@ -502,6 +504,7 @@
 				3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */,
 				3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */,
 				042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */,
+				197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */,
 				4C0A9D8D00C482FFD912D66F /* StatusPill.swift */,
 				8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */,
 				1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */,
@@ -762,6 +765,7 @@
 				E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */,
 				4E26490CC1A2F57B62812901 /* SharePosterView.swift in Sources */,
 				71545CA1C3154C6ED91EE0E9 /* ShutterFeedbackView.swift in Sources */,
+				893ED3BD26DACA8A44490226 /* ShutterWaveTimeRail.swift in Sources */,
 				D634280455F3F1B7470120B4 /* StatusPill.swift in Sources */,
 				712440EB96D62CDF09B0E02E /* StoryProvider.swift in Sources */,
 				1C6CAB0BCDB4ACF81AFBFC86 /* StoryReadyView.swift in Sources */,

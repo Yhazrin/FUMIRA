@@ -18,7 +18,7 @@ actor UserDefaultsAIModelConfigurationStore: AIModelConfigurationStore {
             let data = defaults.data(forKey: key),
             let value = try? JSONDecoder().decode(AIModelConfiguration.self, from: data)
         else {
-            return .demo
+            return .standard
         }
         return value
     }
@@ -31,7 +31,7 @@ actor UserDefaultsAIModelConfigurationStore: AIModelConfigurationStore {
 actor InMemoryAIModelConfigurationStore: AIModelConfigurationStore {
     private var configuration: AIModelConfiguration
 
-    init(configuration: AIModelConfiguration = .demo) {
+    init(configuration: AIModelConfiguration = .standard) {
         self.configuration = configuration
     }
 

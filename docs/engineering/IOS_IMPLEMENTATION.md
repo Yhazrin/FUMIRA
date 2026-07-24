@@ -39,7 +39,7 @@ after explicit approval, never submit a request for every drag event.
 
 ## Runtime modes
 
-The shipped configuration uses deterministic demo providers. Route options for
+The shipped configuration uses deterministic local providers. Route options for
 major providers are visible but disabled until a backend catalog marks them ready.
 Feature views never construct a provider client.
 

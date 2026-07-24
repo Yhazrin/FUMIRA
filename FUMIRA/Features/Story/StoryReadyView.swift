@@ -3,6 +3,10 @@ import SwiftUI
 struct StoryReadyView: View {
     let model: AppModel
 
+    private var photoAspectRatio: CGFloat {
+        CGFloat(model.capturedPhoto?.displayAspectRatio ?? 3.0 / 4.0)
+    }
+
     var body: some View {
         PosterScreenContainer {
             VStack(alignment: .leading, spacing: PosterSpacing.lg) {
@@ -12,18 +16,22 @@ struct StoryReadyView: View {
                     fontSize: 36
                 )
 
-                CapturedPhotoView(photo: model.capturedPhoto)
-                    .frame(height: 230)
-                    .overlay(alignment: .bottomLeading) {
-                        Text(model.sceneUnderstanding?.locationType ?? "这一个地方")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.ink)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(PosterPalette.leafGreen)
-                            .clipShape(Capsule())
-                            .padding(PosterSpacing.md)
-                    }
+                PhotoAspectContainer(
+                    aspectRatio: photoAspectRatio,
+                    maximumHeight: 320
+                ) {
+                    CapturedPhotoView(photo: model.capturedPhoto)
+                        .overlay(alignment: .bottomLeading) {
+                            Text(model.sceneUnderstanding?.locationType ?? "这一个地方")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PosterPalette.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(PosterPalette.leafGreen)
+                                .clipShape(Capsule())
+                                .padding(PosterSpacing.md)
+                        }
+                }
 
                 if let story = model.temporalStory {
                     VStack(alignment: .leading, spacing: PosterSpacing.sm) {
@@ -34,6 +42,18 @@ struct StoryReadyView: View {
                             .font(.body.weight(.medium))
                             .foregroundStyle(PosterPalette.ink)
                     }
+
+                    Text("目标照片 · \(model.generationTargetTime.compactLabel)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PosterPalette.skyDeep)
+                        .padding(.horizontal, PosterSpacing.sm)
+                        .padding(.vertical, PosterSpacing.xs)
+                        .background(PosterPalette.leafGreen.opacity(0.45))
+                        .clipShape(Capsule())
+
+                    Text("浏览 AI 生成的过去 / 未来故事 · 不改变目标照片")
+                        .font(.caption)
+                        .foregroundStyle(PosterPalette.mutedInk)
 
                     TimeRail(
                         value: model.selectedTime.normalized,
@@ -66,20 +86,31 @@ struct StoryReadyView: View {
 
                 VStack(spacing: PosterSpacing.md) {
                     PosterCapsuleButton(
-                        title: "用这个故事生成",
+                        title: "生成拍摄目标年份",
                         style: .lime,
-                        accessibilityHint: "基于原图和当前时间故事生成变迁图"
+                        accessibilityHint: "基于原图生成拍摄时锁定年份的照片；时间轴只用于浏览故事"
                     ) {
                         Task { await model.generateStoryWorld() }
                     }
 
                     PosterCapsuleButton(
-                        title: "再写一个版本",
+                        title: "用浏览年份生成",
                         style: .secondary,
-                        accessibilityHint: "保留识图结果并重新编写时间故事"
+                        accessibilityHint: "将当前浏览的故事年份设为新目标，再生成一张照片"
                     ) {
-                        Task { await model.regenerateStory() }
+                        Task { await model.generateAtStoryPreviewTime() }
                     }
+
+                    Button {
+                        Task { await model.regenerateStory() }
+                    } label: {
+                        Label("再写一个版本", systemImage: "arrow.trianglehead.2.clockwise")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(PosterPalette.skyDeep)
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(PosterPressStyle())
+                    .accessibilityHint("保留识图结果并重新编写时间故事")
                 }
             }
         }

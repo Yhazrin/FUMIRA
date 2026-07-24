@@ -112,6 +112,17 @@ export interface SceneUnderstandingPayload {
   }>;
 }
 
+/** Character budgets for image-analysis copy rendered by the client. */
+export interface UnderstandingCopyConstraints {
+  summary: number;
+  locationType: number;
+  visualMood: number;
+  timeClue: number;
+  changeDriver: number;
+  subjectName: number;
+  identityRule: number;
+}
+
 export interface StoryBeatPayload {
   anchorYears: number;
   title: string;
@@ -125,6 +136,17 @@ export interface TemporalStoryPayload {
   presentTruth: string;
   identityRules: string[];
   beats: StoryBeatPayload[];
+}
+
+/** Character budgets requested by the current client layout. */
+export interface StoryCopyConstraints {
+  title: number;
+  logline: number;
+  presentTruth: number;
+  identityRule: number;
+  beatTitle: number;
+  beatNarrative: number;
+  visualPrompt: number;
 }
 
 export interface MiniMaxIntelligenceFailure {
@@ -142,10 +164,13 @@ export type MiniMaxIntelligenceResult<T> =
 export interface MiniMaxIntelligenceAdapter {
   analyzeImage(input: {
     imageDataUrl: string;
+    copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>>;
   writeStory(input: {
     understanding: SceneUnderstandingPayload;
+    targetTime: { offsetYears: number; compactLabel: string };
+    copyConstraints: StoryCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<TemporalStoryPayload>>;
 }

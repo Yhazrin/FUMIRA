@@ -6,7 +6,7 @@ FUMIRA is a modular monolith: one Xcode project, one app target, and folders tha
 enforce boundaries without introducing package overhead. Minimum deployment is
 iOS 17 so Observation and modern Swift concurrency are available.
 
-A sibling **demo backend** lives under `server/` (TypeScript + Fastify). It is
+A sibling **FUMIRA backend** lives under `server/` (TypeScript + Fastify). It is
 the only process allowed to hold `MINIMAX_API_KEY`. The iOS app never talks to
 MiniMax directly.
 
@@ -108,7 +108,7 @@ The iOS client knows stable route IDs such as `openai.story.server`, not vendor
 keys or hard-coded vendor model versions. A future FUMIRA backend returns the
 catalog and maps each enabled route to an audited provider/model. Options marked
 `requiresBackend` remain visible but disabled. A stored option that is no longer
-ready is sanitized back to the runnable demo route.
+ready is sanitized back to the runnable standard route.
 
 `MINIMAX_API_KEY` and `ADMIN_TOKEN` exist only in the server environment.
 `FUMIRA_API_BASE_URL` is the sole client switch for remote generation.

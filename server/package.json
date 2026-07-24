@@ -2,7 +2,7 @@
   "name": "fumira-server",
   "version": "0.1.0",
   "private": true,
-  "description": "FUMIRA demo backend — MiniMax image-01 I2I proxy",
+  "description": "FUMIRA backend — MiniMax image-01 I2I proxy",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",

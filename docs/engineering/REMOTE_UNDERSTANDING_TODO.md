@@ -11,7 +11,7 @@ HTTP endpoint in `MINIMAX_API_GUIDE.md`.
 
 Development-only verification may use the MiniMax MCP tool
 (`understand_image` / equivalent). That MCP server is **not** a production
-dependency and must not be called from the iOS app or the demo backend at
+dependency and must not be called from the iOS app or the FUMIRA backend at
 runtime.
 
 ## Protocol already in tree
@@ -40,4 +40,4 @@ Then:
 
 - Do not invent a MiniMax HTTP understanding URL.
 - Do not call MCP tools from the server request path.
-- Do not block the MVP demo on understanding parity with generation.
+- Do not block the MVP release on understanding parity with generation.

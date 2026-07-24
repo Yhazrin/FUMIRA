@@ -4,7 +4,9 @@ import type {
   MiniMaxIntelligenceAdapter,
   MiniMaxIntelligenceResult,
   SceneUnderstandingPayload,
+  StoryCopyConstraints,
   TemporalStoryPayload,
+  UnderstandingCopyConstraints,
 } from "../types.js";
 
 
@@ -21,6 +23,7 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
 
   async analyzeImage(input: {
     imageDataUrl: string;
+    copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>> {
     const response = await this.requestJSON(`${config.minimaxApiBaseUrl}/v1/coding_plan/vlm`, {
@@ -29,7 +32,8 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
         "Return JSON only, with this exact shape:",
         '{"summary":"","locationType":"","visualMood":"","timeClues":[""],"changeDrivers":[""],"subjects":[{"name":"","confidence":0.0,"identityRule":""}]}',
         "Describe actual visible subjects, composition, scene, and plausible long-term change drivers.",
-        "Use concise Simplified Chinese. Never identify a person by name.",
+        `Strict character budgets (punctuation counts): summary <= ${input.copyConstraints.summary}; locationType <= ${input.copyConstraints.locationType}; visualMood <= ${input.copyConstraints.visualMood}; each timeClue <= ${input.copyConstraints.timeClue}; each changeDriver <= ${input.copyConstraints.changeDriver}; each subject name <= ${input.copyConstraints.subjectName}; each identityRule <= ${input.copyConstraints.identityRule}.`,
+        "Use concise Simplified Chinese and complete short phrases. Never identify a person by name.",
       ].join(" "),
       image_url: input.imageDataUrl,
     }, "vision", this.vlmApiKey || this.apiKey);
@@ -44,6 +48,8 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
 
   async writeStory(input: {
     understanding: SceneUnderstandingPayload;
+    targetTime: { offsetYears: number; compactLabel: string };
+    copyConstraints: StoryCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<TemporalStoryPayload>> {
     const response = await this.requestStoryJSON({
@@ -64,9 +70,12 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
             text: [
             "Based only on this image analysis, write one coherent time story for a camera app.",
             `Analysis: ${JSON.stringify(input.understanding)}`,
+            `The captured photo is explicitly targeted at ${input.targetTime.compactLabel} (${input.targetTime.offsetYears.toFixed(1)} years from now). Make that target year the narrative destination; the intermediate beats should explain the path from today to that target while retaining the full past/future exploration range.`,
             "Return exactly this JSON shape in Simplified Chinese:",
             '{"title":"","logline":"","presentTruth":"","identityRules":[""],"beats":[{"anchorYears":-100,"title":"","narrative":"","visualPrompt":""}]}.',
-            "Provide exactly seven beats at -100,-30,-10,0,10,30,100. Keep each narrative under 80 Chinese characters and each visualPrompt under 100 Chinese characters. Keep people and places anonymous; preserve composition and visible identity rules.",
+            "Provide exactly seven beats at -100,-30,-10,0,10,30,100.",
+            `Strict character budgets (punctuation counts): title <= ${input.copyConstraints.title}; logline <= ${input.copyConstraints.logline}; presentTruth <= ${input.copyConstraints.presentTruth}; each identityRule <= ${input.copyConstraints.identityRule}; each beat title <= ${input.copyConstraints.beatTitle}; each narrative <= ${input.copyConstraints.beatNarrative}; each visualPrompt <= ${input.copyConstraints.visualPrompt}.`,
+            "Keep people and places anonymous; preserve composition and visible identity rules. Prefer complete short sentences instead of filling the limit.",
             ].join("\n"),
           }],
         },

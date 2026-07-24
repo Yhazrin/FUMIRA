@@ -3,14 +3,14 @@ import UIKit
 @testable import FUMIRA
 
 final class PhotoImportAdapterTests: XCTestCase {
-    func testCenterCropProducesPortraitThreeByFour() throws {
+    func testClassicCompositionFollowsLandscapeOrientation() throws {
         let source = makeJPEG(width: 1_600, height: 900, color: .systemBlue)
         let photo = try PhotoImportAdapter.makeCapturedPhoto(from: source)
 
         XCTAssertGreaterThan(photo.pixelWidth, 0)
         XCTAssertGreaterThan(photo.pixelHeight, 0)
         let ratio = Double(photo.pixelWidth) / Double(photo.pixelHeight)
-        XCTAssertEqual(ratio, 0.75, accuracy: 0.02)
+        XCTAssertEqual(ratio, 4.0 / 3.0, accuracy: 0.02)
         XCTAssertNotNil(UIImage(data: photo.data))
     }
 
@@ -20,6 +20,40 @@ final class PhotoImportAdapterTests: XCTestCase {
 
         XCTAssertEqual(Double(photo.pixelWidth) / Double(photo.pixelHeight), 0.75, accuracy: 0.02)
         XCTAssertNotNil(UIImage(data: photo.data))
+    }
+
+    func testWideCompositionFollowsLandscapeOrientation() throws {
+        let source = makeJPEG(width: 1_200, height: 900, color: .systemOrange)
+        let photo = try PhotoImportAdapter.makeCapturedPhoto(from: source, composition: .widescreen)
+
+        XCTAssertEqual(Double(photo.pixelWidth) / Double(photo.pixelHeight), 16.0 / 9.0, accuracy: 0.02)
+        XCTAssertNotNil(UIImage(data: photo.data))
+    }
+
+    func testSquareCompositionProducesSquarePhoto() throws {
+        let source = makeJPEG(width: 1_200, height: 1_600, color: .systemPurple)
+        let photo = try PhotoImportAdapter.makeCapturedPhoto(from: source, composition: .square)
+
+        XCTAssertEqual(Double(photo.pixelWidth) / Double(photo.pixelHeight), 1, accuracy: 0.02)
+        XCTAssertNotNil(UIImage(data: photo.data))
+    }
+
+    func testCapturedPhotoExposesItsNormalisedDisplayAspectRatio() throws {
+        let portrait = CapturedPhoto(data: Data(), pixelWidth: 900, pixelHeight: 1_600)
+        let landscape = CapturedPhoto(data: Data(), pixelWidth: 1_600, pixelHeight: 900)
+        let unknown = CapturedPhoto(data: Data())
+
+        XCTAssertEqual(
+            try XCTUnwrap(portrait.displayAspectRatio),
+            9.0 / 16.0,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(landscape.displayAspectRatio),
+            16.0 / 9.0,
+            accuracy: 0.0001
+        )
+        XCTAssertNil(unknown.displayAspectRatio)
     }
 
     func testInvalidDataThrows() {

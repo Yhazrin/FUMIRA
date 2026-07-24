@@ -10,12 +10,18 @@ extension AnyTransition {
         }
     }
 
-    /// Camera entry behaves like opening a real aperture, without 3D chrome.
+    /// Camera entry settles into place without masking the live preview.
+    ///
+    /// `MovingParts.iris` keeps an elliptical clip at its identity state on
+    /// some iOS / Pow combinations, exposing the window's white background at
+    /// the top and bottom of the viewfinder. A full-rect scale/fade preserves
+    /// the sense of entering the camera while keeping every pixel available
+    /// for composition.
     static func cameraAperture(reduceMotion: Bool) -> AnyTransition {
         guard !reduceMotion else { return .opacity }
         return .asymmetric(
-            insertion: .movingParts
-                .iris(origin: .center, blurRadius: 2)
+            insertion: .opacity
+                .combined(with: .scale(scale: 1.015))
                 .animation(PosterMotion.aperture),
             removal: .opacity.animation(PosterMotion.exitAnimation)
         )

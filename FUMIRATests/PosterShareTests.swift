@@ -77,7 +77,7 @@ final class PosterShareTests: XCTestCase {
             motionField: MockMotionFieldService()
         )
         let model = AppModel(dependencies: dependencies)
-        model.temporalStory = .demoPark
+        model.temporalStory = .parkReference
         model.generatedFrame = GeneratedFrame(
             sessionID: UUID(),
             time: .now,
@@ -97,7 +97,7 @@ final class PosterShareTests: XCTestCase {
 
     func testOpenShareThenReturnPreservesTime() {
         let model = AppModel(dependencies: .test)
-        model.temporalStory = .demoPark
+        model.temporalStory = .parkReference
         model.selectedTime = TimePosition(normalized: 0.55)
         model.openShare()
         XCTAssertEqual(model.phase, .share)
@@ -108,7 +108,7 @@ final class PosterShareTests: XCTestCase {
 
     func testDeepLinkShareOpensShareWhenStoryReady() {
         let model = AppModel(dependencies: .test)
-        model.temporalStory = .demoPark
+        model.temporalStory = .parkReference
         model.handleDeepLink(URL(string: "fumira://share")!)
         XCTAssertEqual(model.phase, .share)
     }

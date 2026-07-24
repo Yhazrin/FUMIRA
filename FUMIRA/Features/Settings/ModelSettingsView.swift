@@ -29,11 +29,11 @@ struct SettingsView: View {
                             }
                         )
                     )
-                    .tint(PosterPalette.pine)
+                    .tint(PosterPalette.leafGreen)
                 } header: {
                     Text("拍摄")
                 } footer: {
-                    Text("网格也可在取景器左上角开关。模拟器与真机均可使用。")
+                    Text("网格也可在取景器左上角开关。")
                 }
 
                 Section {
@@ -68,7 +68,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .tint(PosterPalette.pine)
+        .tint(PosterPalette.skyDeep)
     }
 }
 
@@ -78,7 +78,7 @@ private struct ModelRoutingAdvancedView: View {
     var body: some View {
         List {
             Section {
-                Text("仅在本地演示联调、远端 API 切换或配置失败恢复时使用。")
+                Text("仅在本地调试、远端 API 切换或配置失败恢复时使用。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -100,7 +100,7 @@ private struct ModelRoutingAdvancedView: View {
                                             .font(.caption2.weight(.bold))
                                             .foregroundStyle(
                                                 option.availability == .ready
-                                                    ? PosterPalette.pine
+                                                    ? PosterPalette.leafGreen
                                                     : PosterPalette.mutedInk
                                             )
                                     }
@@ -111,7 +111,7 @@ private struct ModelRoutingAdvancedView: View {
                                 Spacer()
                                 if model.modelConfiguration.optionID(for: role) == option.id {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(PosterPalette.pine)
+                                        .foregroundStyle(PosterPalette.leafGreen)
                                 } else if option.availability == .requiresBackend {
                                     Image(systemName: "server.rack")
                                         .foregroundStyle(PosterPalette.mutedInk)

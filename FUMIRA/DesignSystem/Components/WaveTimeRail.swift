@@ -25,10 +25,11 @@ struct WaveTimeRail: View {
     @State private var isDragging = false
     @State private var lastHapticYears: Double?
 
-    private let horizontalInset: CGFloat = 16
+    private let horizontalInset: CGFloat = 20
     private let barMaxHeight: CGFloat = 40
     private let barMinHeight: CGFloat = 8
-    private let railHeight: CGFloat = 88
+    /// Wave + year badge only. Landmark labels live in a separate row below.
+    private let barAreaHeight: CGFloat = 64
     private let barCount = WaveformGeometry.defaultBarCount
 
     private var idleBarColor: Color {
@@ -84,7 +85,7 @@ struct WaveTimeRail: View {
     }
 
     var body: some View {
-        VStack(spacing: PosterSpacing.sm) {
+        VStack(spacing: PosterSpacing.xs) {
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let thumbX = normalizedToX(displayValue, width: width)
@@ -95,14 +96,13 @@ struct WaveTimeRail: View {
 
                     yearBadge(at: thumbX, height: proxy.size.height)
                         .allowsHitTesting(false)
-
-                    sparseScale(width: width, height: proxy.size.height)
-                        .allowsHitTesting(false)
                 }
                 .contentShape(Rectangle())
                 .gesture(dragGesture(width: width))
             }
-            .frame(height: railHeight)
+            .frame(height: barAreaHeight)
+
+            landmarkLabelsRow
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
@@ -134,7 +134,8 @@ struct WaveTimeRail: View {
         let usable = max(1, width - horizontalInset * 2)
         let spacing = usable / CGFloat(max(1, barCount - 1))
         let barWidth = max(2.5, spacing * 0.42)
-        let centerY = height - 22 - barMaxHeight / 2
+        // Leave headroom for the floating year badge above the tallest bar.
+        let centerY = height - 6 - barMaxHeight / 2
         let u = continuousIndex
         let impact = releaseImpact
 
@@ -184,7 +185,7 @@ struct WaveTimeRail: View {
     }
 
     private func yearBadge(at x: CGFloat, height: CGFloat) -> some View {
-        let centerY = height - 22 - barMaxHeight / 2
+        let centerY = height - 6 - barMaxHeight / 2
 
         return Text(yearLabel)
             .font(.caption.weight(.semibold).monospacedDigit())
@@ -199,33 +200,29 @@ struct WaveTimeRail: View {
                 Capsule(style: .continuous)
                     .stroke(PosterPalette.leafGreen.opacity(0.55), lineWidth: 1)
             }
-            .position(x: x, y: max(14, centerY - barMaxHeight / 2 - 12))
+            .position(x: x, y: max(12, centerY - barMaxHeight / 2 - 11))
             .offset(y: -3 * releaseImpact)
             .contentTransition(reduceMotion ? .identity : .numericText())
             .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: yearLabel)
             .animation(reduceMotion ? nil : PosterMotion.timeRailKick, value: releaseImpact)
     }
 
-    private func sparseScale(width: CGFloat, height: CGFloat) -> some View {
-        let landmarks: [(String, Double)] = [
-            ("-100", -1),
-            ("NOW", 0),
-            ("+100", 1)
-        ]
-
-        return ZStack {
-            ForEach(Array(landmarks.enumerated()), id: \.offset) { _, landmark in
-                Text(landmark.0)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(
-                        landmark.1 == 0 ? landmarkNowColor : landmarkColor
-                    )
-                    .position(
-                        x: normalizedToX(landmark.1, width: width),
-                        y: height - 8
-                    )
-            }
+    private var landmarkLabelsRow: some View {
+        HStack {
+            Text("-100")
+                .foregroundStyle(landmarkColor)
+                .frame(minWidth: 32, alignment: .leading)
+            Spacer(minLength: 0)
+            Text("NOW")
+                .foregroundStyle(landmarkNowColor)
+            Spacer(minLength: 0)
+            Text("+100")
+                .foregroundStyle(landmarkColor)
+                .frame(minWidth: 32, alignment: .trailing)
         }
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, horizontalInset)
+        .accessibilityHidden(true)
     }
 
     private func dragGesture(width: CGFloat) -> some Gesture {
@@ -276,8 +273,9 @@ struct WaveTimeRail: View {
 
                 // The model snaps immediately; only the presentation layer gets
                 // a brief directional stroke before it locks back into position.
+                // Keep the kick short so ProMotion (120Hz) reads as one clean tick.
                 releaseValue = normalized
-                withAnimation(PosterMotion.timeRailKick) {
+                withAnimation(.timingCurve(0.12, 0.94, 0.20, 1, duration: 0.055)) {
                     releaseValue = WaveTimeRollPhysics.overshoot(
                         target: snapped.normalized,
                         direction: direction,
@@ -289,14 +287,14 @@ struct WaveTimeRail: View {
                 emitReleaseDetent(for: snapped)
 
                 releaseTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(70))
+                    try? await Task.sleep(for: .milliseconds(55))
                     guard !Task.isCancelled else { return }
-                    withAnimation(PosterMotion.timeRailSettle) {
+                    withAnimation(.timingCurve(0.18, 0.86, 0.24, 1, duration: 0.16)) {
                         releaseValue = snapped.normalized
                         releaseImpact = 0
                     }
 
-                    try? await Task.sleep(for: .milliseconds(220))
+                    try? await Task.sleep(for: .milliseconds(180))
                     guard !Task.isCancelled else { return }
                     releaseValue = nil
                     releaseTask = nil

@@ -40,6 +40,51 @@ enum CameraFlashMode: Sendable, Equatable, CaseIterable {
     }
 }
 
+/// The intentional composition selected in the viewfinder. Ratios follow the
+/// device's physical orientation, so a horizontal capture stays horizontal all
+/// the way through image generation.
+enum CameraAspectRatio: String, CaseIterable, Sendable, Equatable {
+    case fullScreen
+    case widescreen
+    case classic
+    case square
+
+    var label: String {
+        switch self {
+        case .fullScreen: "全屏"
+        case .widescreen: "16:9"
+        case .classic: "3:4"
+        case .square: "1:1"
+        }
+    }
+
+    var accessibilityHint: String {
+        switch self {
+        case .fullScreen: "保留相机原始画幅"
+        case .widescreen: "竖持时拍摄 9 比 16，横持时拍摄 16 比 9"
+        case .classic: "竖持时拍摄 3 比 4，横持时拍摄 4 比 3"
+        case .square: "拍摄 1 比 1 的方形画面"
+        }
+    }
+
+    /// `nil` means that no crop is applied and the camera's native photo
+    /// aspect is retained.
+    func targetAspectRatio(for size: CGSize) -> CGFloat? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        let isLandscape = size.width > size.height
+        switch self {
+        case .fullScreen:
+            return nil
+        case .widescreen:
+            return isLandscape ? 16.0 / 9.0 : 9.0 / 16.0
+        case .classic:
+            return isLandscape ? 4.0 / 3.0 : 3.0 / 4.0
+        case .square:
+            return 1
+        }
+    }
+}
+
 struct CameraControlSnapshot: Sendable, Equatable {
     var lensPosition: CameraLensPosition
     var flashMode: CameraFlashMode
@@ -58,7 +103,7 @@ protocol CameraService: Sendable {
     func requestAuthorization() async throws -> CameraAuthorization
     func startPreview() async throws
     func stopPreview() async
-    func capturePhoto() async throws -> CapturedPhoto
+    func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto
 }
 
 actor MockCameraService: CameraService {
@@ -70,7 +115,7 @@ actor MockCameraService: CameraService {
 
     func stopPreview() async {}
 
-    func capturePhoto() async throws -> CapturedPhoto {
+    func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto {
         let data = await MainActor.run {
             let size = CGSize(width: 1_200, height: 1_600)
             let renderer = UIGraphicsImageRenderer(size: size)
@@ -106,6 +151,6 @@ actor MockCameraService: CameraService {
                 }
             }
         }
-        return CapturedPhoto(data: data, pixelWidth: 1_200, pixelHeight: 1_600)
+        return try PhotoImportAdapter.makeCapturedPhoto(from: data, composition: composition)
     }
 }

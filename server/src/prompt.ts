@@ -60,7 +60,7 @@ export function normalizeAspectRatio(
 
 export function toJpegDataUrl(bytes: Buffer, contentType: string): string {
   // MiniMax I2I accepts data:image/jpeg;base64,... — convert HEIC to labeled
-  // jpeg data URL only when already JPEG; otherwise pass as jpeg mime for demo
+  // JPEG data URL only when already JPEG; otherwise pass the JPEG MIME hint.
   // (real HEIC should be transcoded before MiniMax; mock adapter accepts any).
   const mime =
     contentType === "image/jpeg" || contentType === "image/jpg"

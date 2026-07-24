@@ -6,46 +6,55 @@ struct UnderstandingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scanPosition = -0.8
 
+    private var photoAspectRatio: CGFloat {
+        CGFloat(model.capturedPhoto?.displayAspectRatio ?? 3.0 / 4.0)
+    }
+
     var body: some View {
         PosterScreenContainer(background: PosterPalette.skyDeep) {
             VStack(alignment: .leading, spacing: PosterSpacing.lg) {
                 PosterTitleView(
                     segments: ["先", "读懂", "这一刻"],
-                    color: PosterPalette.leafGreen,
+                    color: PosterPalette.paperWhite,
                     fontSize: 36
                 )
 
-                ZStack {
-                    CapturedPhotoView(photo: model.capturedPhoto)
-                        .frame(height: 360)
+                PhotoAspectContainer(
+                    aspectRatio: photoAspectRatio,
+                    maximumHeight: 400
+                ) {
+                    ZStack {
+                        CapturedPhotoView(photo: model.capturedPhoto)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    GeometryReader { proxy in
-                        Rectangle()
-                            .fill(PosterPalette.leafGreen)
-                            .frame(height: 4)
-                            .shadow(color: PosterPalette.leafGreen, radius: 12)
-                            .offset(y: proxy.size.height * scanPosition)
+                        GeometryReader { proxy in
+                            Rectangle()
+                                .fill(PosterPalette.leafGreen)
+                                .frame(height: 4)
+                                .shadow(color: PosterPalette.leafGreen, radius: 12)
+                                .offset(y: proxy.size.height * scanPosition)
+                        }
+                        .opacity(reduceMotion ? 0 : 0.9)
+
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Label(
+                                    model.modelOption(for: .understanding)?.displayName ?? "图片理解",
+                                    systemImage: "viewfinder"
+                                )
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PosterPalette.ink)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(PosterPalette.leafGreen)
+                                .clipShape(Capsule())
+                                Spacer()
+                            }
+                            .padding(PosterSpacing.md)
+                        }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
-                    .opacity(reduceMotion ? 0 : 0.9)
-
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Label(
-                                model.modelOption(for: .understanding)?.displayName ?? "图片理解",
-                                systemImage: "viewfinder"
-                            )
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.ink)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(PosterPalette.leafGreen)
-                            .clipShape(Capsule())
-                            Spacer()
-                        }
-                        .padding(PosterSpacing.md)
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: PosterSpacing.sm) {

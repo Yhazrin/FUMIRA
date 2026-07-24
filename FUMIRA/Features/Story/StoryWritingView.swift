@@ -9,7 +9,7 @@ struct StoryWritingView: View {
     private let years = [-100, -30, -10, 0, 10, 30, 100]
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.pine) {
+        PosterScreenContainer(background: PosterPalette.skyDeep) {
             VStack(alignment: .leading, spacing: PosterSpacing.xl) {
                 PosterTitleView(
                     segments: ["让", "时间", "开口"],
@@ -21,7 +21,7 @@ struct StoryWritingView: View {
                     VStack(alignment: .leading, spacing: PosterSpacing.sm) {
                         Text("AI 看见了")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.pine)
+                            .foregroundStyle(PosterPalette.skyDeep)
                             .textCase(.uppercase)
                         Text(understanding.summary)
                             .font(.title3.weight(.semibold))

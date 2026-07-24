@@ -11,6 +11,10 @@ final class AppModel {
     private var pipelineTask: Task<Void, Never>?
 
     var phase: AppPhase = .connection
+    /// Chosen on the viewfinder, then frozen for this capture/import session.
+    /// Story browsing may move `selectedTime` later, but must never silently
+    /// change which year the image-generation request represents.
+    var capturedTargetTime: TimePosition?
     var selectedTime: TimePosition = .now
     var understandingProgress = 0.0
     var storyProgress = 0.0
@@ -20,6 +24,7 @@ final class AppModel {
     var hardwareSnapshot: HardwareSnapshot?
     var activeSessionID: UUID?
     var capturedPhoto: CapturedPhoto?
+    var cameraAspectRatio: CameraAspectRatio = .classic
     var sceneUnderstanding: SceneUnderstanding?
     var temporalStory: TemporalStory?
     var generatedFrame: GeneratedFrame?
@@ -36,7 +41,7 @@ final class AppModel {
     /// Non-error user feedback on the share screen (e.g. saved confirmation).
     var shareFeedbackMessage: String?
     var modelCatalog: AIModelCatalog = .bundled
-    var modelConfiguration: AIModelConfiguration = .demo
+    var modelConfiguration: AIModelConfiguration = .standard
     /// Presents the user-facing Settings sheet (advanced model routing lives inside).
     var isModelSettingsPresented = false
     var cameraControlSnapshot = CameraControlSnapshot(
@@ -103,6 +108,10 @@ final class AppModel {
         temporalStory?.beat(for: selectedTime)
     }
 
+    var generationTargetTime: TimePosition {
+        capturedTargetTime ?? generatedFrame?.time ?? selectedTime
+    }
+
     func modelOption(for role: AIModelRole) -> AIModelOption? {
         modelCatalog.option(id: modelConfiguration.optionID(for: role))
     }
@@ -116,8 +125,8 @@ final class AppModel {
             modelConfiguration = sanitized(stored)
         } catch {
             modelCatalog = .bundled
-            modelConfiguration = .demo
-            lastErrorMessage = "模型目录暂时不可用，已切换到本地演示路由。"
+            modelConfiguration = .standard
+            lastErrorMessage = "模型目录暂时不可用，已切换到 FUMIRA 标准路由。"
         }
     }
 
@@ -199,6 +208,12 @@ final class AppModel {
         dependencies.haptics.play(.selection)
     }
 
+    func selectCameraAspectRatio(_ aspectRatio: CameraAspectRatio) {
+        guard cameraAspectRatio != aspectRatio else { return }
+        cameraAspectRatio = aspectRatio
+        dependencies.haptics.play(.selection)
+    }
+
     func capture() async {
         guard validateRunnableConfiguration() else { return }
         guard !isPipelineBusy else { return }
@@ -206,11 +221,13 @@ final class AppModel {
         let sessionID = UUID()
         activeSessionID = sessionID
         clearPipelineResult()
+        capturedTargetTime = selectedTime
+        let composition = cameraAspectRatio
         dependencies.haptics.play(.shutter)
 
-        let task = Task { [sessionID] in
+        let task = Task { [sessionID, composition] in
             do {
-                let photo = try await dependencies.camera.capturePhoto()
+                let photo = try await dependencies.camera.capturePhoto(composition: composition)
                 guard !Task.isCancelled, activeSessionID == sessionID else { return }
                 capturedPhoto = photo
                 await dependencies.camera.stopPreview()
@@ -236,11 +253,16 @@ final class AppModel {
         let sessionID = UUID()
         activeSessionID = sessionID
         clearPipelineResult()
+        capturedTargetTime = selectedTime
+        let composition = cameraAspectRatio
         dependencies.haptics.play(.shutter)
 
-        let task = Task { [sessionID] in
+        let task = Task { [sessionID, composition] in
             do {
-                let photo = try PhotoImportAdapter.makeCapturedPhoto(from: imageData)
+                let photo = try PhotoImportAdapter.makeCapturedPhoto(
+                    from: imageData,
+                    composition: composition
+                )
                 guard !Task.isCancelled, activeSessionID == sessionID else { return }
                 capturedPhoto = photo
                 await dependencies.camera.stopPreview()
@@ -311,6 +333,7 @@ final class AppModel {
             let events = await dependencies.story.write(
                 request: StoryRequest(
                     understanding: understanding,
+                    targetTime: generationTargetTime,
                     sessionID: sessionID,
                     model: option
                 )
@@ -358,15 +381,16 @@ final class AppModel {
         lastGenerationError = nil
         lastErrorMessage = nil
         phase = .generating
+        let targetTime = generationTargetTime
 
-        let task = Task { [photo, understanding, story, option, sessionID] in
+        let task = Task { [photo, understanding, story, option, sessionID, targetTime] in
             do {
                 let events = await dependencies.generation.generate(
                     request: ImageGenerationRequest(
                         photo: photo,
                         understanding: understanding,
                         story: story,
-                        time: selectedTime,
+                        time: targetTime,
                         sessionID: sessionID,
                         model: option
                     )
@@ -427,6 +451,14 @@ final class AppModel {
             return
         }
         previousGeneratedFrame = generatedFrame
+        await generateStoryWorld()
+    }
+
+    /// Deliberate exploration strategy: promote the story browser's current
+    /// year to a new generation target. The default generation action never
+    /// does this implicitly.
+    func generateAtStoryPreviewTime() async {
+        capturedTargetTime = selectedTime
         await generateStoryWorld()
     }
 
@@ -714,7 +746,7 @@ final class AppModel {
                 option.role == role,
                 option.availability == .ready
             else {
-                result.select(optionID: AIModelConfiguration.demo.optionID(for: role), for: role)
+                result.select(optionID: AIModelConfiguration.standard.optionID(for: role), for: role)
                 continue
             }
         }
@@ -782,6 +814,7 @@ final class AppModel {
     }
 
     private func clearPipelineResult() {
+        capturedTargetTime = nil
         capturedPhoto = nil
         sceneUnderstanding = nil
         temporalStory = nil

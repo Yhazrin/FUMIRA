@@ -15,7 +15,7 @@ struct GeneratedFrame: Identifiable, Hashable, Sendable {
         time: TimePosition,
         storyBeatID: UUID? = nil,
         prompt: String = "",
-        modelOptionID: String = AIModelConfiguration.demo.imageOptionID,
+        modelOptionID: String = AIModelConfiguration.standard.imageOptionID,
         imageData: Data? = nil
     ) {
         self.id = id

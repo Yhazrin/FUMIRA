@@ -74,6 +74,7 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try JSONEncoder().encode(UnderstandRequest(
             sourceAssetId: assetID,
+            copyConstraints: .appLayout,
             requestId: requestID.uuidString
         ))
 
@@ -99,7 +100,28 @@ private struct UploadResponse: Decodable {
 
 private struct UnderstandRequest: Encodable {
     let sourceAssetId: String
+    let copyConstraints: UnderstandingCopyConstraintsRelayDTO
     let requestId: String
+}
+
+private struct UnderstandingCopyConstraintsRelayDTO: Codable {
+    let summary: Int
+    let locationType: Int
+    let visualMood: Int
+    let timeClue: Int
+    let changeDriver: Int
+    let subjectName: Int
+    let identityRule: Int
+
+    static let appLayout = UnderstandingCopyConstraintsRelayDTO(
+        summary: UnderstandingCopyPolicy.summary,
+        locationType: UnderstandingCopyPolicy.locationType,
+        visualMood: UnderstandingCopyPolicy.visualMood,
+        timeClue: UnderstandingCopyPolicy.timeClue,
+        changeDriver: UnderstandingCopyPolicy.changeDriver,
+        subjectName: UnderstandingCopyPolicy.subjectName,
+        identityRule: UnderstandingCopyPolicy.identityRule
+    )
 }
 
 private struct UnderstandResponse: Decodable {

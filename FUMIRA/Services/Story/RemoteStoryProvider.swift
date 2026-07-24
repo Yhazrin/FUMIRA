@@ -36,6 +36,8 @@ actor RemoteStoryProvider: StoryProvider {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try JSONEncoder().encode(StoryRelayRequest(
             understanding: SceneUnderstandingRelayDTO(request.understanding),
+            targetTime: StoryTargetRelayDTO(request.targetTime),
+            copyConstraints: .appLayout,
             requestId: request.sessionID.uuidString
         ))
 
@@ -50,7 +52,39 @@ actor RemoteStoryProvider: StoryProvider {
 
 private struct StoryRelayRequest: Encodable {
     let understanding: SceneUnderstandingRelayDTO
+    let targetTime: StoryTargetRelayDTO
+    let copyConstraints: StoryCopyConstraintsRelayDTO
     let requestId: String
+}
+
+private struct StoryCopyConstraintsRelayDTO: Codable {
+    let title: Int
+    let logline: Int
+    let presentTruth: Int
+    let identityRule: Int
+    let beatTitle: Int
+    let beatNarrative: Int
+    let visualPrompt: Int
+
+    static let appLayout = StoryCopyConstraintsRelayDTO(
+        title: StoryCopyPolicy.title,
+        logline: StoryCopyPolicy.logline,
+        presentTruth: StoryCopyPolicy.presentTruth,
+        identityRule: StoryCopyPolicy.identityRule,
+        beatTitle: StoryCopyPolicy.beatTitle,
+        beatNarrative: StoryCopyPolicy.beatNarrative,
+        visualPrompt: StoryCopyPolicy.visualPrompt
+    )
+}
+
+private struct StoryTargetRelayDTO: Encodable {
+    let offsetYears: Double
+    let compactLabel: String
+
+    init(_ time: TimePosition) {
+        offsetYears = time.offsetYears
+        compactLabel = time.compactLabel
+    }
 }
 
 private struct StoryRelayResponse: Decodable {

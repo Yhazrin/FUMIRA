@@ -14,6 +14,7 @@ enum PosterMotion {
     static let timeFlow = 0.34
     static let timeRailKickDuration = 0.07
     static let timeRailSettleDuration = 0.20
+    static let cameraCompositionDuration = 0.34
     static let poster = entrance
     static let page = 0.52
     static let reduced = 0.15
@@ -27,6 +28,9 @@ enum PosterMotion {
     /// A firm, non-bouncy impulse for the physical time-wheel lock.
     static let timeRailKick = Animation.timingCurve(0.12, 0.94, 0.20, 1, duration: timeRailKickDuration)
     static let timeRailSettle = Animation.timingCurve(0.18, 0.86, 0.24, 1, duration: timeRailSettleDuration)
+    /// Ratio changes are direct optical geometry changes, so they interpolate
+    /// at a constant speed instead of easing or springing.
+    static let cameraComposition = Animation.linear(duration: cameraCompositionDuration)
     static let pageTransition = Animation.timingCurve(0.22, 1, 0.36, 1, duration: page)
     static let aperture = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.58)
     static let shutter = Animation.timingCurve(0.7, 0, 0.84, 0, duration: 0.2)

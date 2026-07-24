@@ -40,7 +40,7 @@ actor MockImageUnderstandingProvider: ImageUnderstandingProvider {
                     try await Task.sleep(for: stepDelay)
                     continuation.yield(.progress(label: step.0, value: step.1))
                 }
-                continuation.yield(.completed(.demoPark))
+                continuation.yield(.completed(.parkReference))
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }

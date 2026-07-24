@@ -38,11 +38,11 @@ struct PosterExportCard: View {
                 HStack(alignment: .lastTextBaseline) {
                     Text("FUMIRA")
                         .font(PosterTypography.script(22))
-                        .foregroundStyle(PosterPalette.pine)
+                        .foregroundStyle(PosterPalette.skyDeep)
                     Spacer()
                     Text("时间相机")
                         .font(.caption.weight(.medium))
-                        .foregroundStyle(PosterPalette.pine.opacity(0.72))
+                        .foregroundStyle(PosterPalette.skyDeep.opacity(0.72))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -53,7 +53,7 @@ struct PosterExportCard: View {
         .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                .stroke(PosterPalette.pine.opacity(0.18), lineWidth: 1.5)
+                .stroke(PosterPalette.skyDeep.opacity(0.22), lineWidth: 1.5)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("时间海报")

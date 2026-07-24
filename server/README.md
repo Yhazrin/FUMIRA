@@ -1,4 +1,4 @@
-# FUMIRA Demo Backend
+# FUMIRA Backend
 
 TypeScript + Fastify proxy between the iOS app and MiniMax `image-01` I2I.
 

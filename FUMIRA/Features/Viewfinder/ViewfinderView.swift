@@ -9,43 +9,31 @@ struct ViewfinderView: View {
     @State private var controlsAreReady = false
     @State private var shutterFlash = 0.0
     @State private var albumPickerItem: PhotosPickerItem?
-
-    private var timeChipLabel: String {
-        let year = Calendar.current.component(.year, from: model.selectedTime.targetDate())
-        if abs(model.selectedTime.offsetDays) < 0.5 {
-            return "NOW · \(year)"
-        }
-        return "\(model.selectedTime.compactLabel) · \(year)"
-    }
+    @State private var captureOrientation: UIDeviceOrientation = .portrait
 
     var body: some View {
         ZStack {
             preview
                 .ignoresSafeArea()
 
-            if model.isCameraGridEnabled {
-                CameraGridOverlay()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+            CameraCompositionOverlay(
+                aspectRatio: model.cameraAspectRatio,
+                showsGrid: model.isCameraGridEnabled
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
 
-            // Top / bottom scrims only — never a large white control card.
-            VStack(spacing: 0) {
-                LinearGradient(
-                    colors: [PosterEffects.cameraTopScrim, Color.clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 140)
-                Spacer(minLength: 0)
-                LinearGradient(
-                    colors: [Color.clear, PosterEffects.cameraBottomScrim],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 280)
-            }
+            // Only the status-bar area needs a scrim. The time rail and camera
+            // controls carry their own contrast, so a full-width bottom layer
+            // would read as a grey rectangle over the live view.
+            LinearGradient(
+                colors: [PosterPalette.ink.opacity(0.22), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 104)
+            .frame(maxHeight: .infinity, alignment: .top)
             .ignoresSafeArea()
             .allowsHitTesting(false)
 
@@ -58,7 +46,7 @@ struct ViewfinderView: View {
                 Spacer(minLength: 0)
 
                 bottomChrome
-                    .padding(.horizontal, PosterSpacing.md)
+                    .padding(.horizontal, PosterSpacing.xs)
                     .padding(.bottom, PosterSpacing.md)
                     .allowsHitTesting(controlsAreReady)
             }
@@ -70,10 +58,17 @@ struct ViewfinderView: View {
         }
         .accessibilityElement(children: .contain)
         .task {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            updateCaptureOrientation(UIDevice.current.orientation)
             await model.refreshCameraControls()
             try? await Task.sleep(for: PosterMotion.cameraInputGuard)
             guard !Task.isCancelled else { return }
             controlsAreReady = true
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)
+        ) { _ in
+            updateCaptureOrientation(UIDevice.current.orientation)
         }
         .onChange(of: albumPickerItem) { _, newItem in
             guard let newItem else { return }
@@ -84,7 +79,8 @@ struct ViewfinderView: View {
         }
     }
 
-    /// Top: flash / flip (when live) + status + minimal time chip — no slogan, no dead controls.
+    /// Top: flash / flip · album import · aspect ratio.
+    /// Each control rotates in place so it stays upright when the phone is sideways.
     private var topChrome: some View {
         HStack(alignment: .center, spacing: PosterSpacing.sm) {
             HStack(spacing: PosterSpacing.sm) {
@@ -96,6 +92,7 @@ struct ViewfinderView: View {
                     ) {
                         Task { await model.cycleFlashMode() }
                     }
+                    .rotationEffect(chromeRotation)
                 }
 
                 if model.canSwitchCamera {
@@ -108,69 +105,93 @@ struct ViewfinderView: View {
                     ) {
                         Task { await model.switchCameraLens() }
                     }
+                    .rotationEffect(chromeRotation)
                 }
 
-                if !model.isUsingLiveCamera {
-                    Text("模拟器")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(PosterPalette.paperWhite.opacity(0.75))
-                        .padding(.horizontal, PosterSpacing.sm)
-                        .padding(.vertical, PosterSpacing.xs)
-                        .background(PosterPalette.ink.opacity(0.35))
-                        .clipShape(Capsule())
-                        .accessibilityLabel("模拟器场景")
-                }
+                albumPickerButton
+                    .rotationEffect(chromeRotation)
             }
 
             Spacer(minLength: PosterSpacing.sm)
 
-            Text(timeChipLabel)
-                .font(.caption.weight(.semibold).monospacedDigit())
-                .foregroundStyle(PosterPalette.paperWhite)
-                .padding(.horizontal, PosterSpacing.md)
-                .padding(.vertical, PosterSpacing.sm)
-                .background(PosterPalette.ink.opacity(0.4))
-                .clipShape(Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(PosterPalette.paperWhite.opacity(0.22), lineWidth: 1)
-                }
-                .accessibilityLabel("选中时间")
-                .accessibilityValue(timeChipLabel)
-                .contentTransition(reduceMotion ? .identity : .numericText())
+            aspectRatioMenu
+                .rotationEffect(chromeRotation)
         }
     }
 
-    /// Bottom: WaveTimeRail · album · shutter · grid.
-    private var bottomChrome: some View {
-        VStack(spacing: PosterSpacing.md) {
-            WaveTimeRail(
-                value: model.selectedTime.normalized,
-                chrome: .immersive,
-                onDetent: model.playTimeDetent
-            ) { normalized in
-                model.updateTime(normalized: normalized)
-            }
-            .padding(.horizontal, PosterSpacing.xs)
-
-            HStack(alignment: .center, spacing: PosterSpacing.xl) {
-                albumPickerButton
-
-                ShutterButton {
-                    fireShutterFlash()
-                    Task { await model.capture() }
-                }
-
-                CameraChromeButton(
-                    systemImage: model.isCameraGridEnabled ? "grid" : "grid.circle",
-                    accessibilityLabelText: model.isCameraGridEnabled ? "关闭构图网格" : "打开构图网格",
-                    accessibilityHintText: "切换取景辅助网格"
-                ) {
-                    model.toggleCameraGrid()
-                }
-            }
-            .padding(.bottom, PosterSpacing.xs)
+    /// Counter-rotates chrome so labels stay gravity-upright while the app stays portrait-locked.
+    private var chromeRotation: Angle {
+        switch captureOrientation {
+        case .landscapeLeft:
+            return .degrees(90)
+        case .landscapeRight:
+            return .degrees(-90)
+        case .portraitUpsideDown:
+            return .degrees(180)
+        default:
+            return .zero
         }
+    }
+
+    private var aspectRatioMenu: some View {
+        Menu {
+            ForEach(CameraAspectRatio.allCases, id: \.self) { aspectRatio in
+                Button {
+                    withAnimation(Self.compositionMorphAnimation(reduceMotion: reduceMotion)) {
+                        model.selectCameraAspectRatio(aspectRatio)
+                    }
+                } label: {
+                    Label(
+                        aspectRatio.label,
+                        systemImage: model.cameraAspectRatio == aspectRatio
+                            ? "checkmark.circle.fill"
+                            : "rectangle.dashed"
+                    )
+                }
+                .accessibilityHint(aspectRatio.accessibilityHint)
+            }
+        } label: {
+            Text(model.cameraAspectRatio.label)
+                .font(.caption.weight(.bold).monospacedDigit())
+                .foregroundStyle(PosterPalette.paperWhite)
+                .padding(.horizontal, PosterSpacing.md)
+                .frame(height: 48)
+                .background(PosterEffects.cameraChromeFill)
+                .clipShape(Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(PosterEffects.cameraChromeStroke, lineWidth: 1)
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(PosterPressStyle())
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel("拍摄比例，当前为 \(model.cameraAspectRatio.label)")
+        .accessibilityHint("选择全屏、16 比 9、3 比 4或1 比 1构图")
+    }
+
+    /// Aspect-frame morph: quick lift, soft settle — not a constant-speed wipe.
+    fileprivate static func compositionMorphAnimation(reduceMotion: Bool) -> Animation? {
+        reduceMotion
+            ? nil
+            : .timingCurve(0.14, 1.14, 0.22, 1, duration: 0.44)
+    }
+
+    /// Bottom: shutter and time selection are one morphing control.
+    private var bottomChrome: some View {
+        ShutterWaveTimeRail(
+            value: model.selectedTime.normalized,
+            onDetent: model.playTimeDetent,
+            onChange: { normalized in
+                model.updateTime(normalized: normalized)
+            },
+            onCapture: {
+                fireShutterFlash()
+                Task { await model.capture() }
+            },
+            chromeRotation: chromeRotation
+        )
+        .padding(.bottom, PosterSpacing.sm)
     }
 
     private var albumPickerButton: some View {
@@ -237,6 +258,24 @@ struct ViewfinderView: View {
             shutterFlash = 0
         }
     }
+
+    private func updateCaptureOrientation(_ orientation: UIDeviceOrientation) {
+        guard orientation == .portrait
+                || orientation == .portraitUpsideDown
+                || orientation == .landscapeLeft
+                || orientation == .landscapeRight
+        else {
+            return
+        }
+
+        if reduceMotion {
+            captureOrientation = orientation
+        } else {
+            withAnimation(PosterMotion.decelerate) {
+                captureOrientation = orientation
+            }
+        }
+    }
 }
 
 /// PhotosPicker Transferable for JPEG / PNG / HEIC library bytes.
@@ -259,23 +298,167 @@ private struct AlbumImageData: Transferable {
     }
 }
 
-private struct CameraGridOverlay: View {
+private struct CameraCompositionOverlay: View {
+    let aspectRatio: CameraAspectRatio
+    let showsGrid: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
-            Path { path in
-                for step in 1...2 {
-                    let x = width * CGFloat(step) / 3
-                    path.move(to: CGPoint(x: x, y: 0))
-                    path.addLine(to: CGPoint(x: x, y: height))
-                    let y = height * CGFloat(step) / 3
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: width, y: y))
+            let cropFrame = compositionFrame(in: proxy.size)
+            let captureViewport = captureViewport(in: proxy.size)
+
+            ZStack {
+                if let cropFrame {
+                    let cornerRadius = compositionCornerRadius(for: cropFrame)
+
+                    CameraFrostedCompositionMask(
+                        cropFrame: cropFrame,
+                        cornerRadius: cornerRadius
+                    )
+                    .transition(.opacity)
+
+                    if showsGrid {
+                        CameraCompositionGrid(
+                            frame: cropFrame,
+                            cornerRadius: cornerRadius
+                        )
+                        .transition(.opacity)
+                    }
+                } else if showsGrid {
+                    CameraCompositionGrid(
+                        frame: captureViewport,
+                        cornerRadius: 0
+                    )
                 }
             }
-            .stroke(PosterPalette.paperWhite.opacity(0.35), lineWidth: 1)
+            .animation(compositionAnimation, value: aspectRatio)
+            .animation(compositionAnimation, value: showsGrid)
         }
+    }
+
+    private var compositionAnimation: Animation? {
+        ViewfinderView.compositionMorphAnimation(reduceMotion: reduceMotion)
+    }
+
+    /// Shared middle band. Classic / square keep side gutters; chrome may float
+    /// over frost at the bottom so we never carve a dead rectangular dock.
+    private func captureViewport(in size: CGSize) -> CGRect {
+        if aspectRatio == .fullScreen {
+            return CGRect(origin: .zero, size: size)
+        }
+        let topInset = min(92, size.height * 0.12)
+        let bottomInset = min(156, size.height * 0.19)
+        let gutter = sideGutter(in: size)
+        return CGRect(
+            x: gutter,
+            y: topInset,
+            width: max(0, size.width - gutter * 2),
+            height: max(0, size.height - topInset - bottomInset)
+        )
+    }
+
+    /// Match the comfortable side air of 16:9 / 1:1 — classic must not kiss the edges.
+    private func sideGutter(in size: CGSize) -> CGFloat {
+        switch aspectRatio {
+        case .fullScreen, .widescreen:
+            return 0
+        case .classic, .square:
+            return max(12, min(20, size.width * 0.04))
+        }
+    }
+
+    private func compositionFrame(in size: CGSize) -> CGRect? {
+        guard let ratio = aspectRatio.targetAspectRatio(for: size) else { return nil }
+        let viewport = captureViewport(in: size)
+        guard viewport.width > 0, viewport.height > 0 else { return nil }
+
+        let availableRatio = viewport.width / viewport.height
+        let frameSize: CGSize
+        if availableRatio > ratio {
+            frameSize = CGSize(width: viewport.height * ratio, height: viewport.height)
+        } else {
+            frameSize = CGSize(width: viewport.width, height: viewport.width / ratio)
+        }
+
+        return CGRect(
+            x: viewport.midX - frameSize.width / 2,
+            y: viewport.midY - frameSize.height / 2,
+            width: frameSize.width,
+            height: frameSize.height
+        )
+    }
+
+    private func compositionCornerRadius(for frame: CGRect) -> CGFloat {
+        min(34, max(24, min(frame.width, frame.height) * 0.08))
+    }
+}
+
+/// Uses the live preview as the source for the composition surround. iOS 26
+/// gets native Liquid Glass; earlier targets receive the equivalent system
+/// material. The mask is non-interactive and leaves the selected frame clear.
+private struct CameraFrostedCompositionMask: View {
+    let cropFrame: CGRect
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                Color.clear
+                    .glassEffect(
+                        .regular.tint(PosterPalette.ink.opacity(0.06)),
+                        in: .rect(cornerRadius: 0)
+                    )
+            } else {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+            }
+        }
+        .mask {
+            ZStack {
+                Color.white
+
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.black)
+                    .frame(width: cropFrame.width, height: cropFrame.height)
+                    .position(x: cropFrame.midX, y: cropFrame.midY)
+                    .blendMode(.destinationOut)
+            }
+            .compositingGroup()
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct CameraCompositionGrid: View {
+    let frame: CGRect
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            for step in 1...2 {
+                let x = size.width * CGFloat(step) / 3
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+
+                let y = size.height * CGFloat(step) / 3
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+            }
+            context.stroke(
+                path,
+                with: .color(PosterPalette.paperWhite.opacity(0.32)),
+                lineWidth: 1
+            )
+        }
+        .frame(width: frame.width, height: frame.height)
+        .clipShape(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .position(x: frame.midX, y: frame.midY)
+        .allowsHitTesting(false)
     }
 }
 

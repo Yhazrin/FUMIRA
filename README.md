@@ -24,7 +24,7 @@ MiniMax is **not** packaged into the app. The key lives only in `server/.env`.
 Packaging the iOS target never embeds vendor credentials — you run the backend
 alongside the Debug app.
 
-## Run (remote MiniMax I2I demo)
+## Run (remote MiniMax I2I)
 
 1. Start the FUMIRA backend (API key never enters the iOS target):
 

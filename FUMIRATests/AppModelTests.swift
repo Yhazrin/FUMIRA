@@ -85,13 +85,13 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(model.phase, .result)
         XCTAssertEqual(model.generatedFrame?.sessionID, model.activeSessionID)
-        XCTAssertEqual(model.generatedFrame?.modelOptionID, "demo.image.identity")
+        XCTAssertEqual(model.generatedFrame?.modelOptionID, "fumira.image.identity")
         XCTAssertTrue(model.generatedFrame?.prompt.contains("主体连续性") == true)
         XCTAssertTrue(model.generatedFrame?.prompt.contains("保持原图构图") == true)
     }
 
     func testStoryNarrativeChangesAcrossTime() {
-        let story = TemporalStory.demoPark
+        let story = TemporalStory.parkReference
         let past = story.narrative(for: TimePosition(offsetDays: -36_525))
         let present = story.narrative(for: .now)
         let future = story.narrative(for: TimePosition(offsetDays: 36_525))
@@ -101,11 +101,63 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(past, future)
     }
 
+    func testStoryCopyPolicyBoundsProviderTextForCurrentLayouts() {
+        let longText = String(repeating: "长", count: 200)
+        let story = TemporalStory(
+            title: longText,
+            logline: longText,
+            presentTruth: longText,
+            identityRules: [longText],
+            beats: [
+                StoryBeat(
+                    anchorYears: 0,
+                    title: longText,
+                    narrative: longText,
+                    visualPrompt: longText
+                )
+            ]
+        )
+
+        XCTAssertLessThanOrEqual(story.title.count, StoryCopyPolicy.title)
+        XCTAssertLessThanOrEqual(story.logline.count, StoryCopyPolicy.logline)
+        XCTAssertLessThanOrEqual(story.presentTruth.count, StoryCopyPolicy.presentTruth)
+        XCTAssertLessThanOrEqual(story.identityRules[0].count, StoryCopyPolicy.identityRule)
+        XCTAssertLessThanOrEqual(story.beats[0].title.count, StoryCopyPolicy.beatTitle)
+        XCTAssertLessThanOrEqual(story.beats[0].narrative.count, StoryCopyPolicy.beatNarrative)
+        XCTAssertLessThanOrEqual(story.beats[0].visualPrompt.count, StoryCopyPolicy.visualPrompt)
+    }
+
+    func testUnderstandingCopyPolicyBoundsProviderTextForCurrentLayouts() {
+        let longText = String(repeating: "长", count: 200)
+        let understanding = SceneUnderstanding(
+            summary: longText,
+            locationType: longText,
+            visualMood: longText,
+            timeClues: [longText],
+            changeDrivers: [longText],
+            subjects: [
+                SceneSubject(
+                    name: longText,
+                    confidence: 0.9,
+                    identityRule: longText
+                )
+            ]
+        )
+
+        XCTAssertLessThanOrEqual(understanding.summary.count, UnderstandingCopyPolicy.summary)
+        XCTAssertLessThanOrEqual(understanding.locationType.count, UnderstandingCopyPolicy.locationType)
+        XCTAssertLessThanOrEqual(understanding.visualMood.count, UnderstandingCopyPolicy.visualMood)
+        XCTAssertLessThanOrEqual(understanding.timeClues[0].count, UnderstandingCopyPolicy.timeClue)
+        XCTAssertLessThanOrEqual(understanding.changeDrivers[0].count, UnderstandingCopyPolicy.changeDriver)
+        XCTAssertLessThanOrEqual(understanding.subjects[0].name.count, UnderstandingCopyPolicy.subjectName)
+        XCTAssertLessThanOrEqual(understanding.subjects[0].identityRule.count, UnderstandingCopyPolicy.identityRule)
+    }
+
     func testOnlyReadyModelRoutesCanRun() {
         let catalog = AIModelCatalog.bundled
-        XCTAssertTrue(catalog.isRunnable(.demo))
+        XCTAssertTrue(catalog.isRunnable(.standard))
 
-        var unavailable = AIModelConfiguration.demo
+        var unavailable = AIModelConfiguration.standard
         unavailable.select(optionID: "openai.story.server", for: .story)
         XCTAssertFalse(catalog.isRunnable(unavailable))
     }
@@ -275,7 +327,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotNil(model.temporalStory)
         let photo = try XCTUnwrap(model.capturedPhoto)
         let ratio = Double(photo.pixelWidth) / Double(photo.pixelHeight)
-        XCTAssertEqual(ratio, 0.75, accuracy: 0.02)
+        XCTAssertEqual(ratio, 4.0 / 3.0, accuracy: 0.02)
         XCTAssertNotNil(UIImage(data: photo.data))
     }
 

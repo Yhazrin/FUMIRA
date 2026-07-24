@@ -1,11 +1,10 @@
 import Foundation
 import UIKit
 
-/// Silent album-import adapter: center-crops to portrait 3:4 and emits JPEG.
-/// No crop UI — MVP forbids a heavy editing tool.
+/// Normalises album and live-camera bytes into the composition selected in the
+/// viewfinder. Cropping remains deliberately silent: the live guide is the
+/// contract, rather than a separate editing screen.
 enum PhotoImportAdapter {
-    static let aspectWidth = 3
-    static let aspectHeight = 4
     /// Match mock camera long edge for predictable downstream payloads.
     static let maxLongEdge: CGFloat = 1_600
     static let jpegQuality: CGFloat = 0.92
@@ -24,12 +23,20 @@ enum PhotoImportAdapter {
         }
     }
 
-    static func makeCapturedPhoto(from original: Data) throws -> CapturedPhoto {
+    static func makeCapturedPhoto(
+        from original: Data,
+        composition: CameraAspectRatio = .classic
+    ) throws -> CapturedPhoto {
         guard let image = UIImage(data: original) else {
             throw ImportError.invalidImage
         }
         let oriented = image.normalizedUpOrientation()
-        let cropped = centerCrop(oriented, widthUnits: aspectWidth, heightUnits: aspectHeight)
+        let cropped: UIImage
+        if let targetRatio = composition.targetAspectRatio(for: oriented.size) {
+            cropped = centerCrop(oriented, targetRatio: targetRatio)
+        } else {
+            cropped = oriented
+        }
         let scaled = fitLongEdge(cropped, maxLongEdge: maxLongEdge)
         guard let jpeg = scaled.jpegData(compressionQuality: jpegQuality) else {
             throw ImportError.encodingFailed
@@ -39,15 +46,13 @@ enum PhotoImportAdapter {
         return CapturedPhoto(data: jpeg, pixelWidth: width, pixelHeight: height)
     }
 
-    /// Center-crop to `widthUnits:heightUnits` (e.g. 3:4).
+    /// Center-crop to the requested width / height ratio.
     static func centerCrop(
         _ image: UIImage,
-        widthUnits: Int,
-        heightUnits: Int
+        targetRatio: CGFloat
     ) -> UIImage {
         let size = image.size
         guard size.width > 0, size.height > 0 else { return image }
-        let targetRatio = CGFloat(widthUnits) / CGFloat(heightUnits)
         let imageRatio = size.width / size.height
 
         let cropRect: CGRect

@@ -51,7 +51,7 @@
 - Remote failures map to distinct copy: network / upload / invalid params / rate limit /
   generation failure / server unavailable.
 
-## Backend demo
+## Backend verification
 
 - `POST /health` reports `generation.ready=false` and `mode=unavailable` when no
   adapter is attached, without leaking key configuration.

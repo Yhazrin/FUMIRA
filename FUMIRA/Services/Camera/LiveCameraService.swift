@@ -87,8 +87,11 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         }
     }
 
-    func capturePhoto() async throws -> CapturedPhoto {
+    func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto {
         try await startPreview()
+        let rotationAngle = await MainActor.run {
+            Self.captureRotationAngle(for: UIDevice.current.orientation)
+        }
 
         return try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async { [self] in
@@ -104,11 +107,10 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                     settings.flashMode = flashMode
                 }
 
-                if
-                    let connection = photoOutput.connection(with: .video),
-                    connection.isVideoRotationAngleSupported(90)
-                {
-                    connection.videoRotationAngle = 90
+                if let connection = photoOutput.connection(with: .video) {
+                    if connection.isVideoRotationAngleSupported(rotationAngle) {
+                        connection.videoRotationAngle = rotationAngle
+                    }
                 }
 
                 let uniqueID = settings.uniqueID
@@ -118,12 +120,14 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                     }
                     switch result {
                     case let .success(data):
-                        let dimensions = Self.pixelDimensions(for: data)
-                        continuation.resume(returning: CapturedPhoto(
-                            data: data,
-                            pixelWidth: dimensions.width,
-                            pixelHeight: dimensions.height
-                        ))
+                        do {
+                            continuation.resume(returning: try PhotoImportAdapter.makeCapturedPhoto(
+                                from: data,
+                                composition: composition
+                            ))
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
                     case let .failure(error):
                         continuation.resume(throwing: error)
                     }
@@ -258,17 +262,17 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
     }
 
-    private static func pixelDimensions(for data: Data) -> (width: Int, height: Int) {
-        guard
-            let source = CGImageSourceCreateWithData(data as CFData, nil),
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil)
-                as? [CFString: Any]
-        else {
-            return (0, 0)
+    /// AVCapture uses rotation angles, not interface orientation. Mapping this
+    /// at the shutter keeps the JPEG's pixel axes aligned to how the person is
+    /// holding the phone, including a landscape capture.
+    private static func captureRotationAngle(for orientation: UIDeviceOrientation) -> CGFloat {
+        switch orientation {
+        case .landscapeLeft: 180
+        case .landscapeRight: 0
+        case .portraitUpsideDown: 270
+        case .portrait, .faceUp, .faceDown, .unknown: 90
+        @unknown default: 90
         }
-        let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
-        return (width, height)
     }
 }
 
@@ -353,10 +357,20 @@ private final class CameraPreviewUIView: UIView {
         super.layoutSubviews()
         guard
             let connection = previewLayer.connection,
-            connection.isVideoRotationAngleSupported(90)
+            connection.isVideoRotationAngleSupported(previewRotationAngle)
         else {
             return
         }
-        connection.videoRotationAngle = 90
+        connection.videoRotationAngle = previewRotationAngle
+    }
+
+    private var previewRotationAngle: CGFloat {
+        switch window?.windowScene?.interfaceOrientation {
+        case .landscapeLeft: 0
+        case .landscapeRight: 180
+        case .portraitUpsideDown: 270
+        case .portrait, .none, .unknown: 90
+        @unknown default: 90
+        }
     }
 }

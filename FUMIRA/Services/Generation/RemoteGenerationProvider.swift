@@ -1,6 +1,6 @@
 import Foundation
 
-/// Remote image generation against the FUMIRA demo backend.
+/// Remote image generation against the FUMIRA backend.
 /// Flow: upload JPEG → create generation → poll until succeeded/failed → download result.
 /// Vendor credentials never leave the server.
 actor RemoteGenerationProvider: GenerationProvider {

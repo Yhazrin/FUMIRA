@@ -28,7 +28,7 @@ struct GenerationFailureView: View {
                     if let category = errorCategoryLabel {
                         Text(category)
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.pine)
+                            .foregroundStyle(PosterPalette.skyDeep)
                             .textCase(.uppercase)
                     }
 

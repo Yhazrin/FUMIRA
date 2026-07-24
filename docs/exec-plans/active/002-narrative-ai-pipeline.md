@@ -15,7 +15,7 @@ continuous ±100-year narrative browsing.
 3. Session-safe AppModel orchestration with stage-aware failure recovery.
 4. Original-photo hero, scanning, time-writing, story-review, generation and
    narrative-result experiences.
-5. Model background with demo/OpenAI/Gemini/Claude/FLUX/Stability route entries;
+5. Model background with FUMIRA/OpenAI/Gemini/Claude/FLUX/Stability route entries;
    unavailable routes are visible but cannot be selected.
 6. Backend API contract that keeps vendor credentials and concrete versions off-device.
 7. Twelve passing tests covering the complete pipeline and nonlinear time model.

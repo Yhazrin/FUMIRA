@@ -158,7 +158,7 @@ struct TemporalParkScene: View {
     private var treeCrownColor: Color {
         if t < -0.3 { return PosterPalette.mutedInk.opacity(0.8) }
         if t > 0.3 { return PosterPalette.grassLight.opacity(0.75) }
-        return PosterPalette.pine
+        return PosterPalette.leafGreen
     }
 
     private func monolith(in size: CGSize) -> some View {
@@ -190,9 +190,9 @@ struct TemporalParkScene: View {
     }
 
     private func hillColor(depth: Double) -> Color {
-        let nowGreen = depth < 0.45 ? PosterPalette.grassLight : PosterPalette.pine
+        let nowGreen = depth < 0.45 ? PosterPalette.grassLight : PosterPalette.leafGreen
         let pastGreen = PosterPalette.mutedInk.opacity(0.7)
-        let futureGreen = PosterPalette.pine.opacity(0.55 + depth * 0.2)
+        let futureGreen = PosterPalette.skyDeep.opacity(0.55 + depth * 0.2)
         if t < 0 {
             return lerpColor(nowGreen, pastGreen, min(1, abs(t) * 1.2))
         }

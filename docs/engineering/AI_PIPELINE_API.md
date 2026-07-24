@@ -4,9 +4,9 @@ This contract lets operations change concrete models without shipping a new iOS
 binary. The app sends stable route IDs; the backend owns vendor credentials,
 model-version mapping, safety rules, observability, cost controls, and fallbacks.
 
-## Demo backend (shipped under `server/`)
+## FUMIRA backend (shipped under `server/`)
 
-The Fastify demo implements the **image generation** half of the pipeline against
+The Fastify service implements the **image generation** half of the pipeline against
 MiniMax `image-01` I2I. Understanding and story remain on-device mocks until their
 hosted routes are ready (see `REMOTE_UNDERSTANDING_TODO.md`).
 
@@ -53,7 +53,7 @@ never a MiniMax CDN URL that would require vendor auth.
 | `MINIMAX_HTTPS_PROXY` | server | Optional override used only by the MiniMax adapter |
 | `FUMIRA_API_BASE_URL` | iOS env / Info.plist | Enables `RemoteGenerationProvider` |
 
-Local demo proxy port is **7990**. Live MiniMax HTTPS goes through undici
+Local proxy port is **7990**. Live MiniMax HTTPS goes through undici
 `ProxyAgent` when any of the proxy env vars above is set. Mock mode needs no
 proxy. Never put `MINIMAX_API_KEY` in iOS, git, or logs.
 ## Model catalog
@@ -78,7 +78,7 @@ proxy. Never put `MINIMAX_API_KEY` in iOS, git, or logs.
 
 The backend may remap the provider model behind an ID, but must not silently
 change its role or response schema. Removing readiness causes the app to fall back
-to the corresponding demo route. **Not yet implemented** by the demo server; the
+to the corresponding standard route. **Not yet implemented** by the current server; the
 app still uses the bundled catalog.
 
 ## Understand
@@ -116,7 +116,7 @@ and ordered beats. Each beat includes an anchor year, narrative, and visual prom
 
 ## Render (legacy sketch)
 
-Earlier drafts described `POST /v1/render` with SSE. The demo backend supersedes
+Earlier drafts described `POST /v1/render` with SSE. The FUMIRA backend supersedes
 that with the upload + generations poll flow above, which matches MiniMax’s
 synchronous I2I HTTP call wrapped in a server-side job.
 

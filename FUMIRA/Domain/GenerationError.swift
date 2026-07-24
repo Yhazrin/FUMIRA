@@ -24,7 +24,7 @@ enum GenerationError: LocalizedError, Sendable, Equatable {
         case let .generationFailed(message):
             message.isEmpty ? "变迁图生成失败，请稍后重试。" : message
         case .serverUnavailable:
-            "远程生成暂未就绪，请稍后重试或改用本地 Demo。"
+            "生成服务暂未就绪，请稍后重试。"
         }
     }
 

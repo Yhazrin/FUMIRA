@@ -39,6 +39,9 @@ struct PosterKeywordHero: View {
     let moment: PosterHeroMoment
     var fontSize: CGFloat = 44
     var surface: PosterHeroSurface = .paper
+    /// Permission and compact utility surfaces can keep the expressive keyword
+    /// treatment without adding an unrelated English script label.
+    var showsScriptLabel = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -47,7 +50,7 @@ struct PosterKeywordHero: View {
     }
 
     private var pineTone: Color {
-        surface == .dark ? PosterPalette.grassLight : PosterPalette.pine
+        surface == .dark ? PosterPalette.grassLight : PosterPalette.skyDeep
     }
 
     private var accentTone: Color {
@@ -107,7 +110,7 @@ struct PosterKeywordHero: View {
 
     private var alignment: Alignment {
         switch moment {
-        case .invite: .leading
+        case .invite: .trailing
         case .growing: .center
         case .connecting: .trailing
         case .ready, .reply: .leading
@@ -129,7 +132,7 @@ struct PosterKeywordHero: View {
     var body: some View {
         VStack(alignment: stackAlignment, spacing: PosterSpacing.sm) {
             keywordStack
-            if moment != .invite {
+            if moment != .invite, showsScriptLabel {
                 HandDrawnUnderline()
                     .stroke(PosterPalette.leafGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
                     .frame(width: underlineWidth, height: 10)
@@ -142,7 +145,7 @@ struct PosterKeywordHero: View {
                 Text("FUMIRA  /  FUTURE CAMERA")
                     .font(.caption2.weight(.semibold))
                     .tracking(1.7)
-                    .foregroundStyle(PosterPalette.pine.opacity(0.72))
+                    .foregroundStyle(PosterPalette.skyDeep.opacity(0.72))
                     .padding(.top, PosterSpacing.xs)
             }
         }
@@ -156,7 +159,7 @@ struct PosterKeywordHero: View {
     private var keywordStack: some View {
         switch moment {
         case .invite:
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .trailing, spacing: 0) {
                 HStack(alignment: .lastTextBaseline, spacing: PosterSpacing.sm) {
                     segmentView(segments[0], index: 0, size: fontSize * 0.78)
                     segmentView(segments[1], index: 1, size: fontSize * 1.18)
@@ -165,7 +168,7 @@ struct PosterKeywordHero: View {
                     segmentView(segments[2], index: 2, size: fontSize * 0.82)
                     segmentView(segments[3], index: 3, size: fontSize * 1.28)
                 }
-                .padding(.leading, fontSize * 0.48)
+                .padding(.trailing, fontSize * 0.48)
             }
         case .growing:
             VStack(alignment: .center, spacing: PosterSpacing.xs) {

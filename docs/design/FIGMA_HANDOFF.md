@@ -29,7 +29,7 @@
 | B2 | 116:631 | SharePosterView |
 | B3 | 116:669 | GenerationFailureView |
 | B4 | 116:682 | DisconnectedView |
-| B5 | 116:747 | OfflineDemoView |
+| B5 | 116:747 | OfflinePreviewView |
 
 ## Interpretation
 

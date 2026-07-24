@@ -21,12 +21,6 @@ struct PosterCapsuleButton: View {
                 .frame(minHeight: 56)
                 .background(background)
                 .clipShape(Capsule())
-                .overlay {
-                    if style == .secondary {
-                        Capsule()
-                            .stroke(PosterPalette.ink, lineWidth: 2)
-                    }
-                }
         }
         .buttonStyle(PosterCapsulePressStyle())
         .accessibilityLabel(title)
@@ -36,12 +30,12 @@ struct PosterCapsuleButton: View {
     private var foregroundColor: Color {
         switch style {
         case .primary:
-            PosterPalette.canvas
+            PosterPalette.ink
         case .lime:
             // Accent chip style: leaf-green fill + ink label (never fluorescent full-bleed)
             PosterPalette.ink
         case .secondary:
-            PosterPalette.ink
+            PosterPalette.skyDeep
         }
     }
 
@@ -49,10 +43,10 @@ struct PosterCapsuleButton: View {
     private var background: some View {
         switch style {
         case .primary:
-            // Direction H: primary prefers pine; ink remains available via secondary stroke + ink text
-            PosterPalette.pine
+            // Match shutter energy: fresh leaf green, not dark pine.
+            PosterPalette.leafGreen
         case .secondary:
-            PosterPalette.canvas
+            PosterPalette.skyDeep.opacity(0.12)
         case .lime:
             PosterPalette.leafGreen
         }

@@ -25,7 +25,7 @@ struct FutureCamBody: View {
 
                 HStack(spacing: PosterSpacing.lg) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(PosterPalette.pine)
+                        .fill(PosterPalette.skyDeep)
                         .frame(width: 28, height: 8)
                     Circle()
                         .fill(PosterPalette.leafGreen)
@@ -44,19 +44,15 @@ struct ShutterButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .stroke(PosterEffects.cameraShutterRing, lineWidth: 4)
-                    .frame(width: 78, height: 78)
+                    .fill(PosterPalette.leafGreen)
+                    .frame(width: 68, height: 68)
                 Circle()
-                    .fill(PosterEffects.cameraShutterFill)
-                    .frame(width: 62, height: 62)
-                // Moss as ≤5% accent ring — never a fluorescent / yellow full fill.
-                Circle()
-                    .stroke(PosterPalette.leafGreen.opacity(0.75), lineWidth: 2)
+                    .stroke(PosterPalette.skyDeep.opacity(0.42), lineWidth: 2)
                     .frame(width: 54, height: 54)
             }
             .frame(width: 88, height: 88)
             .contentShape(Circle())
-            .shadow(color: PosterEffects.floating, radius: 10, y: 4)
+            .shadow(color: PosterPalette.ink.opacity(0.2), radius: 8, y: 3)
         }
         .buttonStyle(PosterPressStyle())
         .accessibilityLabel("快门")

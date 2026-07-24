@@ -1,53 +1,92 @@
+import AVFoundation
 import SwiftUI
 
 struct CameraPermissionView: View {
     let model: AppModel
 
+    /// Hidden until we know the user still needs a prompt (first grant / denied).
+    @State private var showPrompt = false
+
     var body: some View {
         PosterScreenContainer {
-            VStack(spacing: PosterSpacing.xl) {
-                Spacer()
-
-                PosterKeywordHero(moment: .ready, fontSize: 40)
-
-                Image(systemName: "camera.viewfinder")
-                    .font(.system(size: 64))
-                    .foregroundStyle(PosterPalette.pine)
-                    .padding(.vertical, PosterSpacing.xl)
-                    .accessibilityHidden(true)
-
-                Text(permissionExplanation)
-                    .font(.body)
-                    .foregroundStyle(PosterPalette.ink)
-                    .multilineTextAlignment(.leading)
-
-                if let message = model.lastErrorMessage {
-                    Text(message)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(PosterPalette.errorCoral)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Spacer()
-
-                PosterCapsuleButton(
-                    title: "允许并进入取景器",
-                    accessibilityHint: model.isUsingLiveCamera
-                        ? "打开系统相机权限并进入实时取景"
-                        : "进入模拟器取景场景"
-                ) {
-                    Task { await model.grantCameraAccess() }
-                }
+            if showPrompt {
+                promptContent
+            } else {
+                // Quiet hold while already-authorized sessions jump to the viewfinder.
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("正在进入取景器")
             }
+        }
+        .task {
+            await resolveEntry()
         }
     }
 
-    private var permissionExplanation: String {
-        if model.isUsingLiveCamera {
-            "首次使用会弹出系统相机权限。照片只在你按下快门后交给 FUMIRA 的识图与时间故事流程。"
-        } else {
-            "当前是模拟器环境，将使用可交互场景代替硬件相机；在实体 iPhone 上会自动切换为实时取景。"
+    private var promptContent: some View {
+        VStack(spacing: PosterSpacing.lg) {
+            Spacer(minLength: PosterSpacing.xl)
+
+            Image(systemName: "camera.fill")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(PosterPalette.skyDeep)
+                .frame(width: 64, height: 64)
+                .background(PosterPalette.leafGreen.opacity(0.18))
+                .clipShape(Circle())
+                .accessibilityHidden(true)
+
+            Text(guidance)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(PosterPalette.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let message = model.lastErrorMessage {
+                Text(message)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(PosterPalette.errorCoral)
+                    .multilineTextAlignment(.center)
+            }
+
+            PosterCapsuleButton(
+                title: model.isUsingLiveCamera ? "打开相机" : "进入取景器",
+                accessibilityHint: model.isUsingLiveCamera
+                    ? "请求相机权限并进入实时取景"
+                    : "继续进入取景器"
+            ) {
+                Task { await model.grantCameraAccess() }
+            }
+            .frame(maxWidth: 280)
+
+            Spacer(minLength: PosterSpacing.xl)
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var guidance: String {
+        model.isUsingLiveCamera
+            ? "允许相机权限，开始拍摄"
+            : "准备好后，开始取景"
+    }
+
+    private func resolveEntry() async {
+        guard canEnterWithoutPrompt else {
+            showPrompt = true
+            return
+        }
+
+        await model.grantCameraAccess()
+        // Denied / failed — reveal the prompt so the user can recover.
+        if model.phase == .cameraPermission {
+            showPrompt = true
+        }
+    }
+
+    /// Live camera skips only when the system already granted access.
+    /// Mock / first-time live still shows the prompt so the user consents once.
+    private var canEnterWithoutPrompt: Bool {
+        guard model.isUsingLiveCamera else { return false }
+        return AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     }
 }
 

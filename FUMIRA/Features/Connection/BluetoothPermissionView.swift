@@ -5,37 +5,33 @@ struct BluetoothPermissionView: View {
 
     var body: some View {
         PosterScreenContainer {
-            VStack(spacing: PosterSpacing.xl) {
-                Spacer()
-
-                PosterTitleView(
-                    segments: ["连上", "FutureCam"],
-                    color: PosterPalette.sky,
-                    fontSize: 40
-                )
-
-                PosterScriptSubtitle(text: "Bluetooth")
+            VStack(spacing: PosterSpacing.lg) {
+                Spacer(minLength: PosterSpacing.xl)
 
                 Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 64))
-                    .foregroundStyle(PosterPalette.pine)
-                    .padding(.vertical, PosterSpacing.xl)
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(PosterPalette.skyDeep)
+                    .frame(width: 64, height: 64)
+                    .background(PosterPalette.sky.opacity(0.18))
+                    .clipShape(Circle())
                     .accessibilityHidden(true)
 
-                Text("需要蓝牙权限来发现实体快门与时间旋钮。这是应用内说明，不会弹出系统对话框。")
-                    .font(.body)
+                Text("允许蓝牙，连接 FutureCam")
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(PosterPalette.ink)
-                    .multilineTextAlignment(.leading)
-
-                Spacer()
+                    .multilineTextAlignment(.center)
 
                 PosterCapsuleButton(
-                    title: "允许并连接",
-                    accessibilityHint: "模拟授权后开始连接硬件"
+                    title: "继续",
+                    accessibilityHint: "授权后开始连接硬件"
                 ) {
                     Task { await model.grantBluetoothAndConnect() }
                 }
+                .frame(maxWidth: 280)
+
+                Spacer(minLength: PosterSpacing.xl)
             }
+            .frame(maxWidth: .infinity)
         }
     }
 }

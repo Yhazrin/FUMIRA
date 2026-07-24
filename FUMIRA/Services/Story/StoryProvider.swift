@@ -2,6 +2,8 @@ import Foundation
 
 struct StoryRequest: Sendable {
     let understanding: SceneUnderstanding
+    /// The year selected on the viewfinder when this photo was captured.
+    let targetTime: TimePosition
     let sessionID: UUID
     let model: AIModelOption
 }
@@ -36,7 +38,10 @@ actor MockStoryProvider: StoryProvider {
                     try await Task.sleep(for: stepDelay)
                     continuation.yield(.progress(label: step.0, value: step.1))
                 }
-                continuation.yield(.completed(.demoPark))
+                continuation.yield(.completed(.fallback(
+                    understanding: request.understanding,
+                    targetTime: request.targetTime
+                )))
                 continuation.finish()
             }
             continuation.onTermination = { _ in task.cancel() }

@@ -3,7 +3,11 @@ import { toJpegDataUrl } from "./prompt.js";
 import type {
   MiniMaxIntelligenceAdapter,
   SceneUnderstandingPayload,
+  StoryCopyConstraints,
+  UnderstandingCopyConstraints,
 } from "./types.js";
+import { normalizeTemporalStoryCopy } from "./storyCopy.js";
+import { normalizeSceneUnderstandingCopy } from "./understandingCopy.js";
 
 let adapter: MiniMaxIntelligenceAdapter | null = null;
 
@@ -17,6 +21,7 @@ export function getMiniMaxIntelligenceAdapter(): MiniMaxIntelligenceAdapter | nu
 
 export async function analyzeUploadedAsset(input: {
   sourceAssetId: string;
+  copyConstraints: UnderstandingCopyConstraints;
   requestId: string;
 }) {
   if (!adapter) return unavailable("understanding_unavailable", "图片理解暂未就绪。");
@@ -25,18 +30,31 @@ export async function analyzeUploadedAsset(input: {
   }
   const asset = await readAssetBytes(input.sourceAssetId);
   if (!asset) return unavailable("invalid_image", "源图片无法读取。", false);
-  return adapter.analyzeImage({
+  const result = await adapter.analyzeImage({
     imageDataUrl: toJpegDataUrl(asset.bytes, asset.contentType),
+    copyConstraints: input.copyConstraints,
     requestId: input.requestId,
   });
+  if (!result.ok) return result;
+  return {
+    ok: true as const,
+    value: normalizeSceneUnderstandingCopy(result.value, input.copyConstraints),
+  };
 }
 
 export async function writeTemporalStory(input: {
   understanding: SceneUnderstandingPayload;
+  targetTime: { offsetYears: number; compactLabel: string };
+  copyConstraints: StoryCopyConstraints;
   requestId: string;
 }) {
   if (!adapter) return unavailable("story_unavailable", "时间故事暂未就绪。");
-  return adapter.writeStory(input);
+  const result = await adapter.writeStory(input);
+  if (!result.ok) return result;
+  return {
+    ok: true as const,
+    value: normalizeTemporalStoryCopy(result.value, input.copyConstraints),
+  };
 }
 
 function unavailable(errorCode: string, userMessage: string, retryable = true) {

@@ -36,7 +36,7 @@ struct CameraChromeButton: View {
 
 #Preview {
     ZStack {
-        PosterPalette.pine.ignoresSafeArea()
+        PosterPalette.skyDeep.ignoresSafeArea()
         HStack(spacing: PosterSpacing.lg) {
             CameraChromeButton(
                 systemImage: "bolt.badge.automatic.fill",
