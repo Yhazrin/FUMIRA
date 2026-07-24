@@ -1,43 +1,32 @@
-# Remote Image Understanding — TODO
+# Remote Image Understanding — Implemented
 
-Status: **not implemented for production runtime**.
+Status: **live** via MiniMax VLM (`/v1/coding_plan/vlm` endpoint).
 
-## Why this exists
+## Current implementation
 
-FUMIRA’s narrative pipeline still uses `MockImageUnderstandingProvider` on device.
-Image generation can already go through the FUMIRA Fastify backend → MiniMax
-`image-01` I2I. Image understanding does **not** have a verified public MiniMax
-HTTP endpoint in `MINIMAX_API_GUIDE.md`.
+- `RemoteUnderstandingProvider` (iOS) → `POST /v1/understand` (server)
+- Server delegates to `LiveMiniMaxIntelligenceAdapter.analyzeImage()` using the
+  MiniMax VLM endpoint with `MINIMAX_VLM_API_KEY` (or falls back to `MINIMAX_API_KEY`)
+- Includes prompt injection defense: text visible inside the image is flagged as
+  untrusted scene content
+- Copy constraints enforced server-side and on-device
 
-Development-only verification may use the MiniMax MCP tool
-(`understand_image` / equivalent). That MCP server is **not** a production
-dependency and must not be called from the iOS app or the FUMIRA backend at
-runtime.
+## What changed from the original TODO
 
-## Protocol already in tree
+The original TODO said understanding was not implemented for production. Since then:
 
-- `ImageUnderstandingProvider` — existing stream contract
-- `RemoteUnderstandingProvider` — marker protocol + `UnimplementedRemoteUnderstandingProvider`
-  stub that fails closed
+1. `POST /v1/understand` route is live and tested
+2. `POST /v1/stories` route is live with `targetBeat` support
+3. iOS `RemoteUnderstandingProvider` and `RemoteStoryProvider` are wired in `AppDependencies.runtime`
+4. The intelligence adapter uses the MiniMax VLM endpoint for image analysis
+5. Prompt V2 compiler generates the final image generation prompt server-side
 
-## When to implement
+## Architecture
 
-Implement only after FUMIRA backend publishes a stable understanding route, for
-example the contract already sketched in `AI_PIPELINE_API.md`:
+```
+iOS photo → upload → /v1/understand → /v1/stories → /v1/generations
+                ↑           ↑              ↑              ↑
+           JPEG only    VLM analysis   M3 story    PromptCompiler + image-01
+```
 
-`POST /v1/understand` (multipart photo + session_id + route_id)
-
-Then:
-
-1. Add a real `FUMIRARemoteUnderstandingProvider` that talks to **FUMIRA**, not
-   MiniMax directly.
-2. Wire it in `AppDependencies` behind the same `FUMIRA_API_BASE_URL` (or a
-   dedicated readiness flag from `/health`).
-3. Keep the mock provider as the default when the backend route is unavailable.
-4. Never ship `MINIMAX_API_KEY` to iOS.
-
-## Explicit non-goals
-
-- Do not invent a MiniMax HTTP understanding URL.
-- Do not call MCP tools from the server request path.
-- Do not block the MVP release on understanding parity with generation.
+No vendor credentials ever reach the iOS client.

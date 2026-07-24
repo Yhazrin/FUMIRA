@@ -29,6 +29,30 @@ actor RemoteStoryProvider: StoryProvider {
         }
     }
 
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        var urlRequest = URLRequest(url: baseURL.appending(path: "v1/target-beats"))
+        urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 95
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(TargetBeatRequest(
+            understanding: SceneUnderstandingRelayDTO(understanding),
+            storyContext: StoryContextMinimalRelayDTO(story),
+            target: TargetTimeRelayDTO(target)
+        ))
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else { throw GenerationError.networkFailure }
+        guard (200...299).contains(http.statusCode) else {
+            throw decodeStoryError(data: data)
+        }
+        let decoded = try JSONDecoder().decode(TargetBeatRelayResponse.self, from: data)
+        return decoded.targetBeat.storyBeat
+    }
+
     private func createStory(request: StoryRequest) async throws -> TemporalStory {
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/stories"))
         urlRequest.httpMethod = "POST"
@@ -78,10 +102,12 @@ private struct StoryCopyConstraintsRelayDTO: Codable {
 }
 
 private struct StoryTargetRelayDTO: Encodable {
+    let offsetDays: Double
     let offsetYears: Double
     let compactLabel: String
 
     init(_ time: TimePosition) {
+        offsetDays = time.offsetDays
         offsetYears = time.offsetYears
         compactLabel = time.compactLabel
     }
@@ -122,11 +148,13 @@ private struct SceneSubjectRelayDTO: Codable {
 }
 
 private struct TemporalStoryRelayDTO: Codable {
+    let schemaVersion: String?
     let title: String
     let logline: String
     let presentTruth: String
     let identityRules: [String]
     let beats: [StoryBeatRelayDTO]
+    let targetBeat: StoryBeatRelayDTO?
 
     var temporalStory: TemporalStory {
         TemporalStory(
@@ -134,7 +162,8 @@ private struct TemporalStoryRelayDTO: Codable {
             logline: logline,
             presentTruth: presentTruth,
             identityRules: identityRules,
-            beats: beats.map(\.storyBeat)
+            beats: beats.map(\.storyBeat),
+            targetBeat: targetBeat?.storyBeat
         )
     }
 }
@@ -144,15 +173,79 @@ private struct StoryBeatRelayDTO: Codable {
     let title: String
     let narrative: String
     let visualPrompt: String
+    let exactTarget: ExactTargetRelayDTO?
 
     var storyBeat: StoryBeat {
         StoryBeat(
             anchorYears: anchorYears,
             title: title,
             narrative: narrative,
-            visualPrompt: visualPrompt
+            visualPrompt: visualPrompt,
+            exactTarget: exactTarget?.exactTarget
         )
     }
+}
+
+private struct ExactTargetRelayDTO: Codable {
+    let offsetDays: Double
+    let targetDateISO: String
+    let compactLabel: String
+
+    var exactTarget: ExactTarget {
+        ExactTarget(offsetDays: offsetDays, targetDateISO: targetDateISO, compactLabel: compactLabel)
+    }
+}
+
+private struct TargetBeatRequest: Encodable {
+    let understanding: SceneUnderstandingRelayDTO
+    let storyContext: StoryContextMinimalRelayDTO
+    let target: TargetTimeRelayDTO
+}
+
+private struct StoryContextMinimalRelayDTO: Encodable {
+    let title: String
+    let presentTruth: String
+    let identityRules: [String]
+    let canonicalBeats: [StoryBeatContextRelayDTO]
+
+    init(_ story: TemporalStory) {
+        title = story.title
+        presentTruth = story.presentTruth
+        identityRules = story.identityRules
+        canonicalBeats = story.beats.map { StoryBeatContextRelayDTO($0) }
+    }
+}
+
+private struct StoryBeatContextRelayDTO: Encodable {
+    let anchorYears: Double
+    let title: String
+    let narrative: String
+    let visualPrompt: String
+
+    init(_ beat: StoryBeat) {
+        anchorYears = beat.anchorYears
+        title = beat.title
+        narrative = beat.narrative
+        visualPrompt = beat.visualPrompt
+    }
+}
+
+private struct TargetTimeRelayDTO: Encodable {
+    let offsetDays: Double
+    let targetDateISO: String
+    let compactLabel: String
+
+    init(_ time: TimePosition) {
+        offsetDays = time.offsetDays
+        targetDateISO = time.targetDate().ISO8601Format(.iso8601 .day().timeZone(separator: .omitted))
+        compactLabel = time.compactLabel
+    }
+}
+
+private struct TargetBeatRelayResponse: Decodable {
+    let schemaVersion: String
+    let target: ExactTargetRelayDTO
+    let targetBeat: StoryBeatRelayDTO
 }
 
 private struct StoryRelayError: Decodable {

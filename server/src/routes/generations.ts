@@ -11,7 +11,7 @@ import type { CreateGenerationBody } from "../types.js";
 export async function registerGenerationRoutes(
   app: FastifyInstance
 ): Promise<void> {
-  app.post<{ Body: CreateGenerationBody }>(
+  app.post<{ Body: Record<string, unknown> }>(
     "/v1/generations",
     async (request, reply) => {
       const body = request.body;
@@ -23,7 +23,9 @@ export async function registerGenerationRoutes(
         });
       }
 
-      const result = createGenerationJob(body);
+      // Runtime: pass raw body to createGenerationJob which handles
+      // discriminated union validation and contextVersion detection.
+      const result = createGenerationJob(body as unknown as CreateGenerationBody);
       if (!result.ok) {
         return reply.code(result.statusCode).send({
           errorCode: result.errorCode,

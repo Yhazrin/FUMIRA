@@ -6,36 +6,78 @@ model-version mapping, safety rules, observability, cost controls, and fallbacks
 
 ## FUMIRA backend (shipped under `server/`)
 
-The Fastify service implements the **image generation** half of the pipeline against
-MiniMax `image-01` I2I. Understanding and story remain on-device mocks until their
-hosted routes are ready (see `REMOTE_UNDERSTANDING_TODO.md`).
+The Fastify service implements the full AI pipeline: **image understanding**,
+**temporal story writing**, and **image generation** against MiniMax.
+All three stages are remote when `MINIMAX_API_KEY` is set; mock adapters
+are used when `MINIMAX_MOCK=true` or the key is absent.
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST/GET | `/health` | Coarse readiness (`generation.ready`, `generation.mode`) |
 | POST | `/v1/uploads` | Multipart JPEG/HEIC ≤ 10MB → `assetId` |
+| POST | `/v1/understand` | Analyze uploaded asset → `SceneUnderstanding` |
+| POST | `/v1/stories` | Write temporal story → `TemporalStory` (with `targetBeat`) |
 | POST | `/v1/generations` | Queue job → `202` + `generationId` |
 | GET | `/v1/generations/:id` | `queued` \| `processing` \| `succeeded` \| `failed` |
 | GET | `/v1/results/:filename` | Download generated JPEG |
-| GET | `/v1/admin/generations` | Bearer admin: redacted job list |
+| GET | `/v1/admin/generations` | Bearer admin: redacted job list + prompt metadata |
 | PATCH | `/v1/admin/settings` | Enable/disable remote gen + prompt template |
 
-### Create generation body
+### Create generation body (V2 — structured context)
+
+The iOS client sends structured pipeline data. The server's **PromptCompiler**
+owns the final provider prompt with section-based budgets.
 
 ```json
 {
   "sourceAssetId": "UUID",
   "requestId": "UUID",
   "aspectRatio": "3:4",
-  "story": "continuity-aware prompt text",
   "timePosition": {
     "normalized": 0.5,
     "offsetDays": 9000,
     "offsetYears": 24.6,
     "compactLabel": "25 年后"
+  },
+  "structuredContext": {
+    "understanding": {
+      "summary": "...",
+      "locationType": "...",
+      "visualMood": "...",
+      "timeClues": ["..."],
+      "changeDrivers": ["..."],
+      "subjects": [{ "name": "...", "confidence": 0.95, "identityRule": "..." }]
+    },
+    "story": {
+      "title": "...",
+      "logline": "...",
+      "presentTruth": "...",
+      "identityRules": ["..."],
+      "beats": [
+        { "anchorYears": -100, "title": "...", "narrative": "...", "visualPrompt": "..." },
+        "...seven canonical beats at -100,-30,-10,0,10,30,100..."
+      ],
+      "targetBeat": {
+        "anchorYears": 24.6,
+        "title": "...",
+        "narrative": "...",
+        "visualPrompt": "..."
+      }
+    },
+    "generationMode": "lockedTarget"
   }
 }
 ```
+
+**Legacy path** (backward compatible): the client may still send `"story": "flat string"`
+without `structuredContext`. The server wraps it in the admin-configured template
+using the legacy truncation strategy.
+
+The generation record now includes prompt metadata:
+- `promptVersion`: `"v2"` for compiled prompts, absent for legacy
+- `promptHash`: SHA-256 prefix of the compiled prompt
+- `sectionCharCounts`: per-section character counts
+- `truncatedSections`: which sections were compressed or dropped
 
 On success the poll payload includes `resultUrl` pointing at the FUMIRA server,
 never a MiniMax CDN URL that would require vendor auth.
@@ -83,36 +125,43 @@ app still uses the bundled catalog.
 
 ## Understand
 
-`POST /v1/understand` as multipart form data:
-
-- `photo`: JPEG/HEIC bytes
-- `session_id`: UUID
-- `route_id`: catalog option ID
-
-The response is `SceneUnderstanding`: summary, location type, visual mood, time
-clues, change drivers, and subjects with confidence plus identity rules.
-
-**Status:** contract reserved. Runtime uses `MockImageUnderstandingProvider`.
-Do not invent a MiniMax HTTP understanding URL; MCP is development-only.
-
-## Write story
-
-`POST /v1/story`
+`POST /v1/understand`
 
 ```json
 {
-  "session_id": "UUID",
-  "route_id": "openai.story.server",
-  "range_years": [-100, 100],
-  "anchors": [-100, -30, -10, 0, 10, 30, 100],
-  "understanding": {}
+  "sourceAssetId": "UUID",
+  "requestId": "UUID",
+  "copyConstraints": { "summary": 80, "locationType": 14, "visualMood": 40, "timeClue": 24, "changeDriver": 24, "subjectName": 18, "identityRule": 48 }
+}
+```
+
+The response is `SceneUnderstanding`: summary, location type, visual mood, time
+clues, change drivers, and subjects with confidence plus identity rules.
+Copy constraints are enforced server-side and on-device for safety.
+
+**Status:** live via MiniMax VLM (`MINIMAX_VLM_API_KEY` or `MINIMAX_API_KEY`).
+Includes injection defense for text visible inside the image.
+
+## Write story
+
+`POST /v1/stories`
+
+```json
+{
+  "understanding": { "...SceneUnderstanding..." },
+  "targetTime": { "offsetYears": 24.6, "compactLabel": "25 年后" },
+  "copyConstraints": { "title": 16, "logline": 56, "presentTruth": 72, "identityRule": 48, "beatTitle": 14, "beatNarrative": 72, "visualPrompt": 110 },
+  "requestId": "UUID"
 }
 ```
 
 The response is `TemporalStory`: title, logline, present truth, identity rules,
-and ordered beats. Each beat includes an anchor year, narrative, and visual prompt.
+seven canonical beats, and a **`targetBeat`** at the exact requested year offset.
+The `targetBeat` is used for image generation; the seven canonical beats are for
+browsing only.
 
-**Status:** contract reserved. Runtime uses `MockStoryProvider`.
+**Status:** live via MiniMax M3 (`MINIMAX_STORY_MODEL`).
+Includes injection defense for untrusted scene analysis data.
 
 ## Render (legacy sketch)
 

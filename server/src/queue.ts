@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
-import { buildPrompt, normalizeAspectRatio, toJpegDataUrl } from "./prompt.js";
+import { normalizeAspectRatio, toJpegDataUrl } from "./prompt.js";
+import { compilePrompt, buildLegacyPrompt } from "./promptCompiler.js";
 import {
   getAsset,
   getGeneration,
@@ -13,8 +14,11 @@ import {
 } from "./storage.js";
 import type {
   CreateGenerationBody,
+  GenerationContext,
   GenerationRecord,
   MiniMaxAdapter,
+  StructuredGenerationBody,
+  TemporalStoryPayloadV2,
 } from "./types.js";
 
 let adapter: MiniMaxAdapter | null = null;
@@ -44,75 +48,71 @@ export function createGenerationJob(
       retryable: boolean;
     } {
   const settings = getSettings();
-  // Runtime readiness = admin kill-switch + an attached adapter.
-  // Startup attaches live/mock adapters based on env; tests may inject adapters.
   if (!settings.remoteGenerationEnabled || !adapter) {
-    return {
-      ok: false,
-      statusCode: 503,
-      errorCode: "generation_unavailable",
-      userMessage: "远程生成暂未就绪。",
-      retryable: true,
-    };
+    return contractError(503, "generation_unavailable", "远程生成暂未就绪。", true);
   }
 
   const aspectRatio = normalizeAspectRatio(body.aspectRatio);
   if (!aspectRatio) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_aspect_ratio",
-      userMessage: "不支持的画幅比例。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_aspect_ratio", "不支持的画幅比例。");
   }
 
   if (!body.requestId?.trim()) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "missing_request_id",
-      userMessage: "缺少 requestId。",
-      retryable: false,
-    };
+    return contractError(400, "missing_request_id", "缺少 requestId。");
   }
 
   if (!body.sourceAssetId || !getAsset(body.sourceAssetId)) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_source_asset",
-      userMessage: "源图片不存在或已过期。",
-      retryable: false,
-    };
-  }
-
-  if (typeof body.story !== "string" || !body.story.trim()) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "missing_story",
-      userMessage: "缺少故事内容。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_source_asset", "源图片不存在或已过期。");
   }
 
   if (!body.timePosition || typeof body.timePosition.normalized !== "number") {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_time_position",
-      userMessage: "时间位置无效。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_time_position", "时间位置无效。");
   }
 
-  const built = buildPrompt({
-    template: settings.promptTemplate,
-    story: body.story,
-    timePosition: body.timePosition,
-    aspectRatio,
-  });
+  // Discriminated union: reject mixed input (Task 4 & 6).
+  if ((body as any).contextVersion === undefined) {
+    // Legacy body without contextVersion — treat as legacy.v1
+    (body as any).contextVersion = "legacy.v1";
+  }
+
+  // V2 structured path: server-side prompt compilation.
+  // Legacy path: client sends a flat story string, server wraps in template.
+  let built: {
+    prompt: string;
+    truncated: boolean;
+    charCount: number;
+    version?: string;
+    hash?: string;
+    sectionCharCounts?: Record<string, number>;
+    truncatedSections?: string[];
+  };
+
+  if (body.contextVersion === "generation.v2") {
+    // V2: validate structured context contract.
+    const v2Validation = validateStructuredContext(body.structuredContext);
+    if (v2Validation) return v2Validation;
+
+    // Inject program-authoritative time values into targetBeat (Task 5).
+    // The LLM's anchorYears is a hint; offsetDays is the truth.
+    const ctx = injectTargetTime(body as StructuredGenerationBody);
+    built = compilePrompt({
+      context: ctx,
+      timePosition: body.timePosition,
+      aspectRatio,
+    });
+  } else if (body.contextVersion === "legacy.v1") {
+    if (typeof body.story !== "string" || !body.story.trim()) {
+      return contractError(400, "missing_story", "缺少故事内容。");
+    }
+    built = buildLegacyPrompt({
+      template: settings.promptTemplate,
+      story: body.story,
+      timePosition: body.timePosition,
+      aspectRatio,
+    });
+  } else {
+    return contractError(400, "unsupported_context_version", "不支持的上下文版本。");
+  }
 
   const now = new Date().toISOString();
   const record: GenerationRecord = {
@@ -126,6 +126,10 @@ export function createGenerationJob(
     aspectRatio,
     promptTruncated: built.truncated,
     promptCharCount: built.charCount,
+    promptVersion: built.version,
+    promptHash: built.hash,
+    sectionCharCounts: built.sectionCharCounts,
+    truncatedSections: built.truncatedSections,
   };
 
   promptByGeneration.set(record.generationId, {
@@ -143,10 +147,103 @@ export function createGenerationJob(
       generationId: record.generationId,
       status: record.status,
       promptTruncated: record.promptTruncated,
+      promptVersion: built.version,
     })
   );
 
   return { ok: true, record };
+}
+
+// ---------------------------------------------------------------------------
+// Contract validation (Task 7)
+// ---------------------------------------------------------------------------
+
+function contractError(
+  statusCode: number,
+  errorCode: string,
+  userMessage: string,
+  retryable = false
+) {
+  return { ok: false as const, statusCode, errorCode, userMessage, retryable };
+}
+
+const VALID_GENERATION_MODES = new Set([
+  "captured_target",
+  "story_preview_target",
+  "regenerate_same_target",
+]);
+
+const VALID_SCHEMA_VERSIONS = new Set([
+  "generation-context.v2",
+  "temporal-story.v2",
+]);
+
+function validateStructuredContext(
+  ctx: GenerationContext | undefined
+): ReturnType<typeof contractError> | null {
+  if (!ctx) {
+    return contractError(400, "invalid_generation_contract", "缺少结构化上下文。");
+  }
+  if (!VALID_SCHEMA_VERSIONS.has(ctx.schemaVersion)) {
+    return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
+  }
+  if (!ctx.understanding) {
+    return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  }
+  if (!ctx.story) {
+    return contractError(400, "invalid_generation_contract", "缺少时间故事数据。");
+  }
+  if (ctx.story.schemaVersion !== "temporal-story.v2") {
+    return contractError(400, "unsupported_schema_version", `故事 schema 版本不匹配: ${ctx.story.schemaVersion ?? "undefined"}`);
+  }
+  if (!ctx.story.targetBeat) {
+    return contractError(400, "missing_target_beat", "V2 故事缺少精确目标节点 (targetBeat)。");
+  }
+  const tb = ctx.story.targetBeat;
+  if (!Number.isFinite(tb.anchorYears) || !tb.visualPrompt) {
+    return contractError(400, "invalid_target_beat", "targetBeat 缺少必要字段 (anchorYears, visualPrompt)。");
+  }
+  if (ctx.story.beats.length !== 7) {
+    return contractError(400, "invalid_generation_contract", `需要恰好 7 个浏览节点，收到 ${ctx.story.beats.length} 个。`);
+  }
+  if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
+    return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
+  }
+  // Validate subject count bounds.
+  if (ctx.understanding.subjects.length > 10) {
+    return contractError(400, "invalid_generation_contract", "主体数量超过上限 (10)。");
+  }
+  if (ctx.story.identityRules.length > 10) {
+    return contractError(400, "invalid_generation_contract", "身份规则数量超过上限 (10)。");
+  }
+  return null;
+}
+
+/**
+ * Inject program-authoritative time values into the targetBeat.
+ * The LLM's anchorYears is a hint; offsetDays is the truth.
+ */
+function injectTargetTime(body: StructuredGenerationBody): GenerationContext {
+  const offsetDays = body.timePosition.offsetDays;
+  const now = new Date();
+  const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
+  const exactTarget: import("./types.js").ExactTarget = {
+    offsetDays,
+    targetDateISO: targetDate.toISOString().slice(0, 10),
+    compactLabel: body.timePosition.compactLabel,
+  };
+  return {
+    ...body.structuredContext,
+    story: {
+      ...body.structuredContext.story,
+      targetBeat: {
+        ...body.structuredContext.story.targetBeat,
+        // Overwrite the LLM's anchorYears with the program-authoritative value.
+        anchorYears: offsetDays / 365.25,
+        exactTarget,
+      },
+    },
+  };
 }
 
 async function processGeneration(generationId: string): Promise<void> {
@@ -287,6 +384,10 @@ export function toAdminGeneration(record: GenerationRecord) {
     aspectRatio: record.aspectRatio,
     promptTruncated: record.promptTruncated,
     promptCharCount: record.promptCharCount,
+    promptVersion: record.promptVersion,
+    promptHash: record.promptHash,
+    sectionCharCounts: record.sectionCharCounts,
+    truncatedSections: record.truncatedSections,
     durationMs: record.durationMs,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

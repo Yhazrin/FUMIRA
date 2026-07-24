@@ -29,14 +29,74 @@ export interface TimePositionPayload {
   compactLabel: string;
 }
 
-export interface CreateGenerationBody {
+/**
+ * Precise target time — authoritative values set by the program, not the LLM.
+ * `offsetYears` is for narrative/display only; `offsetDays` + `targetDateISO`
+ * are the canonical identifiers for equality and dedup.
+ */
+export interface ExactTarget {
+  offsetDays: number;
+  targetDateISO: string;
+  compactLabel: string;
+}
+
+// ---------------------------------------------------------------------------
+// CreateGenerationBody — discriminated union (Task 4 & 6)
+// ---------------------------------------------------------------------------
+
+export type CreateGenerationBody = LegacyGenerationBody | StructuredGenerationBody;
+
+export interface LegacyGenerationBody {
+  contextVersion: "legacy.v1";
   sourceAssetId: string;
   timePosition: TimePositionPayload;
   story: string;
+  structuredContext?: never;
   aspectRatio?: AspectRatio;
   requestId: string;
-  /** Explicit opt-in for single-person portrait subject_reference. Default false. */
   useSubjectReference?: boolean;
+}
+
+export interface StructuredGenerationBody {
+  contextVersion: "generation.v2";
+  sourceAssetId: string;
+  timePosition: TimePositionPayload;
+  story?: never;
+  structuredContext: GenerationContext;
+  aspectRatio?: AspectRatio;
+  requestId: string;
+  useSubjectReference?: boolean;
+}
+
+/**
+ * Structured pipeline data the iOS client sends instead of a pre-built prompt.
+ * The server's PromptCompiler owns the final provider prompt.
+ */
+export interface GenerationContext {
+  schemaVersion: "generation-context.v2";
+  understanding: SceneUnderstandingPayload;
+  story: TemporalStoryPayloadV2;
+  generationMode: GenerationMode;
+}
+
+export type GenerationMode =
+  | "captured_target"
+  | "story_preview_target"
+  | "regenerate_same_target";
+
+/**
+ * V2 story payload — `targetBeat` is REQUIRED.
+ * If the model omits it, the server must reject the payload rather than
+ * silently falling back to the nearest canonical beat.
+ */
+export interface TemporalStoryPayloadV2 {
+  schemaVersion: "temporal-story.v2";
+  title: string;
+  logline: string;
+  presentTruth: string;
+  identityRules: string[];
+  beats: StoryBeatPayload[];
+  targetBeat: StoryBeatPayload;
 }
 
 export interface GenerationRecord {
@@ -53,6 +113,14 @@ export interface GenerationRecord {
   aspectRatio: AspectRatio;
   promptTruncated: boolean;
   promptCharCount: number;
+  /** Prompt compiler version (e.g. "v2"). Absent for legacy flat prompts. */
+  promptVersion?: string;
+  /** SHA-256 hex of the compiled prompt for dedup / debugging. */
+  promptHash?: string;
+  /** Per-section character counts from the compiler. */
+  sectionCharCounts?: Record<string, number>;
+  /** Which sections were compressed or deleted. */
+  truncatedSections?: string[];
   resultRelativeUrl?: string;
   errorCode?: string;
   userMessage?: string;
@@ -128,14 +196,29 @@ export interface StoryBeatPayload {
   title: string;
   narrative: string;
   visualPrompt: string;
+  /** Program-generated exact target identity — present only on precise target beats. */
+  exactTarget?: ExactTarget;
 }
 
+/** Response from POST /v1/target-beats */
+export interface TargetBeatResponse {
+  schemaVersion: "target-beat.v1";
+  target: ExactTarget;
+  targetBeat: StoryBeatPayload;
+}
+
+/**
+ * V1 story payload — `targetBeat` is optional (for legacy/mock adapters).
+ * The intelligence adapter should produce TemporalStoryPayloadV2 when possible.
+ */
 export interface TemporalStoryPayload {
   title: string;
   logline: string;
   presentTruth: string;
   identityRules: string[];
   beats: StoryBeatPayload[];
+  /** Exact beat matching the user's chosen year — never the nearest canonical node. */
+  targetBeat?: StoryBeatPayload;
 }
 
 /** Character budgets requested by the current client layout. */
@@ -169,7 +252,7 @@ export interface MiniMaxIntelligenceAdapter {
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>>;
   writeStory(input: {
     understanding: SceneUnderstandingPayload;
-    targetTime: { offsetYears: number; compactLabel: string };
+    targetTime: ExactTarget;
     copyConstraints: StoryCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<TemporalStoryPayload>>;

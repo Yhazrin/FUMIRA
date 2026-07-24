@@ -455,11 +455,36 @@ final class AppModel {
     }
 
     /// Deliberate exploration strategy: promote the story browser's current
-    /// year to a new generation target. The default generation action never
-    /// does this implicitly.
+    /// year to a new generation target. Fetches a fresh exact target beat
+    /// from the server so the generation uses the precise visual changes
+    /// for this year — not the nearest canonical beat.
     func generateAtStoryPreviewTime() async {
-        capturedTargetTime = selectedTime
-        await generateStoryWorld()
+        guard let understanding = sceneUnderstanding, let story = temporalStory else {
+            return
+        }
+        // Fetch a new exact target beat for the browse year.
+        do {
+            let exactBeat = try await dependencies.story.writeTargetBeat(
+                understanding: understanding,
+                story: story,
+                target: selectedTime
+            )
+            // Inject the exact beat into the story for this generation.
+            temporalStory = TemporalStory(
+                title: story.title,
+                logline: story.logline,
+                presentTruth: story.presentTruth,
+                identityRules: story.identityRules,
+                beats: story.beats,
+                targetBeat: exactBeat
+            )
+            capturedTargetTime = selectedTime
+            await generateStoryWorld()
+        } catch {
+            // If target-beat fetch fails, fall back to generation with existing story.
+            capturedTargetTime = selectedTime
+            await generateStoryWorld()
+        }
     }
 
     func undoLastGeneration() {

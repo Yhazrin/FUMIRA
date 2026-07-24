@@ -17,8 +17,9 @@ xcodebuild -project FUMIRA.xcodeproj -scheme FUMIRA -sdk iphonesimulator \
 talks to the local FUMIRA backend (`RemoteGenerationProvider`). **Release** /
 Archive leave the URL empty → local Mock generation (safe default).
 
-Understanding / story stay on Mock in MVP either way. Simulator uses the
-deterministic camera fallback; physical devices use the live rear camera.
+Understanding, story, and generation are all remote when `MINIMAX_API_KEY` is
+set in `server/.env`. Simulator uses the deterministic camera fallback;
+physical devices use the live rear camera.
 
 MiniMax is **not** packaged into the app. The key lives only in `server/.env`.
 Packaging the iOS target never embeds vendor credentials — you run the backend
@@ -67,8 +68,9 @@ FUMIRA_API_BASE_URL=http://<Mac-LAN-IP>:8787
 Scheme env wins over the Info.plist Debug default. Mac and phone must be on the
 same LAN; local HTTP is allowed via `NSAllowsLocalNetworking`.
 
-Flow: capture → (mock) understand/story → upload JPEG → queue MiniMax
-`image-01` I2I → poll → show generated JPEG on the result screen.
+Flow: capture → upload JPEG → remote understand → remote story (with
+`targetBeat`) → queue MiniMax `image-01` I2I (server-compiled prompt) → poll →
+show generated JPEG on the result screen.
 
 Admin (Bearer `ADMIN_TOKEN`):
 

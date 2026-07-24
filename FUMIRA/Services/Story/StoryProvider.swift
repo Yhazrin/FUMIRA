@@ -15,6 +15,12 @@ enum StoryEvent: Sendable {
 
 protocol StoryProvider: Sendable {
     func write(request: StoryRequest) async -> AsyncThrowingStream<StoryEvent, Error>
+    /// Generate a single exact target beat for browse-year generation.
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat
 }
 
 actor MockStoryProvider: StoryProvider {
@@ -22,6 +28,27 @@ actor MockStoryProvider: StoryProvider {
 
     init(stepDelay: Duration = .milliseconds(260)) {
         self.stepDelay = stepDelay
+    }
+
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        let location = understanding.locationType.isEmpty ? "这个地方" : understanding.locationType
+        let driver = understanding.changeDrivers.first ?? "时间自然变化"
+        let targetIdentity = ExactTarget(
+            offsetDays: target.offsetDays,
+            targetDateISO: target.targetDate().ISO8601Format(),
+            compactLabel: target.compactLabel
+        )
+        return StoryBeat(
+            anchorYears: target.offsetYears,
+            title: "\(location)的\(target.compactLabel)",
+            narrative: "\(driver)在\(target.compactLabel)深刻改变\(location)的面貌，主体与构图保持连续。",
+            visualPrompt: "\(understanding.visualMood)，\(driver)经过\(target.compactLabel)的累积效应，保持原图主体、机位与构图",
+            exactTarget: targetIdentity
+        )
     }
 
     func write(request: StoryRequest) async -> AsyncThrowingStream<StoryEvent, Error> {

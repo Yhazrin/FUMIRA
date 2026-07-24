@@ -170,25 +170,36 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
     )
 }
 
+struct ExactTarget: Hashable, Codable, Sendable {
+    let offsetDays: Double
+    let targetDateISO: String
+    let compactLabel: String
+}
+
 struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let anchorYears: Double
     let title: String
     let narrative: String
     let visualPrompt: String
+    /// Program-generated exact target identity — present only on the precise
+    /// target beat, never on canonical browsing beats.
+    let exactTarget: ExactTarget?
 
     init(
         id: UUID = UUID(),
         anchorYears: Double,
         title: String,
         narrative: String,
-        visualPrompt: String
+        visualPrompt: String,
+        exactTarget: ExactTarget? = nil
     ) {
         self.id = id
         self.anchorYears = anchorYears
         self.title = StoryCopyPolicy.limit(title, to: StoryCopyPolicy.beatTitle)
         self.narrative = StoryCopyPolicy.limit(narrative, to: StoryCopyPolicy.beatNarrative)
         self.visualPrompt = StoryCopyPolicy.limit(visualPrompt, to: StoryCopyPolicy.visualPrompt)
+        self.exactTarget = exactTarget
     }
 }
 
@@ -216,6 +227,9 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
     let presentTruth: String
     let identityRules: [String]
     let beats: [StoryBeat]
+    /// Exact beat matching the user's chosen target year — never the nearest
+    /// canonical node. Used for image generation to avoid semantic mismatch.
+    let targetBeat: StoryBeat?
 
     init(
         id: UUID = UUID(),
@@ -223,7 +237,8 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
         logline: String,
         presentTruth: String,
         identityRules: [String],
-        beats: [StoryBeat]
+        beats: [StoryBeat],
+        targetBeat: StoryBeat? = nil
     ) {
         self.id = id
         self.title = StoryCopyPolicy.limit(title, to: StoryCopyPolicy.title)
@@ -234,6 +249,23 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
             .map { StoryCopyPolicy.limit($0, to: StoryCopyPolicy.identityRule) }
             .filter { !$0.isEmpty }
         self.beats = beats.sorted { $0.anchorYears < $1.anchorYears }
+        self.targetBeat = targetBeat
+    }
+
+    /// The beat to use for image generation. Uses `targetBeat` only when its
+    /// exact target identity matches the requested time (within 0.5 days).
+    /// This prevents a locked 100-day target beat from being used for a
+    /// 250-day generation, or a 25-year target for a 25.6-year request.
+    func generationBeat(for time: TimePosition) -> StoryBeat? {
+        if let targetBeat,
+           let exact = targetBeat.exactTarget,
+           abs(exact.offsetDays - time.offsetDays) < 0.5 {
+            return targetBeat
+        }
+        return beats.min {
+            abs($0.anchorYears - time.offsetYears) <
+                abs($1.anchorYears - time.offsetYears)
+        }
     }
 
     func beat(for time: TimePosition) -> StoryBeat? {
@@ -247,26 +279,6 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
         guard abs(time.offsetYears) >= 0.5 else { return presentTruth }
         guard let beat = beat(for: time) else { return logline }
         return "\(time.compactLabel)，\(beat.narrative)"
-    }
-
-    func generationPrompt(
-        for time: TimePosition,
-        understanding: SceneUnderstanding
-    ) -> String {
-        let beat = beat(for: time)
-        let identity = identityRules.joined(separator: "；")
-        let subjects = understanding.subjects
-            .map(\.identityRule)
-            .joined(separator: "；")
-        return """
-        基于原始照片生成 \(time.compactLabel) 的同一地点。
-        故事：\(beat?.narrative ?? logline)
-        视觉变化：\(beat?.visualPrompt ?? "保持当下状态")
-        场景理解：\(understanding.summary)
-        主体连续性：\(subjects)
-        叙事连续性：\(identity)
-        保持原图构图、镜头位置和主要主体身份，不添加无关人物或文字。
-        """
     }
 
     /// Offline/simulator fallback. Live runs receive every content field from
@@ -284,6 +296,20 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
             : understanding.changeDrivers
         let identityRules = understanding.subjects.map(\.identityRule)
         let anchors = [-100.0, -30, -10, 0, 10, 30, 100]
+
+        let mainDriver = drivers.first ?? "时间自然变化"
+        let targetIdentity = ExactTarget(
+            offsetDays: targetTime.offsetDays,
+            targetDateISO: targetTime.targetDate().ISO8601Format(),
+            compactLabel: targetTime.compactLabel
+        )
+        let exactTarget = StoryBeat(
+            anchorYears: targetTime.offsetYears,
+            title: "\(location)的\(targetTime.compactLabel)",
+            narrative: "\(mainDriver)在\(targetTime.compactLabel)深刻改变\(location)的面貌，主体与构图保持连续。",
+            visualPrompt: "\(understanding.visualMood)，\(mainDriver)经过\(targetTime.compactLabel)的累积效应，保持原图主体、机位与构图",
+            exactTarget: targetIdentity
+        )
 
         return TemporalStory(
             title: "\(location)的时间回声",
@@ -304,7 +330,8 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
                         : "\(driver)继续改变\(location)的景象，主体与构图保持连续。",
                     visualPrompt: "\(understanding.visualMood)，\(driver)，保持原图主体、机位与构图"
                 )
-            }
+            },
+            targetBeat: exactTarget
         )
     }
 

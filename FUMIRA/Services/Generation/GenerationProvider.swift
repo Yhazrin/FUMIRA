@@ -91,11 +91,8 @@ actor MockGenerationProvider: GenerationProvider {
                     continuation.yield(.completed(GeneratedFrame(
                         sessionID: request.sessionID,
                         time: request.time,
-                        storyBeatID: request.story.beat(for: request.time)?.id,
-                        prompt: request.story.generationPrompt(
-                            for: request.time,
-                            understanding: request.understanding
-                        ),
+                        storyBeatID: request.story.generationBeat(for: request.time)?.id,
+                        prompt: "[mock-compiled]",
                         modelOptionID: request.model.id,
                         imageData: nil
                     )))
