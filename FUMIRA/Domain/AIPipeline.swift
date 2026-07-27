@@ -54,6 +54,27 @@ struct CapturedPhoto: Identifiable, Hashable, Sendable {
     }
 }
 
+/// Offline/mock fallback only. Live generation prompts are authored on the
+/// server (`server/src/temporalImagePrompt.ts`). Keep this short and never treat
+/// it as the product source of truth.
+enum TemporalImagePrompt {
+    static func make(for time: TimePosition) -> String {
+        let direction: String
+        if abs(time.offsetDays) < 1 {
+            direction = "接近此刻，仅做必要时间一致性修正。"
+        } else if time.offsetDays > 0 {
+            direction = "未来方向，累积可解释的环境与使用变化。"
+        } else {
+            direction = "过去方向，保守逆推并避免时代错置。"
+        }
+        return """
+        [mock-fallback] 将输入照片编辑为「\(time.compactLabel)」同一机位真实照片。\
+        \(direction) 保持构图与空间锚点；只改变有依据的部分，但不能在改变一个主体后停止；\
+        不添加无关、抢镜或缺乏时间因果依据的人物、车辆、建筑或设施。权威 Prompt 在 server。
+        """
+    }
+}
+
 private enum GeneratedCopyLimiter {
     static func limit(_ value: String, to maximum: Int) -> String {
         let normalized = value
@@ -105,6 +126,29 @@ struct SceneSubject: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+struct CameraLock: Hashable, Codable, Sendable {
+    var viewpoint: String?
+    var lensAndPerspective: String?
+    var horizon: String?
+    var depthStructure: String?
+}
+
+struct SpatialAnchor: Hashable, Codable, Sendable {
+    var name: String
+    var depth: String?
+    var position: String?
+    var geometry: String?
+    var identityLock: String?
+}
+
+struct TemporalLayer: Hashable, Codable, Sendable {
+    var layer: String
+    var visibleEvidence: String?
+    var pastPotential: String?
+    var futurePotential: String?
+    var confidence: Double?
+}
+
 struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let summary: String
@@ -113,6 +157,12 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
     let timeClues: [String]
     let changeDrivers: [String]
     let subjects: [SceneSubject]
+    /// Optional Scene Bible extensions from the relay (ignored when absent).
+    var cameraLock: CameraLock?
+    var spatialAnchors: [SpatialAnchor]?
+    var temporalLayers: [TemporalLayer]?
+    var storySeeds: [String]?
+    var hardConstraints: [String]?
 
     init(
         id: UUID = UUID(),
@@ -121,7 +171,12 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
         visualMood: String,
         timeClues: [String],
         changeDrivers: [String],
-        subjects: [SceneSubject]
+        subjects: [SceneSubject],
+        cameraLock: CameraLock? = nil,
+        spatialAnchors: [SpatialAnchor]? = nil,
+        temporalLayers: [TemporalLayer]? = nil,
+        storySeeds: [String]? = nil,
+        hardConstraints: [String]? = nil
     ) {
         self.id = id
         self.summary = UnderstandingCopyPolicy.limit(summary, to: UnderstandingCopyPolicy.summary)
@@ -142,6 +197,23 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
             .map { UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.changeDriver) }
             .filter { !$0.isEmpty }
         self.subjects = Array(subjects.prefix(6))
+        self.cameraLock = cameraLock
+        self.spatialAnchors = spatialAnchors.map { Array($0.prefix(8)) }
+        self.temporalLayers = temporalLayers.map { Array($0.prefix(8)) }
+        self.storySeeds = storySeeds.map {
+            Array(
+                $0.prefix(8).map {
+                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.changeDriver)
+                }.filter { !$0.isEmpty }
+            )
+        }
+        self.hardConstraints = hardConstraints.map {
+            Array(
+                $0.prefix(8).map {
+                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.identityRule)
+                }.filter { !$0.isEmpty }
+            )
+        }
     }
 
     static let parkReference = SceneUnderstanding(
@@ -176,19 +248,56 @@ struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
     let title: String
     let narrative: String
     let visualPrompt: String
+    var transitionCause: String?
+    var unchangedAnchors: [String]?
+    var foregroundDelta: String?
+    var midgroundDelta: String?
+    var backgroundDelta: String?
+    var subjectDelta: String?
+    var environmentDelta: String?
 
     init(
         id: UUID = UUID(),
         anchorYears: Double,
         title: String,
         narrative: String,
-        visualPrompt: String
+        visualPrompt: String,
+        transitionCause: String? = nil,
+        unchangedAnchors: [String]? = nil,
+        foregroundDelta: String? = nil,
+        midgroundDelta: String? = nil,
+        backgroundDelta: String? = nil,
+        subjectDelta: String? = nil,
+        environmentDelta: String? = nil
     ) {
         self.id = id
         self.anchorYears = anchorYears
         self.title = StoryCopyPolicy.limit(title, to: StoryCopyPolicy.beatTitle)
         self.narrative = StoryCopyPolicy.limit(narrative, to: StoryCopyPolicy.beatNarrative)
         self.visualPrompt = StoryCopyPolicy.limit(visualPrompt, to: StoryCopyPolicy.visualPrompt)
+        self.transitionCause = transitionCause.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
+        self.unchangedAnchors = unchangedAnchors.map {
+            Array(
+                $0.prefix(6).map { StoryCopyPolicy.limit($0, to: 28) }.filter { !$0.isEmpty }
+            )
+        }
+        self.foregroundDelta = foregroundDelta.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
+        self.midgroundDelta = midgroundDelta.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
+        self.backgroundDelta = backgroundDelta.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
+        self.subjectDelta = subjectDelta.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
+        self.environmentDelta = environmentDelta.map {
+            StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
+        }
     }
 }
 
@@ -202,7 +311,7 @@ enum StoryCopyPolicy {
     static let identityRule = 48
     static let beatTitle = 14
     static let beatNarrative = 72
-    static let visualPrompt = 110
+    static let visualPrompt = 140
 
     static func limit(_ value: String, to maximum: Int) -> String {
         GeneratedCopyLimiter.limit(value, to: maximum)
@@ -247,26 +356,6 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
         guard abs(time.offsetYears) >= 0.5 else { return presentTruth }
         guard let beat = beat(for: time) else { return logline }
         return "\(time.compactLabel)，\(beat.narrative)"
-    }
-
-    func generationPrompt(
-        for time: TimePosition,
-        understanding: SceneUnderstanding
-    ) -> String {
-        let beat = beat(for: time)
-        let identity = identityRules.joined(separator: "；")
-        let subjects = understanding.subjects
-            .map(\.identityRule)
-            .joined(separator: "；")
-        return """
-        基于原始照片生成 \(time.compactLabel) 的同一地点。
-        故事：\(beat?.narrative ?? logline)
-        视觉变化：\(beat?.visualPrompt ?? "保持当下状态")
-        场景理解：\(understanding.summary)
-        主体连续性：\(subjects)
-        叙事连续性：\(identity)
-        保持原图构图、镜头位置和主要主体身份，不添加无关人物或文字。
-        """
     }
 
     /// Offline/simulator fallback. Live runs receive every content field from

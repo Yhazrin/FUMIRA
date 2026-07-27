@@ -177,7 +177,7 @@ struct WaveTimeRail: View {
                 height: activeHeight
             )
             let activePath = Capsule(style: .continuous).path(in: activeRect)
-            context.fill(activePath, with: .color(PosterPalette.leafGreen))
+            context.fill(activePath, with: .color(PosterPalette.actionBlue))
         }
         .frame(width: width, height: height)
         .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: displayValue)
@@ -198,7 +198,7 @@ struct WaveTimeRail: View {
             )
             .overlay {
                 Capsule(style: .continuous)
-                    .stroke(PosterPalette.leafGreen.opacity(0.55), lineWidth: 1)
+                    .stroke(PosterPalette.actionBlue.opacity(0.55), lineWidth: 1)
             }
             .position(x: x, y: max(12, centerY - barMaxHeight / 2 - 11))
             .offset(y: -3 * releaseImpact)

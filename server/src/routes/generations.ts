@@ -68,7 +68,12 @@ export async function registerGenerationRoutes(
           retryable: false,
         });
       }
-      reply.header("Content-Type", "image/jpeg");
+      reply.header(
+        "Content-Type",
+        request.params.filename.toLowerCase().endsWith(".png")
+          ? "image/png"
+          : "image/jpeg"
+      );
       return reply.send(createReadStream(absolute));
     }
   );

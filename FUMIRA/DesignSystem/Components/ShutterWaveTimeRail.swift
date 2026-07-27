@@ -2,15 +2,16 @@ import SwiftUI
 
 /// Viewfinder time rail whose selection cursor *is* the shutter.
 ///
-/// Idle: neighboring white bars fuse into the leaf-green circular shutter
-/// (as if the two side strokes + the green selection bar became one button).
-/// Scrubbing: the circle elastically contracts into the thin green rail bar
+/// Idle: neighboring white bars fuse into the blue-and-white circular shutter
+/// (as if the two side strokes + the blue selection bar became one button).
+/// Scrubbing: the circle elastically contracts into the thin blue rail bar
 /// while the fused neighbors reappear as ordinary waveform strokes.
 /// Release: the bar expands back into the shutter and re-absorbs its neighbors.
 struct ShutterWaveTimeRail: View {
     let value: Double
     var onDetent: (WaveTimeDetent) -> Void = { _ in }
     let onChange: (Double) -> Void
+    var onShutterPress: () -> Void = {}
     let onCapture: () -> Void
     /// Keeps year + landmark labels upright when the phone is held sideways.
     var chromeRotation: Angle = .zero
@@ -24,9 +25,16 @@ struct ShutterWaveTimeRail: View {
     @State private var dragStartValue: Double?
     @State private var isDragging = false
     @State private var lastHapticYears: Double?
-    /// 0 = circular shutter, 1 = thin green rail bar.
+    /// 0 = circular shutter, 1 = thin blue rail bar.
+    #if DEBUG
+    @State private var morphProgress: CGFloat =
+        ProcessInfo.processInfo.environment["FUMIRA_AUDIT_SHUTTER_MORPH"] == "half" ? 0.5 : 0
+    @State private var touchBeganOnShutter =
+        ProcessInfo.processInfo.environment["FUMIRA_AUDIT_SHUTTER"] == "pressed"
+    #else
     @State private var morphProgress: CGFloat = 0
     @State private var touchBeganOnShutter = false
+    #endif
 
     /// Wave bars reach near the screen edges.
     private let barInset: CGFloat = 10
@@ -97,6 +105,7 @@ struct ShutterWaveTimeRail: View {
 
                     MorphingShutterCursor(
                         morphProgress: morphProgress,
+                        isPressed: touchBeganOnShutter && !isDragging,
                         shutterDiameter: shutterDiameter,
                         barWidth: railBarWidth,
                         barHeight: barMaxHeight * (1 + CGFloat(releaseImpact) * 0.12),
@@ -119,7 +128,7 @@ struct ShutterWaveTimeRail: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("时间轴与快门")
         .accessibilityValue(accessibilityValueText)
-        .accessibilityHint("左右拖动浏览过去与未来；轻点绿色快门拍摄")
+        .accessibilityHint("左右拖动浏览过去与未来；轻点蓝白快门拍摄")
         .accessibilityAdjustableAction { direction in
             let adjusted = WaveTimeAccessibilityAdjustment.adjustedNormalized(
                 from: value,
@@ -175,6 +184,9 @@ struct ShutterWaveTimeRail: View {
                     releaseImpact = 0
                     lastHapticYears = nil
                     touchBeganOnShutter = abs(gesture.startLocation.x - thumbX) <= shutterDiameter * 0.55
+                    if touchBeganOnShutter {
+                        onShutterPress()
+                    }
                     dragStartValue = xToNormalized(gesture.location.x, width: width)
                 }
 
@@ -387,29 +399,27 @@ private struct WaveformPartingCanvas: View {
 
 // MARK: - Morphing cursor
 
-/// Circle shutter ↔ thin green selection bar, with side ghosts that read as
+/// Circle shutter ↔ thin blue selection bar, with side ghosts that read as
 /// “neighbor bars merging into / emerging from” the control.
 private struct MorphingShutterCursor: View {
     var morphProgress: CGFloat
+    var isPressed: Bool
     var shutterDiameter: CGFloat
     var barWidth: CGFloat
     var barHeight: CGFloat
     var neighborSpacing: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var openAmount: CGFloat { 1 - morphProgress }
 
-    /// Ease the size morph so fusion reads more continuous than a linear lerp.
-    private var morphT: CGFloat {
-        let t = morphProgress
-        return t * t * (3 - 2 * t)
-    }
-
-    private var width: CGFloat {
-        shutterDiameter + (barWidth - shutterDiameter) * morphT
-    }
-
-    private var height: CGFloat {
-        shutterDiameter + (barHeight - shutterDiameter) * morphT
+    private var morphSize: CGSize {
+        ShutterMorphGeometry.size(
+            progress: morphProgress,
+            shutterDiameter: shutterDiameter,
+            barWidth: barWidth,
+            barHeight: barHeight
+        )
     }
 
     private var ringOpacity: Double {
@@ -417,7 +427,18 @@ private struct MorphingShutterCursor: View {
     }
 
     private var shadowOpacity: Double {
-        Double(max(0, openAmount) * 0.22)
+        let pressMultiplier = isPressed ? 0.35 : 1
+        return Double(max(0, openAmount) * 0.22 * pressMultiplier)
+    }
+
+    private var pressOffset: CGFloat {
+        guard !reduceMotion, isPressed else { return 0 }
+        return 4
+    }
+
+    private var pressScale: CGFloat {
+        guard !reduceMotion, isPressed else { return 1 }
+        return 0.985
     }
 
     /// Peaks mid-morph: ghosts visible while bars are mid-fusion.
@@ -447,28 +468,77 @@ private struct MorphingShutterCursor: View {
                     .offset(x: sideOffset)
             }
 
+            // Flat-color base and short top travel suggest a physical key while
+            // staying within FUMIRA's graphic poster language.
             Capsule(style: .continuous)
-                .fill(PosterPalette.leafGreen)
-                .frame(width: max(barWidth, width), height: max(barWidth, height))
-                .shadow(
-                    color: PosterPalette.ink.opacity(shadowOpacity),
-                    radius: 8 * openAmount,
-                    y: 3 * openAmount
+                .fill(PosterPalette.cameraShutterBlueDeep)
+                .frame(
+                    width: max(barWidth, morphSize.width),
+                    height: max(barWidth, morphSize.height)
                 )
+                .offset(y: 4 * openAmount)
+                .opacity(ringOpacity)
 
             Capsule(style: .continuous)
-                .stroke(
-                    PosterPalette.skyDeep.opacity(0.42 * ringOpacity),
-                    lineWidth: 2
-                )
+                .fill(PosterPalette.cameraShutterBlue)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .fill(PosterPalette.cameraShutterBlue)
+                        .opacity(morphProgress)
+                }
                 .frame(
-                    width: shutterDiameter * 0.79 * (1 - morphProgress * 0.9) + barWidth * morphProgress,
-                    height: shutterDiameter * 0.79 * (1 - morphProgress * 0.9) + barWidth * morphProgress
+                    width: max(barWidth, morphSize.width),
+                    height: max(barWidth, morphSize.height)
+                )
+                .overlay(alignment: .top) {
+                    Capsule(style: .continuous)
+                        .stroke(PosterEffects.cameraShutterTopHighlight, lineWidth: 1)
+                        .padding(1)
+                        .opacity(ringOpacity)
+                }
+                .shadow(
+                    color: PosterEffects.cameraShutterBodyShadow.opacity(shadowOpacity),
+                    radius: (isPressed ? 1.5 : 5) * openAmount,
+                    y: (isPressed ? 1 : 3) * openAmount
+                )
+                .offset(y: pressOffset * openAmount)
+
+            Capsule(style: .continuous)
+                .fill(PosterPalette.paperWhite)
+                .frame(
+                    width: shutterDiameter * 0.82 * (1 - morphProgress * 0.9)
+                        + barWidth * morphProgress,
+                    height: shutterDiameter * 0.82 * (1 - morphProgress * 0.9)
+                        + barWidth * morphProgress
                 )
                 .opacity(ringOpacity)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(PosterEffects.cameraShutterFaceStroke, lineWidth: 1)
+                        .opacity(ringOpacity)
+                }
+                .offset(y: -1 + pressOffset * openAmount)
+
+            Circle()
+                .fill(PosterPalette.cameraShutterBlue)
+                .frame(width: 8, height: 8)
+                .opacity(ringOpacity)
+                .offset(y: -1 + pressOffset * openAmount)
         }
-        // Stable layout box so `.position` stays centered while the capsule morphs.
+        // Fix the animation canvas before applying any scale. This keeps the
+        // morph anchored at its center instead of inheriting a changing origin.
         .frame(width: shutterDiameter, height: shutterDiameter, alignment: .center)
+        .scaleEffect(pressScale)
+        .animation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : (
+                    isPressed
+                        ? PosterMotion.cameraShutterPressDown
+                        : PosterMotion.cameraShutterRelease
+            ),
+            value: isPressed
+        )
         .accessibilityHidden(true)
     }
 }

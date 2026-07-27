@@ -1,9 +1,11 @@
 import { ProxyAgent, fetch as undiciFetch, type RequestInit } from "undici";
 
 /**
- * Outbound HTTP for MiniMax. When HTTPS_PROXY / HTTP_PROXY / MINIMAX_HTTPS_PROXY
- * is set (project default example: http://127.0.0.1:7990), requests go through
- * that proxy. Never logs proxy credentials or Authorization headers.
+ * Outbound vendor HTTP.
+ *
+ * Domestic (China) access is direct — do **not** set HTTP(S)_PROXY unless you
+ * intentionally need one. When MINIMAX_HTTPS_PROXY / HTTPS_PROXY / HTTP_PROXY
+ * is set, requests go through that proxy. Never logs credentials or Authorization.
  */
 let agent: ProxyAgent | undefined;
 
@@ -46,7 +48,7 @@ export async function outboundFetch(
   url: string,
   init: RequestInit & { signal?: AbortSignal }
 ): Promise<Response> {
-  const dispatcher = getDispatcher();
+  const dispatcher = init.dispatcher ?? getDispatcher();
   const response = await undiciFetch(url, {
     ...init,
     dispatcher,

@@ -1,14 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { getMiniMaxAdapter } from "../queue.js";
+import { getImageGenerationAdapter } from "../queue.js";
 import { getMiniMaxIntelligenceAdapter } from "../intelligence.js";
 import { getSettings } from "../storage.js";
 
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
   const handler = async () => {
     const settings = getSettings();
-    const hasAdapter = getMiniMaxAdapter() !== null;
-    const generationReady = settings.remoteGenerationEnabled && hasAdapter;
+    const miniMaxReady = getImageGenerationAdapter("minimax") !== null;
+    const apiMartReady = getImageGenerationAdapter("apimart") !== null;
+    const generationReady =
+      settings.remoteGenerationEnabled && (miniMaxReady || apiMartReady);
 
     return {
       ok: true,
@@ -21,6 +23,10 @@ export async function registerHealthRoutes(app: FastifyInstance): Promise<void> 
           : config.minimaxMock
             ? "mock"
             : "live",
+        providers: {
+          minimax: settings.remoteGenerationEnabled && miniMaxReady,
+          apimart: settings.remoteGenerationEnabled && apiMartReady,
+        },
       },
       intelligence: {
         ready: getMiniMaxIntelligenceAdapter() !== null,

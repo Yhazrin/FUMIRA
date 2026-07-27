@@ -18,6 +18,8 @@ const bounds: Record<
   identityRule: { defaultValue: 48, minimum: 16, maximum: 100 },
 };
 
+const sceneBibleFieldLimit = 64;
+
 export function resolveUnderstandingCopyConstraints(
   requested?: Partial<UnderstandingCopyConstraints>
 ): UnderstandingCopyConstraints {
@@ -36,6 +38,21 @@ export function normalizeSceneUnderstandingCopy(
   value: SceneUnderstandingPayload,
   constraints: UnderstandingCopyConstraints
 ): SceneUnderstandingPayload {
+  const cameraLock = value.cameraLock
+    ? {
+        viewpoint: optionalLimit(value.cameraLock.viewpoint, sceneBibleFieldLimit),
+        lensAndPerspective: optionalLimit(
+          value.cameraLock.lensAndPerspective,
+          sceneBibleFieldLimit
+        ),
+        horizon: optionalLimit(value.cameraLock.horizon, sceneBibleFieldLimit),
+        depthStructure: optionalLimit(
+          value.cameraLock.depthStructure,
+          sceneBibleFieldLimit
+        ),
+      }
+    : undefined;
+
   return {
     summary: limit(value.summary, constraints.summary),
     locationType: limit(value.locationType, constraints.locationType),
@@ -53,6 +70,35 @@ export function normalizeSceneUnderstandingCopy(
       confidence: subject.confidence,
       identityRule: limit(subject.identityRule, constraints.identityRule),
     })),
+    cameraLock: hasAnyString(cameraLock) ? cameraLock : undefined,
+    spatialAnchors: value.spatialAnchors
+      ?.slice(0, 8)
+      .map((anchor) => ({
+        name: limit(anchor.name, constraints.subjectName),
+        depth: optionalLimit(anchor.depth, 16),
+        position: optionalLimit(anchor.position, sceneBibleFieldLimit),
+        geometry: optionalLimit(anchor.geometry, sceneBibleFieldLimit),
+        identityLock: optionalLimit(anchor.identityLock, constraints.identityRule),
+      }))
+      .filter((anchor) => Boolean(anchor.name)),
+    temporalLayers: value.temporalLayers
+      ?.slice(0, 8)
+      .map((layer) => ({
+        layer: limit(layer.layer, 28),
+        visibleEvidence: optionalLimit(layer.visibleEvidence, sceneBibleFieldLimit),
+        pastPotential: optionalLimit(layer.pastPotential, sceneBibleFieldLimit),
+        futurePotential: optionalLimit(layer.futurePotential, sceneBibleFieldLimit),
+        confidence: layer.confidence,
+      }))
+      .filter((layer) => Boolean(layer.layer)),
+    storySeeds: value.storySeeds
+      ?.slice(0, 8)
+      .map((item) => limit(item, constraints.changeDriver))
+      .filter(Boolean),
+    hardConstraints: value.hardConstraints
+      ?.slice(0, 8)
+      .map((item) => limit(item, constraints.identityRule))
+      .filter(Boolean),
   };
 }
 
@@ -70,4 +116,17 @@ function limit(value: string, maximum: number): string {
   if (characters.length <= maximum) return normalized;
   if (maximum <= 1) return characters.slice(0, maximum).join("");
   return `${characters.slice(0, maximum - 1).join("")}…`;
+}
+
+function optionalLimit(value: string | undefined, maximum: number): string | undefined {
+  if (!value) return undefined;
+  const limited = limit(value, maximum);
+  return limited || undefined;
+}
+
+function hasAnyString(
+  value: Record<string, string | undefined> | undefined
+): boolean {
+  if (!value) return false;
+  return Object.values(value).some((item) => Boolean(item));
 }

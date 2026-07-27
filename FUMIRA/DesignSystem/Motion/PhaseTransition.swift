@@ -1,50 +1,61 @@
-import Pow
 import SwiftUI
 
 extension AnyTransition {
+    /// Soft chrome-only phase swap. Opacity never drops to 0 so the permanent
+    /// RootView backdrop cannot punch through as a white/black flash.
     static func posterPhase(reduceMotion: Bool) -> AnyTransition {
         if reduceMotion {
-            .opacity
+            .identity
         } else {
-            .opacity.combined(with: .scale(scale: 0.99))
+            .modifier(
+                active: PhaseOpacityFloor(opacity: 0.96),
+                identity: PhaseOpacityFloor(opacity: 1)
+            )
+            .combined(with: .scale(scale: 0.992))
+            .combined(with: .offset(y: 4))
         }
     }
 
-    /// Camera entry settles into place without masking the live preview.
-    ///
-    /// `MovingParts.iris` keeps an elliptical clip at its identity state on
-    /// some iOS / Pow combinations, exposing the window's white background at
-    /// the top and bottom of the viewfinder. A full-rect scale/fade preserves
-    /// the sense of entering the camera while keeping every pixel available
-    /// for composition.
+    /// Camera entry settles without masking the live preview or punching holes.
     static func cameraAperture(reduceMotion: Bool) -> AnyTransition {
-        guard !reduceMotion else { return .opacity }
+        guard !reduceMotion else { return .identity }
         return .asymmetric(
-            insertion: .opacity
-                .combined(with: .scale(scale: 1.015))
-                .animation(PosterMotion.aperture),
-            removal: .opacity.animation(PosterMotion.exitAnimation)
+            insertion: .modifier(
+                active: PhaseOpacityFloor(opacity: 0.96),
+                identity: PhaseOpacityFloor(opacity: 1)
+            )
+            .animation(PosterMotion.phaseChange),
+            removal: .identity
         )
     }
 
-    /// A brief overexposure bridges live preview and the captured frame.
+    /// Kept for call-site compatibility. Shutter flash is a Root overlay now —
+    /// do not fade the page away with Pow snapshot / filmExposure.
     static func cameraSnapshot(reduceMotion: Bool) -> AnyTransition {
-        guard !reduceMotion else { return .opacity }
+        posterPhase(reduceMotion: reduceMotion)
+    }
+
+    /// Shutter stage: identity so the persistent hero owns continuity.
+    static func photoDropAway(reduceMotion: Bool) -> AnyTransition {
+        .identity
+    }
+
+    /// Understanding entry: identity insert; chrome fades inside the page.
+    static func photoDropIn(reduceMotion: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .identity }
         return .asymmetric(
-            insertion: .movingParts.snapshot.animation(PosterMotion.shutter),
-            removal: .movingParts.filmExposure.animation(PosterMotion.exitAnimation)
+            insertion: .identity,
+            removal: .modifier(
+                active: PhaseOpacityFloor(opacity: 0.96),
+                identity: PhaseOpacityFloor(opacity: 1)
+            )
+            .animation(PosterMotion.phaseChange)
         )
     }
 
-    /// A vertical green exposure pass makes generation feel like film developing.
+    /// Result reveal: soft chrome only — hero hosts the generated image morph.
     static func generatedReveal(reduceMotion: Bool) -> AnyTransition {
-        guard !reduceMotion else { return .opacity }
-        return .asymmetric(
-            insertion: .movingParts
-                .glare(angle: .degrees(90), color: PosterPalette.leafGreen)
-                .animation(PosterMotion.reveal),
-            removal: .opacity.animation(PosterMotion.exitAnimation)
-        )
+        posterPhase(reduceMotion: reduceMotion)
     }
 }
 
@@ -52,6 +63,27 @@ extension Animation {
     static func posterPhaseChange(reduceMotion: Bool) -> Animation? {
         reduceMotion
             ? .linear(duration: PosterMotion.reduced)
-            : PosterMotion.decelerate
+            : PosterMotion.phaseChange
+    }
+
+    static func posterHeroMorph(reduceMotion: Bool) -> Animation? {
+        reduceMotion
+            ? .linear(duration: PosterMotion.reduced)
+            : PosterMotion.heroMorph
+    }
+
+    static func posterPhotoDrop(reduceMotion: Bool) -> Animation? {
+        reduceMotion
+            ? .linear(duration: PosterMotion.reduced)
+            : PosterMotion.photoDrop
+    }
+}
+
+/// Floor opacity during insertion/removal so the stage never goes fully clear.
+private struct PhaseOpacityFloor: ViewModifier {
+    let opacity: Double
+
+    func body(content: Content) -> some View {
+        content.opacity(opacity)
     }
 }

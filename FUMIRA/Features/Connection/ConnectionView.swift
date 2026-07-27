@@ -34,7 +34,7 @@ struct ConnectionView: View {
                         .padding(.horizontal, PosterSpacing.lg)
                         .frame(minHeight: 58)
                         .frame(maxWidth: .infinity)
-                        .background(PosterPalette.pine)
+                        .background(PosterPalette.actionBlue)
                         .clipShape(Capsule())
                         .shadow(color: PosterEffects.floating, radius: 12, y: 6)
                 }

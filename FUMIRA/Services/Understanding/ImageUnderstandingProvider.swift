@@ -2,6 +2,8 @@ import Foundation
 
 struct ImageUnderstandingRequest: Sendable {
     let photo: CapturedPhoto
+    /// Target browsing time used while building the source Scene Bible.
+    let targetTime: TimePosition
     let sessionID: UUID
     let model: AIModelOption
 }
@@ -30,10 +32,10 @@ actor MockImageUnderstandingProvider: ImageUnderstandingProvider {
         AsyncThrowingStream { continuation in
             let task = Task {
                 let steps = [
-                    ("寻找画面主体", 0.22),
-                    ("理解空间与构图", 0.48),
-                    ("提取时代线索", 0.74),
-                    ("推演变化驱动", 1.0)
+                    ("封存源照片", 0.22),
+                    ("读取空间与构图", 0.48),
+                    ("锁定时间层与锚点", 0.74),
+                    ("整理场景圣经", 1.0)
                 ]
                 for step in steps {
                     try Task.checkCancellation()

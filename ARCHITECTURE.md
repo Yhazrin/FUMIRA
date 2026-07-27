@@ -2,8 +2,11 @@
 
 ## Decision
 
-FUMIRA is a modular monolith: one Xcode project, one app target, and folders that
-enforce boundaries without introducing package overhead. Minimum deployment is
+FUMIRA is a modular monolith in one Xcode project. The main app remains one
+application target, with one narrowly scoped WidgetKit extension for the camera
+Live Activity and Dynamic Island presentation. Shared `ActivityAttributes` are
+compiled into both targets; camera behavior remains owned by the app and is
+reached from the system surface through FUMIRA deep links. Minimum deployment is
 iOS 17 so Observation and modern Swift concurrency are available.
 
 A sibling **FUMIRA backend** lives under `server/` (TypeScript + Fastify). It is
@@ -30,18 +33,19 @@ connection
   → bluetoothPermission → connected
   → cameraPermission → viewfinder
   → shuttered
+  → generating
   → understanding
   → storyWriting
-  → storyReady
-  → generating
   → result
   → share
 ```
 
 Phone-only mode enters camera permission directly. Failure, cancellation, retry,
 disconnect, retake, and returning from share are explicit transitions rather than
-parallel Boolean flags. The story is a review gate: image generation cannot start
-until understanding and story writing have both produced domain results.
+parallel Boolean flags. The reveal is deliberately suspenseful: the captured
+photo and locked target time go to image generation first. The generated target
+frame is then analyzed and used to write the story; neither the frame nor its
+analysis is shown until both downstream stages finish.
 
 ## Continuous time model
 
@@ -62,12 +66,17 @@ a session ID so stale results cannot overwrite a newer scrub position.
 - `CameraService`: real authorization, preview lifecycle and captured-photo boundary.
 - `CameraPreviewFactory`: an opaque preview view so Features never construct or
   import `AVCaptureSession`.
+- `CameraLiveActivityService`: ActivityKit lifecycle for the triggered system
+  Dynamic Island camera deck. The WidgetKit extension renders only shared,
+  bounded camera state and never owns the capture session.
 - `HardwareController`: optional physical shutter/rotary controller boundary.
-- `ImageUnderstandingProvider`: subjects, composition, clues and change drivers.
-- `StoryProvider`: past/present/future beats plus visual continuity rules.
-- `GenerationProvider`: story-aware image generation request and progress events.
+- `GenerationProvider`: source-photo + exact-target image generation and progress.
   - `MockGenerationProvider` (default)
   - `RemoteGenerationProvider` when `FUMIRA_API_BASE_URL` is set
+- `ImageUnderstandingProvider`: analyzes the generated target frame, including
+  subjects, composition, visible time clues, and bounded change drivers.
+- `StoryProvider`: writes past/present/future beats anchored to the generated
+  target frame and its exact selected time.
 - `AIModelCatalogProvider`: backend-controlled route catalog.
 - `AIModelConfigurationStore`: selected route IDs only; never vendor credentials.
 - `PosterStorage`: rendering persistence boundary.
@@ -85,9 +94,8 @@ the simulator is selected at compile time for the safe scene fallback.
 iOS App                        FUMIRA server                     MiniMax
 ───────                        ─────────────                     ───────
 capture JPEG
-Mock understand + story
                                POST /v1/uploads  ──────────────► (store file)
-                               POST /v1/generations (202)
+exact target prompt            POST /v1/generations (202)
                                      │
                                      ▼
                                image-01 I2I  ──────────────────► /v1/image_generation
@@ -95,12 +103,15 @@ Mock understand + story
                                save JPEG + resultUrl
 GET /v1/generations/:id  ◄──── poll status
 download resultUrl       ◄──── GET /v1/results/:id.jpg
-show GeneratedFrame.imageData
+keep frame sealed
+generated JPEG            POST /v1/uploads
+generated asset           POST /v1/understand
+target understanding      POST /v1/stories
+reveal image + story
 ```
 
-Understanding remains on `MockImageUnderstandingProvider`. A replaceable
-`RemoteUnderstandingProvider` protocol exists with an explicit TODO — do not
-invent MiniMax HTTP understanding endpoints; MCP is development-only.
+The relay owns live image generation, generated-image understanding, and story
+writing credentials. The iOS app receives only bounded domain results.
 
 ## Model routing and trust boundary
 

@@ -29,11 +29,42 @@ struct SettingsView: View {
                             }
                         )
                     )
-                    .tint(PosterPalette.leafGreen)
+                    .tint(PosterPalette.actionBlue)
                 } header: {
                     Text("拍摄")
                 } footer: {
                     Text("网格也可在取景器左上角开关。")
+                }
+
+                Section {
+                    Picker(
+                        "图片生成服务",
+                        selection: Binding(
+                            get: { model.modelConfiguration.imageOptionID },
+                            set: { optionID in
+                                Task {
+                                    await model.selectModel(optionID: optionID, for: .image)
+                                }
+                            }
+                        )
+                    ) {
+                        ForEach(readyImageOptions) { option in
+                            Text(option.provider.displayName)
+                                .tag(option.id)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if let option = model.modelOption(for: .image) {
+                        LabeledContent("当前模型", value: option.displayName)
+                        Text(option.detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("图片生成")
+                } footer: {
+                    Text("选择只影响最终图片生成。图片理解与故事仍使用各自的模型路由，服务密钥保存在 FUMIRA 后台。")
                 }
 
                 Section {
@@ -70,6 +101,12 @@ struct SettingsView: View {
         }
         .tint(PosterPalette.skyDeep)
     }
+
+    private var readyImageOptions: [AIModelOption] {
+        model.modelCatalog.options(for: .image).filter {
+            $0.availability == .ready && $0.provider.imageGenerationRoute != nil
+        }
+    }
 }
 
 private struct ModelRoutingAdvancedView: View {
@@ -100,7 +137,7 @@ private struct ModelRoutingAdvancedView: View {
                                             .font(.caption2.weight(.bold))
                                             .foregroundStyle(
                                                 option.availability == .ready
-                                                    ? PosterPalette.leafGreen
+                                                    ? PosterPalette.actionBlue
                                                     : PosterPalette.mutedInk
                                             )
                                     }
@@ -111,7 +148,7 @@ private struct ModelRoutingAdvancedView: View {
                                 Spacer()
                                 if model.modelConfiguration.optionID(for: role) == option.id {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(PosterPalette.leafGreen)
+                                        .foregroundStyle(PosterPalette.actionBlue)
                                 } else if option.availability == .requiresBackend {
                                     Image(systemName: "server.rack")
                                         .foregroundStyle(PosterPalette.mutedInk)

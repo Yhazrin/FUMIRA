@@ -15,55 +15,50 @@ struct GenerationView: View {
     }
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.skyDeep) {
-            VStack(spacing: PosterSpacing.lg) {
-                PosterKeywordHero(moment: .growing, fontSize: 36, surface: .dark)
+        // Keep page chrome transparent so RootView's persistent source photo
+        // remains visible inside HeroPhotoSlot while the target is generated.
+        PosterScreenContainer(background: Color.clear) {
+            VStack(alignment: .leading, spacing: PosterSpacing.lg) {
+                VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+                    Label("目标 \(model.generationTargetTime.compactLabel)", systemImage: "clock.arrow.2.circlepath")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PosterPalette.actionBlueDeep)
 
-                Text(yearText)
-                    .font(PosterTypography.display(72))
-                    .foregroundStyle(PosterPalette.paperWhite)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("照片先去往目标时间")
+                        .font(PosterTypography.display(34))
+                        .foregroundStyle(PosterPalette.ink)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Rectangle()
-                    .fill(PosterPalette.leafGreen)
-                    .frame(height: 4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(width: 120)
-
-                PhotoAspectContainer(
-                    aspectRatio: photoAspectRatio,
-                    maximumHeight: 260
-                ) {
-                    ZStack {
-                        CapturedPhotoView(photo: model.capturedPhoto)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .opacity(1 - model.generationProgress * 0.45)
-
-                        TemporalParkScene(
-                            time: model.selectedTime,
-                            namespace: namespace
-                        )
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .opacity(0.2 + model.generationProgress * 0.8)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
+                    Text("在它回来之前，我们不会先写答案。")
+                        .font(.subheadline)
+                        .foregroundStyle(PosterPalette.mutedInk)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.pipelineStatusText.isEmpty
-                         ? (model.currentStoryBeat?.title ?? "时间正在生长")
-                         : model.pipelineStatusText)
-                        .font(.headline)
-                        .foregroundStyle(PosterPalette.paperWhite)
-                        .accessibilityLabel(model.pipelineStatusText.isEmpty
-                            ? "时间正在生长"
-                            : model.pipelineStatusText)
-                    Text(model.currentNarrative)
-                        .font(.footnote)
-                        .foregroundStyle(PosterPalette.paperWhite.opacity(0.76))
+                HStack(alignment: .firstTextBaseline) {
+                    Text(yearText)
+                        .font(PosterTypography.display(54))
+                        .foregroundStyle(PosterPalette.actionBlue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Spacer(minLength: PosterSpacing.md)
+                    Text(model.pipelineStatusText.isEmpty ? "准备出发" : model.pipelineStatusText)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(PosterPalette.ink)
+                        .multilineTextAlignment(.trailing)
                         .lineLimit(3)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HeroPhotoSlot(
+                    owner: .generating,
+                    aspectRatio: photoAspectRatio,
+                    maximumHeight: 280,
+                    cornerRadius: PosterRadius.photoPaper
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: PosterRadius.photoPaper, style: .continuous)
+                        .stroke(PosterPalette.actionBlue.opacity(0.32), lineWidth: 1)
+                }
 
                 VStack(spacing: PosterSpacing.md) {
                     GenerationProgressRow(
@@ -85,29 +80,16 @@ struct GenerationView: View {
 
                 Spacer(minLength: PosterSpacing.sm)
 
-                HStack(spacing: PosterSpacing.md) {
-                    Button("取消生成") {
-                        model.cancelGeneration()
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PosterPalette.paperWhite)
-                    .frame(minHeight: 44)
-                    .accessibilityLabel("取消生成")
-                    .accessibilityHint("停止当前生成并返回故事确认页，不再继续请求")
-
-                    Spacer()
-
-                    #if DEBUG
-                    Button("测试超时") {
-                        model.presentFailureForPreview()
-                    }
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(PosterPalette.paperWhite.opacity(0.7))
-                    .frame(minHeight: 44)
-                    .accessibilityLabel("测试超时")
-                    .accessibilityHint("预览生成失败界面")
-                    #endif
+                Button {
+                    model.cancelGeneration()
+                } label: {
+                    Label("取消并返回相机", systemImage: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PosterPalette.actionBlueDeep)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
+                .buttonStyle(PosterPressStyle())
+                .accessibilityHint("停止当前目标图片请求并回到取景页面")
             }
         }
     }

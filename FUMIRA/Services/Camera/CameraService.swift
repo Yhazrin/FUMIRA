@@ -92,11 +92,51 @@ struct CameraControlSnapshot: Sendable, Equatable {
     var supportsFlash: Bool
 }
 
+struct CameraZoomSnapshot: Sendable, Equatable {
+    var factor: CGFloat
+    var displayFactor: CGFloat
+    var minimumFactor: CGFloat
+    var maximumFactor: CGFloat
+
+    static let unavailable = CameraZoomSnapshot(
+        factor: 1,
+        displayFactor: 1,
+        minimumFactor: 1,
+        maximumFactor: 1
+    )
+
+    var isAvailable: Bool {
+        maximumFactor - minimumFactor > 0.01
+    }
+
+    func clamping(_ proposedFactor: CGFloat) -> CameraZoomSnapshot {
+        let clampedFactor = min(max(proposedFactor, minimumFactor), maximumFactor)
+        let multiplier = factor > 0 ? displayFactor / factor : 1
+        return CameraZoomSnapshot(
+            factor: clampedFactor,
+            displayFactor: clampedFactor * multiplier,
+            minimumFactor: minimumFactor,
+            maximumFactor: maximumFactor
+        )
+    }
+}
+
 /// Optional live-camera controls. Mock / simulator cameras do not adopt this.
 protocol CameraControlProviding: Sendable {
     func currentControls() async -> CameraControlSnapshot
     func switchCamera() async throws -> CameraControlSnapshot
     func setFlashMode(_ mode: CameraFlashMode) async throws -> CameraControlSnapshot
+}
+
+/// Continuous zoom shared by touch gestures and supported Camera Control hardware.
+protocol CameraZoomProviding: Sendable {
+    func currentZoom() async -> CameraZoomSnapshot
+    func setZoomFactor(_ factor: CGFloat)
+
+    @MainActor
+    func setZoomObserver(
+        _ observer: (@MainActor @Sendable (CameraZoomSnapshot) -> Void)?
+    )
 }
 
 protocol CameraService: Sendable {

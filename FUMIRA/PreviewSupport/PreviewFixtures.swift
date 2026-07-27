@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 @MainActor
 enum PreviewFixtures {
@@ -22,22 +23,31 @@ enum PreviewFixtures {
             previewSize = (width: previewSize.height, height: previewSize.width)
         }
         model.cameraAspectRatio = photoAspectRatio
+        let previewImageData = makePreviewImageData(
+            width: previewSize.width,
+            height: previewSize.height
+        )
         model.capturedPhoto = CapturedPhoto(
-            data: Data(),
+            data: previewImageData,
             pixelWidth: previewSize.width,
             pixelHeight: previewSize.height
         )
+        model.decodedCapturedImage = UIImage(data: previewImageData)
         model.sceneUnderstanding = .parkReference
         model.temporalStory = .parkReference
+        model.generatedPhoto = CapturedPhoto(
+            data: previewImageData,
+            pixelWidth: previewSize.width,
+            pixelHeight: previewSize.height
+        )
         model.generatedFrame = GeneratedFrame(
             sessionID: UUID(),
             time: model.selectedTime,
-            storyBeatID: TemporalStory.parkReference.beat(for: model.selectedTime)?.id,
-            prompt: TemporalStory.parkReference.generationPrompt(
-                for: model.selectedTime,
-                understanding: .parkReference
-            )
+            storyBeatID: model.temporalStory?.beat(for: model.selectedTime)?.id,
+            prompt: TemporalImagePrompt.make(for: model.selectedTime),
+            imageData: previewImageData
         )
+        model.decodedGeneratedImage = UIImage(data: previewImageData)
         if phase == .connected || phase == .viewfinder {
             model.hardwareSnapshot = HardwareSnapshot(name: "FutureCam_01", batteryLevel: 86)
         }
@@ -66,14 +76,76 @@ enum PreviewFixtures {
 
     private static func statusText(for phase: AppPhase) -> String {
         switch phase {
-        case .understanding:
-            "提取时代线索"
-        case .storyWriting:
-            "把七个年代连成故事"
         case .generating:
-            "时间正在生长"
+            "目标照片正在生长"
+        case .understanding:
+            "正在读取目标画面"
+        case .storyWriting:
+            "围绕目标画面编写故事"
         default:
             ""
+        }
+    }
+
+    private static func makePreviewImageData(width: Int, height: Int) -> Data {
+        let ratio = CGFloat(max(width, 1)) / CGFloat(max(height, 1))
+        let renderWidth: CGFloat = min(max(CGFloat(width), 320), 900)
+        let renderSize = CGSize(
+            width: renderWidth,
+            height: max(renderWidth / max(ratio, 0.01), 1)
+        )
+        let renderer = UIGraphicsImageRenderer(size: renderSize)
+        return renderer.jpegData(withCompressionQuality: 0.9) { context in
+            let bounds = CGRect(origin: .zero, size: renderSize)
+            UIColor(red: 0.16, green: 0.64, blue: 0.9, alpha: 1).setFill()
+            context.fill(bounds)
+
+            UIColor.white.withAlphaComponent(0.92).setFill()
+            context.fill(CGRect(
+                x: renderSize.width * 0.08,
+                y: renderSize.height * 0.12,
+                width: renderSize.width * 0.84,
+                height: renderSize.height * 0.24
+            ))
+
+            UIColor(red: 0.23, green: 0.69, blue: 0.43, alpha: 1).setFill()
+            context.fill(CGRect(
+                x: 0,
+                y: renderSize.height * 0.62,
+                width: renderSize.width,
+                height: renderSize.height * 0.38
+            ))
+
+            let markerSize = min(renderSize.width, renderSize.height) * 0.065
+            UIColor(red: 0.93, green: 0.23, blue: 0.2, alpha: 1).setFill()
+            for point in [
+                CGPoint(x: 12, y: 12),
+                CGPoint(x: renderSize.width - markerSize - 12, y: 12),
+                CGPoint(x: 12, y: renderSize.height - markerSize - 12),
+                CGPoint(
+                    x: renderSize.width - markerSize - 12,
+                    y: renderSize.height - markerSize - 12
+                ),
+            ] {
+                context.fill(CGRect(origin: point, size: CGSize(width: markerSize, height: markerSize)))
+            }
+
+            let label = "TARGET"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(
+                    ofSize: min(renderSize.width * 0.1, 54),
+                    weight: .black
+                ),
+                .foregroundColor: UIColor.black,
+            ]
+            let labelSize = label.size(withAttributes: attributes)
+            label.draw(
+                at: CGPoint(
+                    x: (renderSize.width - labelSize.width) / 2,
+                    y: (renderSize.height - labelSize.height) / 2
+                ),
+                withAttributes: attributes
+            )
         }
     }
 }

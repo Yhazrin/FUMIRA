@@ -15,8 +15,10 @@ const bounds: Record<
   identityRule: { defaultValue: 48, minimum: 16, maximum: 100 },
   beatTitle: { defaultValue: 14, minimum: 4, maximum: 28 },
   beatNarrative: { defaultValue: 72, minimum: 24, maximum: 140 },
-  visualPrompt: { defaultValue: 110, minimum: 40, maximum: 180 },
+  visualPrompt: { defaultValue: 140, minimum: 40, maximum: 220 },
 };
+
+const beatDeltaLimit = 72;
 
 export function resolveStoryCopyConstraints(
   requested?: Partial<StoryCopyConstraints>
@@ -49,6 +51,16 @@ export function normalizeTemporalStoryCopy(
       title: limit(beat.title, constraints.beatTitle),
       narrative: limit(beat.narrative, constraints.beatNarrative),
       visualPrompt: limit(beat.visualPrompt, constraints.visualPrompt),
+      transitionCause: optionalLimit(beat.transitionCause, beatDeltaLimit),
+      unchangedAnchors: beat.unchangedAnchors
+        ?.slice(0, 6)
+        .map((item) => limit(item, 28))
+        .filter(Boolean),
+      foregroundDelta: optionalLimit(beat.foregroundDelta, beatDeltaLimit),
+      midgroundDelta: optionalLimit(beat.midgroundDelta, beatDeltaLimit),
+      backgroundDelta: optionalLimit(beat.backgroundDelta, beatDeltaLimit),
+      subjectDelta: optionalLimit(beat.subjectDelta, beatDeltaLimit),
+      environmentDelta: optionalLimit(beat.environmentDelta, beatDeltaLimit),
     })),
   };
 }
@@ -67,4 +79,10 @@ function limit(value: string, maximum: number): string {
   if (characters.length <= maximum) return normalized;
   if (maximum <= 1) return characters.slice(0, maximum).join("");
   return `${characters.slice(0, maximum - 1).join("")}…`;
+}
+
+function optionalLimit(value: string | undefined, maximum: number): string | undefined {
+  if (!value) return undefined;
+  const limited = limit(value, maximum);
+  return limited || undefined;
 }

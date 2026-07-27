@@ -42,6 +42,10 @@ targets:
         NSBluetoothAlwaysUsageDescription: 用于连接 FutureCam 的实体快门与连续时间旋钮。
         NSPhotoLibraryUsageDescription: 用于导入一张照片体验时间相机。
         NSPhotoLibraryAddUsageDescription: 用于保存生成的时间海报。
+        # Required on device to reach the Mac LAN relay (URLSession to a private IP).
+        NSLocalNetworkUsageDescription: 用于在同一 Wi‑Fi 下连接电脑上的 FUMIRA 中转服务，以上传照片并生成时间影像。
+        NSBonjourServices:
+          - _http._tcp.
         CFBundleURLTypes:
           - CFBundleURLName: com.fumira.timecamera
             CFBundleTypeRole: Editor
@@ -49,6 +53,7 @@ targets:
               - fumira
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        NSSupportsLiveActivities: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         # Build-setting expanded. Debug defaults to local backend; Release stays empty = Mock.
@@ -79,6 +84,31 @@ targets:
           FUMIRA_API_BASE_URL: ""
     dependencies:
       - package: Pow
+      - target: FUMIRALiveActivity
+        embed: true
+  FUMIRALiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FUMIRALiveActivity
+        excludes:
+          - Info.plist
+      - path: FUMIRA/Domain/CameraLiveActivityAttributes.swift
+    info:
+      path: FUMIRALiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: FUMIRA Camera
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera.liveactivity
+        PRODUCT_NAME: FUMIRALiveActivity
+        DEVELOPMENT_TEAM: 5CQ49A8XPZ
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../../Frameworks"
   FUMIRATests:
     type: bundle.unit-test
     platform: iOS
@@ -95,6 +125,7 @@ schemes:
     build:
       targets:
         FUMIRA: all
+        FUMIRALiveActivity: all
         FUMIRATests: [test]
     test:
       gatherCoverageData: true

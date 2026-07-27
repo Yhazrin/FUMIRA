@@ -36,5 +36,5 @@
 Figma defines visual DNA and flow, not a literal fixed-frame implementation.
 Status bars and device chrome are excluded from app UI. The original five-point
 rail is replaced by the continuous ±100-year WaveTimeRail (audio-waveform bars,
-leaf-green selected cursor/year, sparse −100 / NOW / +100 labels) while retaining
+action-blue selected cursor/year, sparse −100 / NOW / +100 labels) while retaining
 continuous scrubbing and nonlinear time mapping.

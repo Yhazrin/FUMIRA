@@ -21,6 +21,7 @@ export function getMiniMaxIntelligenceAdapter(): MiniMaxIntelligenceAdapter | nu
 
 export async function analyzeUploadedAsset(input: {
   sourceAssetId: string;
+  targetTime: { offsetYears: number; compactLabel: string };
   copyConstraints: UnderstandingCopyConstraints;
   requestId: string;
 }) {
@@ -32,6 +33,7 @@ export async function analyzeUploadedAsset(input: {
   if (!asset) return unavailable("invalid_image", "源图片无法读取。", false);
   const result = await adapter.analyzeImage({
     imageDataUrl: toJpegDataUrl(asset.bytes, asset.contentType),
+    targetTime: input.targetTime,
     copyConstraints: input.copyConstraints,
     requestId: input.requestId,
   });

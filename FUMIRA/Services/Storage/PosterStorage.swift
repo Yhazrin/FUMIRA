@@ -88,6 +88,8 @@ struct PhotoLibraryPosterStorage: PosterStorage {
             switch next {
             case .authorized, .limited:
                 return
+            case .notDetermined:
+                throw PosterStorageError.photoLibraryDenied
             case .denied:
                 throw PosterStorageError.photoLibraryDenied
             case .restricted:

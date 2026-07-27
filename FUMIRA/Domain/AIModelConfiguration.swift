@@ -30,6 +30,8 @@ enum AIModelRole: String, Codable, CaseIterable, Hashable, Sendable {
 
 enum AIProviderKind: String, Codable, CaseIterable, Hashable, Sendable {
     case fumira
+    case miniMax
+    case apiMart
     case openAI
     case google
     case anthropic
@@ -40,6 +42,10 @@ enum AIProviderKind: String, Codable, CaseIterable, Hashable, Sendable {
         switch self {
         case .fumira:
             "FUMIRA"
+        case .miniMax:
+            "MiniMax"
+        case .apiMart:
+            "中转站"
         case .openAI:
             "OpenAI"
         case .google:
@@ -175,10 +181,19 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
             AIModelOption(
                 id: "fumira.image.identity",
                 role: .image,
-                provider: .fumira,
-                modelID: "fumira-image-identity-v1",
-                displayName: "时间影像",
-                detail: "基于原图主体与构图生成时间变迁",
+                provider: .miniMax,
+                modelID: "minimax/image-01",
+                displayName: "MiniMax image-01",
+                detail: "直接使用 MiniMax 图生图，保持主体与构图",
+                availability: .ready
+            ),
+            AIModelOption(
+                id: "apimart.image.gpt-image-2",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/gpt-image-2",
+                displayName: "中转站 GPT-Image-2",
+                detail: "通过中转站生成，支持原图参考与 2K 输出",
                 availability: .ready
             ),
             AIModelOption(
@@ -253,4 +268,17 @@ struct AIModelConfiguration: Hashable, Codable, Sendable {
         storyOptionID: "fumira.story.cinematic",
         imageOptionID: "fumira.image.identity"
     )
+}
+
+extension AIProviderKind {
+    var imageGenerationRoute: String? {
+        switch self {
+        case .miniMax, .fumira:
+            "minimax"
+        case .apiMart:
+            "apimart"
+        default:
+            nil
+        }
+    }
 }

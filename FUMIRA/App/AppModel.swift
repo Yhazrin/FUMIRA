@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 
 @MainActor
 @Observable
@@ -9,6 +10,10 @@ final class AppModel {
     private var hasPrepared = false
     /// Single in-flight pipeline task — cancel stops URLSession poll/upload via stream termination.
     private var pipelineTask: Task<Void, Never>?
+    /// Keeps repeated viewfinder entries from racing camera-session startup.
+    private var cameraPreviewTask: Task<Void, Never>?
+    /// Coalesces rapid pinch / Camera Control updates before publishing to ActivityKit.
+    private var cameraActivityUpdateTask: Task<Void, Never>?
 
     var phase: AppPhase = .connection
     /// Chosen on the viewfinder, then frozen for this capture/import session.
@@ -24,12 +29,24 @@ final class AppModel {
     var hardwareSnapshot: HardwareSnapshot?
     var activeSessionID: UUID?
     var capturedPhoto: CapturedPhoto?
+    /// Pre-decoded capture for the persistent hero — never decode in View bodies.
+    var decodedCapturedImage: UIImage?
+    /// Pre-decoded generated frame for Result / hero crossfade.
+    var decodedGeneratedImage: UIImage?
+    /// Bumps when the Root shutter-flash overlay should fire.
+    var shutterFlashRequestID: UUID?
     var cameraAspectRatio: CameraAspectRatio = .classic
     var sceneUnderstanding: SceneUnderstanding?
     var temporalStory: TemporalStory?
     var generatedFrame: GeneratedFrame?
+    /// Canonical generated result photo for Result / share surfaces.
+    var generatedPhoto: CapturedPhoto?
     /// One-level in-memory undo after result regeneration (not a history library).
     var previousGeneratedFrame: GeneratedFrame?
+    private var previousGeneratedPhoto: CapturedPhoto?
+    private var previousSceneUnderstanding: SceneUnderstanding?
+    private var previousTemporalStory: TemporalStory?
+    private var previousDecodedGeneratedImage: UIImage?
     var failedStage: PipelineStage?
     var lastErrorMessage: String?
     var lastGenerationError: GenerationError?
@@ -50,11 +67,16 @@ final class AppModel {
         canSwitchCamera: false,
         supportsFlash: false
     )
+    var cameraZoomSnapshot = CameraZoomSnapshot.unavailable
     var isCameraGridEnabled = false
     let motionField: MotionFieldModel
+    /// A stable preview identity prevents remounting the SwiftUI/UIKit bridge
+    /// whenever unrelated camera chrome state changes.
+    let cameraPreview: AnyView
 
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
+        cameraPreview = dependencies.cameraPreview.makePreview()
         motionField = MotionFieldModel(service: dependencies.motionField)
     }
 
@@ -70,8 +92,16 @@ final class AppModel {
         cameraControlSnapshot.supportsFlash
     }
 
+    var supportsCameraZoom: Bool {
+        cameraZoomSnapshot.isAvailable
+    }
+
     private var cameraControlProvider: (any CameraControlProviding)? {
         dependencies.camera as? any CameraControlProviding
+    }
+
+    private var cameraZoomProvider: (any CameraZoomProviding)? {
+        dependencies.camera as? any CameraZoomProviding
     }
 
     var isPipelineBusy: Bool {
@@ -95,13 +125,9 @@ final class AppModel {
         previousGeneratedFrame != nil
     }
 
-    var cameraPreview: AnyView {
-        dependencies.cameraPreview.makePreview()
-    }
-
     var currentNarrative: String {
         temporalStory?.narrative(for: selectedTime)
-            ?? "先拍下一张照片，FUMIRA 会读懂画面，再为同一个地方写出跨越时间的故事。"
+            ?? "FUMIRA 会先读懂源场景，再写出连续时间故事，并生成那一刻的照片。"
     }
 
     var currentStoryBeat: StoryBeat? {
@@ -119,6 +145,7 @@ final class AppModel {
     func prepare() async {
         guard !hasPrepared else { return }
         hasPrepared = true
+        await dependencies.cameraActivity.dismissAll()
         do {
             modelCatalog = try await dependencies.modelCatalog.catalog()
             let stored = await dependencies.modelConfigurationStore.load()
@@ -156,8 +183,8 @@ final class AppModel {
     func grantCameraAccess() async {
         do {
             _ = try await dependencies.camera.requestAuthorization()
-            await refreshCameraControls()
             phase = .viewfinder
+            scheduleCameraPreview()
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -180,11 +207,39 @@ final class AppModel {
         cameraControlSnapshot = await provider.currentControls()
     }
 
+    func refreshCameraZoom() async {
+        guard let provider = cameraZoomProvider else {
+            cameraZoomSnapshot = .unavailable
+            return
+        }
+        provider.setZoomObserver { [weak self] snapshot in
+            self?.cameraZoomSnapshot = snapshot
+            self?.scheduleCameraActivityUpdate()
+        }
+        cameraZoomSnapshot = await provider.currentZoom()
+    }
+
+    func setCameraZoomFactor(_ factor: CGFloat) {
+        guard let provider = cameraZoomProvider, cameraZoomSnapshot.isAvailable else {
+            return
+        }
+        cameraZoomSnapshot = cameraZoomSnapshot.clamping(factor)
+        provider.setZoomFactor(cameraZoomSnapshot.factor)
+        scheduleCameraActivityUpdate()
+    }
+
+    func resetCameraZoom() {
+        setCameraZoomFactor(1)
+        dependencies.haptics.play(.selection)
+    }
+
     func switchCameraLens() async {
         guard let provider = cameraControlProvider else { return }
         do {
             cameraControlSnapshot = try await provider.switchCamera()
+            await refreshCameraZoom()
             dependencies.haptics.play(.selection)
+            scheduleCameraActivityUpdate()
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -198,6 +253,7 @@ final class AppModel {
                 cameraControlSnapshot.flashMode.next
             )
             dependencies.haptics.play(.selection)
+            scheduleCameraActivityUpdate()
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -206,46 +262,39 @@ final class AppModel {
     func toggleCameraGrid() {
         isCameraGridEnabled.toggle()
         dependencies.haptics.play(.selection)
+        scheduleCameraActivityUpdate()
     }
 
     func selectCameraAspectRatio(_ aspectRatio: CameraAspectRatio) {
         guard cameraAspectRatio != aspectRatio else { return }
         cameraAspectRatio = aspectRatio
         dependencies.haptics.play(.selection)
+        scheduleCameraActivityUpdate()
     }
 
-    func capture() async {
-        guard validateRunnableConfiguration() else { return }
-        guard !isPipelineBusy else { return }
-        invalidatePipelineWork()
-        let sessionID = UUID()
-        activeSessionID = sessionID
-        clearPipelineResult()
-        capturedTargetTime = selectedTime
-        let composition = cameraAspectRatio
-        dependencies.haptics.play(.shutter)
-
-        let task = Task { [sessionID, composition] in
-            do {
-                let photo = try await dependencies.camera.capturePhoto(composition: composition)
-                guard !Task.isCancelled, activeSessionID == sessionID else { return }
-                capturedPhoto = photo
-                await dependencies.camera.stopPreview()
-                phase = .shuttered
-                try? await Task.sleep(for: .milliseconds(180))
-                guard !Task.isCancelled, activeSessionID == sessionID else { return }
-                await startUnderstanding(photo: photo, sessionID: sessionID)
-            } catch is CancellationError {
-                return
-            } catch {
-                presentFailure(stage: .capture, error: error, sessionID: sessionID)
-            }
+    func triggerCameraLiveActivity() async {
+        do {
+            try await dependencies.cameraActivity.trigger(
+                with: cameraActivityState(phase: .framing)
+            )
+            lastErrorMessage = nil
+            dependencies.haptics.play(.selection)
+        } catch {
+            lastErrorMessage = error.localizedDescription
+            dependencies.haptics.play(.selection)
         }
-        pipelineTask = task
-        await task.value
     }
 
-    /// Album import — same pipeline as shutter capture (understanding → story → generate).
+    func playShutterPressHaptic() {
+        dependencies.haptics.play(.shutterPress)
+    }
+
+    /// Independent Root overlay flash — does not fade page content.
+    func requestShutterFlash() {
+        shutterFlashRequestID = UUID()
+    }
+
+    /// Album import — same pipeline as shutter capture (understand → story → generate).
     func importPhoto(imageData: Data) async {
         guard validateRunnableConfiguration() else { return }
         guard !isPipelineBusy else { return }
@@ -264,12 +313,21 @@ final class AppModel {
                     composition: composition
                 )
                 guard !Task.isCancelled, activeSessionID == sessionID else { return }
+
+                let decoded = await Self.decodeForDisplay(photo.data)
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+
                 capturedPhoto = photo
+                decodedCapturedImage = decoded
                 await dependencies.camera.stopPreview()
                 phase = .shuttered
                 try? await Task.sleep(for: .milliseconds(180))
                 guard !Task.isCancelled, activeSessionID == sessionID else { return }
-                await startUnderstanding(photo: photo, sessionID: sessionID)
+                await startSourcePipeline(
+                    photo: photo,
+                    targetTime: capturedTargetTime ?? selectedTime,
+                    sessionID: sessionID
+                )
             } catch is CancellationError {
                 return
             } catch {
@@ -281,19 +339,196 @@ final class AppModel {
         await task.value
     }
 
-    func startUnderstanding(photo: CapturedPhoto, sessionID: UUID) async {
+    func capture() async {
+        guard validateRunnableConfiguration() else { return }
+        guard !isPipelineBusy else { return }
+        invalidatePipelineWork()
+        let sessionID = UUID()
+        activeSessionID = sessionID
+        clearPipelineResult()
+        capturedTargetTime = selectedTime
+        let composition = cameraAspectRatio
+        dependencies.haptics.play(.shutter)
+        requestShutterFlash()
+        await dependencies.cameraActivity.update(
+            with: cameraActivityState(phase: .capturing)
+        )
+
+        let task = Task { [sessionID, composition] in
+            do {
+                let photo = try await dependencies.camera.capturePhoto(composition: composition)
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+
+                // Decode off the main render path before committing UI state.
+                let decoded = await Self.decodeForDisplay(photo.data)
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+
+                capturedPhoto = photo
+                decodedCapturedImage = decoded
+                await dependencies.cameraActivity.finish(
+                    with: cameraActivityState(phase: .captured)
+                )
+                // Freeze in place on the shutter stage while the hero crossfades.
+                phase = .shuttered
+                try? await Task.sleep(
+                    for: .milliseconds(Int(PosterMotion.heroCaptureCrossfade * 1_000))
+                )
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+
+                // Stop preview only after the still is on screen.
+                await dependencies.camera.stopPreview()
+
+                // A short dwell lets the live preview hand off to the still.
+                // Then: understand source → write story → generate target image.
+                try? await Task.sleep(
+                    for: .milliseconds(Int(PosterMotion.shutterDwell * 1_000))
+                )
+                guard !Task.isCancelled, activeSessionID == sessionID else { return }
+                await startSourcePipeline(
+                    photo: photo,
+                    targetTime: capturedTargetTime ?? selectedTime,
+                    sessionID: sessionID
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                await dependencies.cameraActivity.dismissAll()
+                presentFailure(stage: .capture, error: error, sessionID: sessionID)
+                await resumeCameraPreview()
+            }
+        }
+        pipelineTask = task
+        await task.value
+    }
+
+    /// Source photo → Scene Bible → story → story-driven image generation.
+    private func startSourcePipeline(
+        photo: CapturedPhoto,
+        targetTime: TimePosition,
+        sessionID: UUID
+    ) async {
+        await startUnderstanding(
+            photo: photo,
+            targetTime: targetTime,
+            sessionID: sessionID
+        )
+    }
+
+    private func startImageGeneration(
+        photo: CapturedPhoto,
+        targetTime: TimePosition,
+        sessionID: UUID,
+        understanding: SceneUnderstanding? = nil,
+        story: TemporalStory? = nil
+    ) async {
+        guard let option = modelOption(for: .image) else {
+            presentConfigurationFailure()
+            return
+        }
+
+        generationProgress = 0
+        generationStage = .preparing
+        pipelineStatusText = "正在把照片送往\(targetTime.compactLabel)"
+        failedStage = nil
+        lastGenerationError = nil
+        lastErrorMessage = nil
+        phase = .generating
+
+        let resolvedUnderstanding = understanding ?? sceneUnderstanding
+        let resolvedStory = story ?? temporalStory
+        let resolvedBeat = resolvedStory?.beat(for: targetTime)
+        // Mock mode still gets a short local fallback string for GeneratedFrame.
+        // Remote generation ignores client prompt authorship.
+        let prompt = TemporalImagePrompt.make(for: targetTime)
+
+        do {
+            let events = await dependencies.generation.generate(
+                request: ImageGenerationRequest(
+                    photo: photo,
+                    time: targetTime,
+                    prompt: prompt,
+                    sessionID: sessionID,
+                    model: option,
+                    understanding: resolvedUnderstanding,
+                    temporalStory: resolvedStory,
+                    storyBeat: resolvedBeat
+                )
+            )
+            for try await event in events {
+                try Task.checkCancellation()
+                guard activeSessionID == sessionID else { return }
+                switch event {
+                case let .progress(label, value, stage):
+                    pipelineStatusText = label
+                    generationProgress = value
+                    generationStage = stage
+                case let .completed(frame):
+                    guard let imageData = frame.imageData, !imageData.isEmpty else {
+                        throw GenerationError.generationFailed(message: "目标照片已经生成，但图片内容为空。")
+                    }
+                    let decoded = await Self.decodeForDisplay(imageData)
+                    guard
+                        !Task.isCancelled,
+                        activeSessionID == sessionID,
+                        let decoded
+                    else {
+                        if Task.isCancelled { return }
+                        throw GenerationError.generationFailed(message: "目标照片无法读取，请重试。")
+                    }
+
+                    let targetPhoto = Self.makeGeneratedPhoto(
+                        imageData: imageData,
+                        decodedImage: decoded
+                    )
+                    let completedFrame: GeneratedFrame
+                    if let beatID = resolvedBeat?.id, frame.storyBeatID == nil {
+                        completedFrame = GeneratedFrame(
+                            id: frame.id,
+                            sessionID: frame.sessionID,
+                            time: frame.time,
+                            storyBeatID: beatID,
+                            prompt: frame.prompt,
+                            modelOptionID: frame.modelOptionID,
+                            imageData: frame.imageData
+                        )
+                    } else {
+                        completedFrame = frame
+                    }
+                    generatedFrame = completedFrame
+                    generatedPhoto = targetPhoto
+                    decodedGeneratedImage = decoded
+                    generationProgress = 1
+                    generationStage = .finishing
+                    pipelineStatusText = "照片与故事已经准备好"
+                    phase = .result
+                    dependencies.haptics.play(.reveal)
+                }
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            presentFailure(stage: .imageGeneration, error: error, sessionID: sessionID)
+        }
+    }
+
+    func startUnderstanding(
+        photo: CapturedPhoto,
+        targetTime: TimePosition,
+        sessionID: UUID
+    ) async {
         guard let option = modelOption(for: .understanding) else {
             presentConfigurationFailure()
             return
         }
         understandingProgress = 0
-        pipelineStatusText = "准备理解画面"
+        pipelineStatusText = "正在读取源场景的空间锚点与时间层"
         phase = .understanding
 
         do {
             let events = await dependencies.understanding.analyze(
                 request: ImageUnderstandingRequest(
                     photo: photo,
+                    targetTime: targetTime,
                     sessionID: sessionID,
                     model: option
                 )
@@ -307,7 +542,12 @@ final class AppModel {
                 case let .completed(value):
                     understandingProgress = 1
                     sceneUnderstanding = value
-                    await startStoryWriting(understanding: value, sessionID: sessionID)
+                    await startStoryWriting(
+                        understanding: value,
+                        targetTime: targetTime,
+                        sessionID: sessionID,
+                        sourcePhoto: photo
+                    )
                 }
             }
         } catch is CancellationError {
@@ -319,21 +559,23 @@ final class AppModel {
 
     func startStoryWriting(
         understanding: SceneUnderstanding,
-        sessionID: UUID
+        targetTime: TimePosition,
+        sessionID: UUID,
+        sourcePhoto: CapturedPhoto? = nil
     ) async {
         guard let option = modelOption(for: .story) else {
             presentConfigurationFailure()
             return
         }
         storyProgress = 0
-        pipelineStatusText = "准备时间线"
+        pipelineStatusText = "正在根据源场景编写连续时间故事"
         phase = .storyWriting
 
         do {
             let events = await dependencies.story.write(
                 request: StoryRequest(
                     understanding: understanding,
-                    targetTime: generationTargetTime,
+                    targetTime: targetTime,
                     sessionID: sessionID,
                     model: option
                 )
@@ -347,8 +589,20 @@ final class AppModel {
                 case let .completed(value):
                     storyProgress = 1
                     temporalStory = value
-                    phase = .storyReady
-                    dependencies.haptics.play(.success)
+                    let photo = sourcePhoto ?? capturedPhoto
+                    guard let photo else {
+                        pipelineStatusText = "照片与故事已经准备好"
+                        phase = .result
+                        dependencies.haptics.play(.reveal)
+                        return
+                    }
+                    await startImageGeneration(
+                        photo: photo,
+                        targetTime: targetTime,
+                        sessionID: sessionID,
+                        understanding: understanding,
+                        story: value
+                    )
                 }
             }
         } catch is CancellationError {
@@ -358,64 +612,37 @@ final class AppModel {
         }
     }
 
+    /// Starts a fresh story-driven generation from the original capture.
+    /// Used for result regeneration and explicit generation at a browsed year.
     func generateStoryWorld() async {
-        // Debounce: ignore duplicate taps while already generating.
-        guard phase == .storyReady || phase == .pipelineFailure || phase == .result else { return }
-        guard
-            let photo = capturedPhoto,
-            let understanding = sceneUnderstanding,
-            let story = temporalStory,
-            let option = modelOption(for: .image)
-        else {
-            presentConfigurationFailure()
-            return
-        }
+        guard !isPipelineBusy, let photo = capturedPhoto else { return }
 
+        if generatedFrame != nil {
+            preserveCurrentResultForUndo()
+        }
         invalidatePipelineWork()
         let sessionID = UUID()
         activeSessionID = sessionID
-        generationProgress = 0
-        generationStage = .preparing
-        pipelineStatusText = "准备让时间生长"
-        failedStage = nil
-        lastGenerationError = nil
-        lastErrorMessage = nil
-        phase = .generating
         let targetTime = generationTargetTime
+        let existingUnderstanding = sceneUnderstanding
+        let existingStory = temporalStory
+        prepareForNewTargetResult()
 
-        let task = Task { [photo, understanding, story, option, sessionID, targetTime] in
-            do {
-                let events = await dependencies.generation.generate(
-                    request: ImageGenerationRequest(
-                        photo: photo,
-                        understanding: understanding,
-                        story: story,
-                        time: targetTime,
-                        sessionID: sessionID,
-                        model: option
-                    )
+        let task = Task { [photo, sessionID, targetTime, existingUnderstanding, existingStory] in
+            if let existingUnderstanding, let existingStory {
+                await startImageGeneration(
+                    photo: photo,
+                    targetTime: targetTime,
+                    sessionID: sessionID,
+                    understanding: existingUnderstanding,
+                    story: existingStory
                 )
-                for try await event in events {
-                    try Task.checkCancellation()
-                    guard activeSessionID == sessionID else { return }
-                    switch event {
-                    case let .progress(label, value, stage):
-                        pipelineStatusText = label
-                        generationProgress = value
-                        generationStage = stage
-                    case let .completed(frame):
-                        generatedFrame = frame
-                        generationProgress = 1
-                        generationStage = .finishing
-                        pipelineStatusText = "这一帧已经长成"
-                        phase = .result
-                        dependencies.haptics.play(.reveal)
-                    }
-                }
-            } catch is CancellationError {
-                return
-            } catch {
-                presentFailure(stage: .imageGeneration, error: error, sessionID: sessionID)
+            } else {
+                await startSourcePipeline(
+                    photo: photo,
+                    targetTime: targetTime,
+                    sessionID: sessionID
+                )
             }
         }
         pipelineTask = task
@@ -433,24 +660,24 @@ final class AppModel {
         activeSessionID = sessionID
         temporalStory = nil
         let task = Task {
-            await startStoryWriting(understanding: understanding, sessionID: sessionID)
+            await startStoryWriting(
+                understanding: understanding,
+                targetTime: generationTargetTime,
+                sessionID: sessionID,
+                sourcePhoto: capturedPhoto
+            )
         }
         pipelineTask = task
         await task.value
     }
 
-    /// Re-run image generation with the same source photo + current time position.
+        /// Re-run image generation with the same source photo + current time position.
     /// Replaces the current result; keeps one previous frame in memory for undo.
     func regenerateResult() async {
-        guard
-            capturedPhoto != nil,
-            sceneUnderstanding != nil,
-            temporalStory != nil
-        else {
+        guard capturedPhoto != nil else {
             retake()
             return
         }
-        previousGeneratedFrame = generatedFrame
         await generateStoryWorld()
     }
 
@@ -465,9 +692,24 @@ final class AppModel {
     func undoLastGeneration() {
         guard let previous = previousGeneratedFrame else { return }
         generatedFrame = previous
+        generatedPhoto = previousGeneratedPhoto
+        sceneUnderstanding = previousSceneUnderstanding
+        temporalStory = previousTemporalStory
+        decodedGeneratedImage = previousDecodedGeneratedImage
         previousGeneratedFrame = nil
+        previousGeneratedPhoto = nil
+        previousSceneUnderstanding = nil
+        previousTemporalStory = nil
+        previousDecodedGeneratedImage = nil
+        capturedTargetTime = previous.time
+        selectedTime = previous.time
         phase = .result
         dependencies.haptics.play(.selection)
+        if decodedGeneratedImage == nil {
+            Task {
+                decodedGeneratedImage = await Self.decodeForDisplay(previous.imageData)
+            }
+        }
     }
 
     func retryPipeline() async {
@@ -477,7 +719,8 @@ final class AppModel {
             return
         }
         guard canRetryFailedStage || stage == .configuration else {
-            // Non-retryable: send the user back to adjust story / time instead of re-hitting the API.
+            // Non-retryable: return to the previous result or camera instead of
+            // immediately submitting the same invalid request again.
             showOriginalNow()
             return
         }
@@ -491,14 +734,18 @@ final class AppModel {
         switch stage {
         case .configuration:
             isModelSettingsPresented = true
-            phase = capturedPhoto == nil ? .viewfinder : .storyReady
+            phase = restorePreviousResultIfAvailable() ? .result : .viewfinder
         case .capture:
             phase = .viewfinder
             await resumeCameraPreview()
         case .understanding:
-            if let photo = capturedPhoto {
+            if let photo = generatedPhoto {
                 let task = Task {
-                    await startUnderstanding(photo: photo, sessionID: sessionID)
+                    await startUnderstanding(
+                        photo: photo,
+                        targetTime: generationTargetTime,
+                        sessionID: sessionID
+                    )
                 }
                 pipelineTask = task
                 await task.value
@@ -508,13 +755,21 @@ final class AppModel {
         case .story:
             if let understanding = sceneUnderstanding {
                 let task = Task {
-                    await startStoryWriting(understanding: understanding, sessionID: sessionID)
+                    await startStoryWriting(
+                        understanding: understanding,
+                        targetTime: generationTargetTime,
+                        sessionID: sessionID
+                    )
                 }
                 pipelineTask = task
                 await task.value
-            } else if let photo = capturedPhoto {
+            } else if let photo = generatedPhoto {
                 let task = Task {
-                    await startUnderstanding(photo: photo, sessionID: sessionID)
+                    await startUnderstanding(
+                        photo: photo,
+                        targetTime: generationTargetTime,
+                        sessionID: sessionID
+                    )
                 }
                 pipelineTask = task
                 await task.value
@@ -524,7 +779,9 @@ final class AppModel {
         }
     }
 
-    /// Cancel in-flight generation (and stop remote poll/upload). Returns to storyReady when possible.
+    /// Cancel in-flight generation (and stop remote poll/upload). A result
+    /// regeneration returns to the previous reveal; first generation returns
+    /// to the camera without exposing an unfinished target frame.
     func cancelGeneration() {
         guard phase == .generating else { return }
         invalidatePipelineWork()
@@ -534,8 +791,8 @@ final class AppModel {
         failedStage = nil
         lastGenerationError = nil
         lastErrorMessage = nil
-        if temporalStory != nil {
-            phase = .storyReady
+        if restorePreviousResultIfAvailable() {
+            phase = .result
         } else {
             phase = .viewfinder
             Task { await resumeCameraPreview() }
@@ -556,8 +813,12 @@ final class AppModel {
             failedStage = nil
             lastGenerationError = nil
             lastErrorMessage = nil
-            phase = .viewfinder
-            Task { await resumeCameraPreview() }
+            if restorePreviousResultIfAvailable() {
+                phase = .result
+            } else {
+                phase = .viewfinder
+                Task { await resumeCameraPreview() }
+            }
             dependencies.haptics.play(.selection)
         default:
             break
@@ -566,16 +827,16 @@ final class AppModel {
 
     func showOriginalNow() {
         invalidatePipelineWork()
-        selectedTime = .now
         failedStage = nil
         lastGenerationError = nil
-        if temporalStory != nil {
-            // Prefer story gate over result when recovering from generation failure without a frame.
-            phase = generatedFrame != nil ? .result : .storyReady
-        } else if sceneUnderstanding != nil {
-            phase = .viewfinder
-            Task { await resumeCameraPreview() }
+        if restorePreviousResultIfAvailable() {
+            phase = .result
+        } else if generatedFrame != nil {
+            // A completed target image can still be revealed after a later
+            // story rewrite / regeneration failure without discarding it.
+            phase = .result
         } else {
+            selectedTime = .now
             phase = .viewfinder
             Task { await resumeCameraPreview() }
         }
@@ -583,6 +844,7 @@ final class AppModel {
 
     func updateTime(normalized: Double) {
         selectedTime = TimePosition(normalized: normalized)
+        scheduleCameraActivityUpdate()
     }
 
     func playTimeDetent(_ detent: WaveTimeDetent) {
@@ -625,11 +887,13 @@ final class AppModel {
         shareFeedbackMessage = nil
     }
 
-    /// Minimal `fumira://` deep link. Hosts: `share`, `result`. No backend inventing.
+    /// Minimal `fumira://` deep link used by sharing and the Live Activity controls.
     func handleDeepLink(_ url: URL) {
         guard url.scheme?.lowercased() == "fumira" else { return }
         let host = (url.host ?? url.pathComponents.dropFirst().first)?.lowercased()
         switch host {
+        case "camera":
+            handleCameraActivityDeepLink(url)
         case "share":
             guard temporalStory != nil || generatedFrame != nil else { return }
             openShare()
@@ -703,7 +967,7 @@ final class AppModel {
         invalidatePipelineWork()
         clearPipelineResult()
         phase = .viewfinder
-        Task { await resumeCameraPreview() }
+        scheduleCameraPreview()
     }
 
     func recoverConnection() {
@@ -799,13 +1063,20 @@ final class AppModel {
         activeSessionID = nil
         pipelineTask?.cancel()
         pipelineTask = nil
+        cameraActivityUpdateTask?.cancel()
+        cameraActivityUpdateTask = nil
     }
 
     private func resumeCameraPreview() async {
         do {
             try await dependencies.camera.startPreview()
+            guard !Task.isCancelled, phase == .viewfinder else { return }
             await refreshCameraControls()
+            await refreshCameraZoom()
+        } catch is CancellationError {
+            return
         } catch {
+            guard phase == .viewfinder else { return }
             lastErrorMessage = error.localizedDescription
             lastGenerationError = Self.classify(error)
             failedStage = .capture
@@ -813,13 +1084,131 @@ final class AppModel {
         }
     }
 
+    private func scheduleCameraPreview() {
+        cameraPreviewTask?.cancel()
+        cameraPreviewTask = Task { [weak self] in
+            await self?.resumeCameraPreview()
+        }
+    }
+
+    private func scheduleCameraActivityUpdate() {
+        guard phase == .viewfinder else { return }
+        cameraActivityUpdateTask?.cancel()
+        cameraActivityUpdateTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled, let self, self.phase == .viewfinder else { return }
+            await self.dependencies.cameraActivity.update(
+                with: self.cameraActivityState(phase: .framing)
+            )
+        }
+    }
+
+    private func cameraActivityState(
+        phase: CameraLiveActivityAttributes.ContentState.Phase
+    ) -> CameraLiveActivityAttributes.ContentState {
+        let zoomFactor = cameraZoomSnapshot.displayFactor
+        let zoomLabel = zoomFactor < 10
+            ? String(format: "%.1f×", Double(zoomFactor))
+            : String(format: "%.0f×", Double(zoomFactor))
+
+        return CameraLiveActivityAttributes.ContentState(
+            phase: phase,
+            targetLabel: selectedTime.compactLabel,
+            zoomLabel: zoomLabel,
+            flashSymbol: cameraControlSnapshot.flashMode.systemImageName,
+            lensSymbol: cameraControlSnapshot.lensPosition == .front
+                ? "camera.rotate.fill"
+                : "arrow.triangle.2.circlepath",
+            isGridEnabled: isCameraGridEnabled,
+            aspectRatioLabel: cameraAspectRatio.label
+        )
+    }
+
+    private func handleCameraActivityDeepLink(_ url: URL) {
+        guard phase == .viewfinder else { return }
+        let action = url.pathComponents.dropFirst().first?.lowercased()
+
+        switch action {
+        case "flash":
+            Task { await cycleFlashMode() }
+        case "lens":
+            Task { await switchCameraLens() }
+        case "grid":
+            toggleCameraGrid()
+        case "aspect":
+            selectCameraAspectRatio(nextCameraAspectRatio)
+        default:
+            scheduleCameraPreview()
+        }
+    }
+
+    private var nextCameraAspectRatio: CameraAspectRatio {
+        switch cameraAspectRatio {
+        case .fullScreen: .widescreen
+        case .widescreen: .classic
+        case .classic: .square
+        case .square: .fullScreen
+        }
+    }
+
+    private func preserveCurrentResultForUndo() {
+        previousGeneratedFrame = generatedFrame
+        previousGeneratedPhoto = generatedPhoto
+        previousSceneUnderstanding = sceneUnderstanding
+        previousTemporalStory = temporalStory
+        previousDecodedGeneratedImage = decodedGeneratedImage
+    }
+
+    private func prepareForNewTargetResult() {
+        generatedFrame = nil
+        generatedPhoto = nil
+        decodedGeneratedImage = nil
+        // Keep Scene Bible + story across regenerations so every target year
+        // reuses the same source understanding (no chain drift).
+        understandingProgress = 0
+        storyProgress = 0
+        generationProgress = 0
+        generationStage = .preparing
+        pipelineStatusText = ""
+        failedStage = nil
+        lastErrorMessage = nil
+        lastGenerationError = nil
+        shareImageData = nil
+        posterURL = nil
+    }
+
+    @discardableResult
+    private func restorePreviousResultIfAvailable() -> Bool {
+        guard let previous = previousGeneratedFrame else { return false }
+        generatedFrame = previous
+        generatedPhoto = previousGeneratedPhoto
+        sceneUnderstanding = previousSceneUnderstanding
+        temporalStory = previousTemporalStory
+        decodedGeneratedImage = previousDecodedGeneratedImage
+        capturedTargetTime = previous.time
+        selectedTime = previous.time
+        previousGeneratedFrame = nil
+        previousGeneratedPhoto = nil
+        previousSceneUnderstanding = nil
+        previousTemporalStory = nil
+        previousDecodedGeneratedImage = nil
+        return true
+    }
+
     private func clearPipelineResult() {
         capturedTargetTime = nil
         capturedPhoto = nil
+        decodedCapturedImage = nil
+        decodedGeneratedImage = nil
         sceneUnderstanding = nil
         temporalStory = nil
         generatedFrame = nil
+        generatedPhoto = nil
         previousGeneratedFrame = nil
+        previousGeneratedPhoto = nil
+        previousSceneUnderstanding = nil
+        previousTemporalStory = nil
+        previousDecodedGeneratedImage = nil
         understandingProgress = 0
         storyProgress = 0
         generationProgress = 0
@@ -833,5 +1222,30 @@ final class AppModel {
         shareFeedbackMessage = nil
         isPreparingPoster = false
         isSavingPoster = false
+    }
+
+    private static func makeGeneratedPhoto(
+        imageData: Data,
+        decodedImage: UIImage
+    ) -> CapturedPhoto {
+        let scale = max(decodedImage.scale, 1)
+        return CapturedPhoto(
+            data: imageData,
+            pixelWidth: max(Int((decodedImage.size.width * scale).rounded()), 1),
+            pixelHeight: max(Int((decodedImage.size.height * scale).rounded()), 1)
+        )
+    }
+
+    /// Decode + prepare on a background cooperative task; return nil when data is empty.
+    private static func decodeForDisplay(_ data: Data?) async -> UIImage? {
+        guard let data, !data.isEmpty else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            guard let image = UIImage(data: data) else { return nil }
+            return image.preparingForDisplay() ?? image
+        }.value
+    }
+
+    private static func decodeForDisplay(_ data: Data) async -> UIImage? {
+        await decodeForDisplay(Optional(data))
     }
 }

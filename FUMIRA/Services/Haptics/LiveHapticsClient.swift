@@ -94,17 +94,15 @@ final class LiveHapticsClient: HapticsClient {
                 transient(time: 0.038, intensity: 0.68, sharpness: 0.98)
             ]
 
+        case .shutterPress:
+            // One dry, high-sharpness contact at the bottom of the short travel.
+            events = [transient(time: 0, intensity: 0.40, sharpness: 1)]
+
         case .shutter:
-            // Blade release, blade return, then a short body resonance.
+            // A crisp release and immediate return, without a lingering motor rumble.
             events = [
-                transient(time: 0, intensity: 0.92, sharpness: 0.92),
-                transient(time: 0.048, intensity: 0.62, sharpness: 0.76),
-                continuous(
-                    time: 0.058,
-                    duration: 0.065,
-                    intensity: 0.16,
-                    sharpness: 0.24
-                )
+                transient(time: 0, intensity: 0.92, sharpness: 1),
+                transient(time: 0.032, intensity: 0.44, sharpness: 0.82)
             ]
 
         case .reveal:
@@ -180,6 +178,11 @@ final class LiveHapticsClient: HapticsClient {
             let generator = UIImpactFeedbackGenerator(style: .rigid)
             generator.prepare()
             generator.impactOccurred(intensity: 0.7)
+
+        case .shutterPress:
+            let generator = UIImpactFeedbackGenerator(style: .rigid)
+            generator.prepare()
+            generator.impactOccurred(intensity: 0.45)
 
         case .shutter:
             let generator = UIImpactFeedbackGenerator(style: .rigid)

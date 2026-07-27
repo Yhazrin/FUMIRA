@@ -30,7 +30,7 @@ enum LiveCameraError: LocalizedError, Sendable {
     }
 }
 
-final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraPreviewFactory, @unchecked Sendable {
+final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraZoomProviding, CameraPreviewFactory, @unchecked Sendable {
     let isLive = true
 
     private let session = AVCaptureSession()
@@ -41,6 +41,8 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
     private var videoDeviceInput: AVCaptureDeviceInput?
     private var currentPosition: AVCaptureDevice.Position = .back
     private var preferredFlashMode: AVCaptureDevice.FlashMode = .auto
+    private let zoomObserverLock = NSLock()
+    private var zoomObserver: (@MainActor @Sendable (CameraZoomSnapshot) -> Void)?
 
     func requestAuthorization() async throws -> CameraAuthorization {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -56,7 +58,7 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
             throw LiveCameraError.accessDenied
         }
 
-        try await startPreview()
+        // Authorization only — preview starts when the viewfinder asks via startPreview().
         return .authorized
     }
 
@@ -146,6 +148,38 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         }
     }
 
+    func currentZoom() async -> CameraZoomSnapshot {
+        await withCheckedContinuation { continuation in
+            sessionQueue.async { [self] in
+                continuation.resume(returning: makeZoomSnapshot())
+            }
+        }
+    }
+
+    func setZoomFactor(_ factor: CGFloat) {
+        sessionQueue.async { [self] in
+            guard let device = videoDeviceInput?.device else { return }
+            let snapshot = makeZoomSnapshot().clamping(factor)
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = snapshot.factor
+                device.unlockForConfiguration()
+                publishZoomSnapshot(makeZoomSnapshot())
+            } catch {
+                return
+            }
+        }
+    }
+
+    @MainActor
+    func setZoomObserver(
+        _ observer: (@MainActor @Sendable (CameraZoomSnapshot) -> Void)?
+    ) {
+        zoomObserverLock.lock()
+        zoomObserver = observer
+        zoomObserverLock.unlock()
+    }
+
     func switchCamera() async throws -> CameraControlSnapshot {
         try await withCheckedThrowingContinuation { continuation in
             sessionQueue.async { [self] in
@@ -166,7 +200,9 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                     }
 
                     try installInput(position: nextPosition)
+                    configureSystemZoomControlIfAvailable()
                     currentPosition = nextPosition
+                    publishZoomSnapshot(makeZoomSnapshot())
                     continuation.resume(returning: makeSnapshot())
                 } catch {
                     continuation.resume(throwing: error)
@@ -202,6 +238,7 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         session.sessionPreset = .photo
 
         try installInput(position: .back)
+        configureSystemZoomControlIfAvailable()
 
         guard session.canAddOutput(photoOutput) else {
             throw LiveCameraError.outputUnavailable
@@ -241,6 +278,65 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         )
     }
 
+    private func makeZoomSnapshot() -> CameraZoomSnapshot {
+        guard let device = videoDeviceInput?.device else {
+            return .unavailable
+        }
+
+        let hardwareMinimum = device.minAvailableVideoZoomFactor
+        let hardwareMaximum = device.maxAvailableVideoZoomFactor
+        let recommendedRange: ClosedRange<CGFloat>
+        if #available(iOS 18.0, *) {
+            recommendedRange = device.activeFormat.systemRecommendedVideoZoomRange
+                ?? hardwareMinimum...min(hardwareMaximum, 10)
+        } else {
+            recommendedRange = hardwareMinimum...min(hardwareMaximum, 10)
+        }
+
+        let minimum = max(hardwareMinimum, recommendedRange.lowerBound)
+        let maximum = max(minimum, min(hardwareMaximum, recommendedRange.upperBound))
+        let factor = min(max(device.videoZoomFactor, minimum), maximum)
+        let displayMultiplier: CGFloat
+        if #available(iOS 18.0, *) {
+            displayMultiplier = max(device.displayVideoZoomFactorMultiplier, 0.01)
+        } else {
+            displayMultiplier = 1
+        }
+        return CameraZoomSnapshot(
+            factor: factor,
+            displayFactor: factor * displayMultiplier,
+            minimumFactor: minimum,
+            maximumFactor: maximum
+        )
+    }
+
+    private func publishZoomSnapshot(_ snapshot: CameraZoomSnapshot) {
+        zoomObserverLock.lock()
+        let observer = zoomObserver
+        zoomObserverLock.unlock()
+        guard let observer else { return }
+        Task { @MainActor in
+            observer(snapshot)
+        }
+    }
+
+    private func configureSystemZoomControlIfAvailable() {
+        guard #available(iOS 18.0, *), session.supportsControls else {
+            return
+        }
+        session.controls.forEach(session.removeControl)
+        session.setControlsDelegate(self, queue: .main)
+        guard let device = videoDeviceInput?.device else { return }
+        let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] _ in
+            guard let self else { return }
+            sessionQueue.async { [self] in
+                publishZoomSnapshot(makeZoomSnapshot())
+            }
+        }
+        guard session.canAddControl(slider) else { return }
+        session.addControl(slider)
+    }
+
     private var currentDeviceSupportsFlash: Bool {
         guard let device = videoDeviceInput?.device else { return false }
         return device.hasFlash && !photoOutput.supportedFlashModes.isEmpty
@@ -259,7 +355,18 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
     }
 
     private static func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
+        if position == .front {
+            return AVCaptureDevice.default(
+                .builtInWideAngleCamera,
+                for: .video,
+                position: .front
+            )
+        }
+
+        return AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
     }
 
     /// AVCapture uses rotation angles, not interface orientation. Mapping this
@@ -274,6 +381,17 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         @unknown default: 90
         }
     }
+}
+
+@available(iOS 18.0, *)
+extension LiveCameraService: AVCaptureSessionControlsDelegate {
+    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+
+    func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {}
+
+    func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {}
+
+    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {}
 }
 
 private extension CameraFlashMode {
@@ -340,7 +458,9 @@ private struct LiveCameraPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: CameraPreviewUIView, context: Context) {
-        uiView.previewLayer.session = session
+        if uiView.previewLayer.session !== session {
+            uiView.previewLayer.session = session
+        }
     }
 }
 
@@ -361,7 +481,10 @@ private final class CameraPreviewUIView: UIView {
         else {
             return
         }
-        connection.videoRotationAngle = previewRotationAngle
+        let angle = previewRotationAngle
+        if abs(connection.videoRotationAngle - angle) > 0.5 {
+            connection.videoRotationAngle = angle
+        }
     }
 
     private var previewRotationAngle: CGFloat {

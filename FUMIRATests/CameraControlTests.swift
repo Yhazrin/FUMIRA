@@ -13,4 +13,32 @@ final class CameraControlTests: XCTestCase {
         XCTAssertFalse(CameraFlashMode.on.accessibilityLabel.isEmpty)
         XCTAssertFalse(CameraFlashMode.auto.systemImageName.isEmpty)
     }
+
+    func testZoomClampsToRecommendedHardwareRange() {
+        let snapshot = CameraZoomSnapshot(
+            factor: 2,
+            displayFactor: 1,
+            minimumFactor: 1,
+            maximumFactor: 8
+        )
+
+        XCTAssertEqual(snapshot.clamping(0.5).factor, 1)
+        XCTAssertEqual(snapshot.clamping(12).factor, 8)
+        XCTAssertEqual(snapshot.clamping(4).factor, 4)
+    }
+
+    func testZoomClampingPreservesDisplayMultiplier() {
+        let snapshot = CameraZoomSnapshot(
+            factor: 2,
+            displayFactor: 1,
+            minimumFactor: 1,
+            maximumFactor: 8
+        )
+
+        XCTAssertEqual(snapshot.clamping(6).displayFactor, 3)
+    }
+
+    func testUnavailableZoomHasNoAdjustableRange() {
+        XCTAssertFalse(CameraZoomSnapshot.unavailable.isAvailable)
+    }
 }

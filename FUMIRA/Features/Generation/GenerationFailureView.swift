@@ -138,10 +138,10 @@ struct GenerationFailureView: View {
     }
 
     private var fallbackTitle: String {
-        if !model.canRetryFailedStage, model.temporalStory != nil {
-            return "回到故事调整"
+        if model.canUndoGeneration {
+            return "返回上一张结果"
         }
-        return model.temporalStory == nil ? "重新拍摄" : "查看已有故事"
+        return model.generatedFrame == nil ? "重新拍摄" : "查看已有结果"
     }
 }
 

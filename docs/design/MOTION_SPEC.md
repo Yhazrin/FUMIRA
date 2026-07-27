@@ -49,7 +49,7 @@ firm settle; while dragging, follow the finger with no lag animation.
 VoiceOver adjustable actions step in offset-day space: at NOW, increment/decrement
 moves ±1 day instead of snapping back to zero.
 
-Selected bar / cursor / year emphasis uses `PosterPalette.leafGreen` (≤5% 点睛).
+Selected bar / cursor / year emphasis uses `PosterPalette.actionBlue`.
 
 ## Device tilt (2.5D)
 
@@ -82,7 +82,7 @@ Selected bar / cursor / year emphasis uses `PosterPalette.leafGreen` (≤5% 点�
 ## Camera transitions and haptics
 
 - Pow 1.0.6 is limited to three semantic transitions: Iris when entering the
-  camera, Snapshot / Film Exposure across capture, and a leaf-green Glare pass
+  camera, Snapshot / Film Exposure across capture, and an action-blue Glare pass
   when the generated result develops. Reduce Motion replaces all three with
   opacity.
 - `LiveHapticsClient` owns one reusable Core Haptics engine. It restarts after

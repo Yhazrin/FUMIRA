@@ -40,7 +40,10 @@ export async function initStorage(): Promise<void> {
     const raw = await readFile(generationsPath(), "utf8");
     const list = JSON.parse(raw) as GenerationRecord[];
     for (const item of list) {
-      generations.set(item.generationId, item);
+      generations.set(item.generationId, {
+        ...item,
+        imageProvider: item.imageProvider ?? "minimax",
+      });
     }
   } catch {
     // first boot
@@ -121,14 +124,16 @@ export async function readAssetBytes(
 export async function saveGeneratedImage(params: {
   generationId: string;
   bytes: Buffer;
+  contentType: string;
 }): Promise<string> {
   await ensureDirs();
+  const extension = params.contentType === "image/png" ? "png" : "jpg";
   const absolutePath = path.join(
     config.generatedDir,
-    `${params.generationId}.jpg`
+    `${params.generationId}.${extension}`
   );
   await writeFile(absolutePath, params.bytes);
-  return `/v1/results/${params.generationId}.jpg`;
+  return `/v1/results/${params.generationId}.${extension}`;
 }
 
 export function getGeneratedAbsolutePath(filename: string): string {

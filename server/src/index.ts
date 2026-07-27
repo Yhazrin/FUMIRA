@@ -1,11 +1,15 @@
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import { config, isGenerationReady } from "./config.js";
+import { LiveAPIMartAdapter } from "./apimart/liveAdapter.js";
 import { LiveMiniMaxAdapter } from "./minimax/liveAdapter.js";
 import { LiveMiniMaxIntelligenceAdapter } from "./minimax/liveIntelligenceAdapter.js";
 import { setMiniMaxIntelligenceAdapter } from "./intelligence.js";
 import { MockMiniMaxAdapter } from "./minimax/mockAdapter.js";
-import { setMiniMaxAdapter } from "./queue.js";
+import {
+  setImageGenerationAdapter,
+  setMiniMaxAdapter,
+} from "./queue.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerGenerationRoutes } from "./routes/generations.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -17,6 +21,8 @@ import type { MiniMaxAdapter } from "./types.js";
 export interface BuildAppOptions {
   /** Force a specific adapter (tests). */
   adapter?: MiniMaxAdapter | null;
+  /** Force a specific API Mart adapter (tests). */
+  apiMartAdapter?: MiniMaxAdapter | null;
   /** Force a specific image-understanding / story adapter (tests). */
   intelligenceAdapter?: import("./types.js").MiniMaxIntelligenceAdapter | null;
   /** Skip binding listen — for inject() tests. */
@@ -34,6 +40,19 @@ export async function buildApp(options: BuildAppOptions = {}) {
     setMiniMaxAdapter(new LiveMiniMaxAdapter(config.minimaxApiKey));
   } else {
     setMiniMaxAdapter(null);
+  }
+
+  if (options.apiMartAdapter !== undefined) {
+    setImageGenerationAdapter("apimart", options.apiMartAdapter);
+  } else if (config.minimaxMock) {
+    setImageGenerationAdapter("apimart", new MockMiniMaxAdapter());
+  } else if (config.apiMartApiKey) {
+    setImageGenerationAdapter(
+      "apimart",
+      new LiveAPIMartAdapter(config.apiMartApiKey)
+    );
+  } else {
+    setImageGenerationAdapter("apimart", null);
   }
 
   if (options.intelligenceAdapter !== undefined) {
@@ -101,7 +120,7 @@ async function main() {
       generationReady: isGenerationReady(),
       mode: config.minimaxMock
         ? "mock"
-        : config.minimaxApiKey
+        : config.minimaxApiKey || config.apiMartApiKey
           ? "live"
           : "unavailable",
     })

@@ -10,21 +10,21 @@ struct GenerationProgressRow: View {
             HStack {
                 Text(title)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(PosterPalette.paperWhite)
+                    .foregroundStyle(PosterPalette.ink)
                 Spacer()
                 if isComplete {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(PosterPalette.leafGreen)
+                        .foregroundStyle(PosterPalette.actionBlue)
                 }
             }
 
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(PosterPalette.paperWhite.opacity(0.25))
+                        .fill(PosterPalette.actionBlue.opacity(0.14))
                     Capsule()
-                        .fill(PosterPalette.leafGreen)
+                        .fill(PosterPalette.actionBlue)
                         .frame(width: proxy.size.width * min(max(progress, 0), 1))
                         .animation(PosterMotion.flow, value: progress)
                 }

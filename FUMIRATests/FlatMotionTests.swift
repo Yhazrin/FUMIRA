@@ -49,6 +49,24 @@ final class FlatMotionTests: XCTestCase {
             accuracy: 0.000_001
         )
     }
+
+    func testShutterMorphExpandsSymmetricallyAroundItsCenter() {
+        let centerX: CGFloat = 180
+
+        for progress in stride(from: CGFloat(0), through: 1, by: 0.1) {
+            let size = ShutterMorphGeometry.size(
+                progress: progress,
+                shutterDiameter: 68,
+                barWidth: 5,
+                barHeight: 44
+            )
+            let edges = ShutterMorphGeometry.horizontalEdges(centerX: centerX, width: size.width)
+
+            XCTAssertEqual(centerX - edges.lowerBound, edges.upperBound - centerX, accuracy: 0.000_001)
+            XCTAssertGreaterThanOrEqual(size.width, 5)
+            XCTAssertLessThanOrEqual(size.width, 68)
+        }
+    }
 }
 
 final class WaveTimeAccessibilityTests: XCTestCase {

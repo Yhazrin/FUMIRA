@@ -74,6 +74,32 @@ enum WaveformGeometry {
     }
 }
 
+// MARK: - Shutter morph geometry
+
+enum ShutterMorphGeometry {
+    static func easedProgress(_ progress: CGFloat) -> CGFloat {
+        let clamped = min(max(progress, 0), 1)
+        return clamped * clamped * (3 - 2 * clamped)
+    }
+
+    static func size(
+        progress: CGFloat,
+        shutterDiameter: CGFloat,
+        barWidth: CGFloat,
+        barHeight: CGFloat
+    ) -> CGSize {
+        let eased = easedProgress(progress)
+        return CGSize(
+            width: shutterDiameter + (barWidth - shutterDiameter) * eased,
+            height: shutterDiameter + (barHeight - shutterDiameter) * eased
+        )
+    }
+
+    static func horizontalEdges(centerX: CGFloat, width: CGFloat) -> ClosedRange<CGFloat> {
+        (centerX - width / 2)...(centerX + width / 2)
+    }
+}
+
 // MARK: - VoiceOver adjustment
 
 enum WaveTimeAccessibilityAdjustment {

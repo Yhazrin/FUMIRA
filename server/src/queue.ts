@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 import { buildPrompt, normalizeAspectRatio, toJpegDataUrl } from "./prompt.js";
 import {
+  compileStoryDrivenPrompt,
+  makeTemporalImagePrompt,
+  pickNearestBeat,
+} from "./temporalImagePrompt.js";
+import {
   getAsset,
   getGeneration,
   getSettings,
@@ -14,22 +19,43 @@ import {
 import type {
   CreateGenerationBody,
   GenerationRecord,
-  MiniMaxAdapter,
+  ImageGenerationAdapter,
+  ImageGenerationProvider,
 } from "./types.js";
+// TODO(P2 validation): wire `buildValidationPrompt` / `shouldAttemptRepair`
+// from `./validation.js` after first successful generation when dual-image
+// VLM compare is available. Keep generation succeeding without auto-redraw for now.
 
-let adapter: MiniMaxAdapter | null = null;
+const adapters = new Map<ImageGenerationProvider, ImageGenerationAdapter>();
 const processing = new Set<string>();
 const promptByGeneration = new Map<
   string,
   { prompt: string; useSubjectReference: boolean }
 >();
 
-export function setMiniMaxAdapter(next: MiniMaxAdapter | null): void {
-  adapter = next;
+export function setImageGenerationAdapter(
+  provider: ImageGenerationProvider,
+  next: ImageGenerationAdapter | null
+): void {
+  if (next) {
+    adapters.set(provider, next);
+  } else {
+    adapters.delete(provider);
+  }
 }
 
-export function getMiniMaxAdapter(): MiniMaxAdapter | null {
-  return adapter;
+export function setMiniMaxAdapter(next: ImageGenerationAdapter | null): void {
+  setImageGenerationAdapter("minimax", next);
+}
+
+export function getImageGenerationAdapter(
+  provider: ImageGenerationProvider
+): ImageGenerationAdapter | null {
+  return adapters.get(provider) ?? null;
+}
+
+export function getMiniMaxAdapter(): ImageGenerationAdapter | null {
+  return getImageGenerationAdapter("minimax");
 }
 
 export function createGenerationJob(
@@ -44,14 +70,31 @@ export function createGenerationJob(
       retryable: boolean;
     } {
   const settings = getSettings();
-  // Runtime readiness = admin kill-switch + an attached adapter.
-  // Startup attaches live/mock adapters based on env; tests may inject adapters.
+  if (
+    body.imageProvider !== undefined
+    && body.imageProvider !== "minimax"
+    && body.imageProvider !== "apimart"
+  ) {
+    return {
+      ok: false,
+      statusCode: 400,
+      errorCode: "invalid_image_provider",
+      userMessage: "不支持的图片生成服务。",
+      retryable: false,
+    };
+  }
+  const imageProvider: ImageGenerationProvider =
+    body.imageProvider === "apimart" ? "apimart" : "minimax";
+  const adapter = getImageGenerationAdapter(imageProvider);
+  // Runtime readiness = admin kill-switch + the specifically requested adapter.
   if (!settings.remoteGenerationEnabled || !adapter) {
     return {
       ok: false,
       statusCode: 503,
       errorCode: "generation_unavailable",
-      userMessage: "远程生成暂未就绪。",
+      userMessage: imageProvider === "apimart"
+        ? "中转站图片服务暂未配置。"
+        : "MiniMax 图片服务暂未配置。",
       retryable: true,
     };
   }
@@ -87,16 +130,6 @@ export function createGenerationJob(
     };
   }
 
-  if (typeof body.story !== "string" || !body.story.trim()) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "missing_story",
-      userMessage: "缺少故事内容。",
-      retryable: false,
-    };
-  }
-
   if (!body.timePosition || typeof body.timePosition.normalized !== "number") {
     return {
       ok: false,
@@ -107,9 +140,45 @@ export function createGenerationJob(
     };
   }
 
+  // Server is the sole prompt author. Client `prompt` / `story` strings are
+  // ignored except for mock/test force markers (`__FORCE_*__`).
+  const clientPrompt =
+    typeof body.prompt === "string" && body.prompt.trim()
+      ? body.prompt.trim()
+      : typeof body.story === "string" && body.story.trim()
+        ? body.story.trim()
+        : "";
+  const forceMarker = /__FORCE_[A-Z0-9_]+__/.test(clientPrompt) ? clientPrompt : null;
+  if (clientPrompt && !forceMarker) {
+    console.info(
+      JSON.stringify({
+        event: "client_prompt_ignored",
+        requestId: body.requestId.trim(),
+        clientPromptChars: clientPrompt.length,
+      })
+    );
+  }
+
+  const beat =
+    body.storyBeat
+    ?? pickNearestBeat(body.temporalStory, body.timePosition.offsetYears);
+  const corePrompt = forceMarker
+    ?? (compileStoryDrivenPrompt({
+      time: body.timePosition,
+      understanding: body.understanding,
+      story: body.temporalStory
+        ? {
+            identityRules: body.temporalStory.identityRules,
+            logline: body.temporalStory.logline,
+            presentTruth: body.temporalStory.presentTruth,
+          }
+        : null,
+      beat,
+    }) || makeTemporalImagePrompt(body.timePosition));
+
   const built = buildPrompt({
     template: settings.promptTemplate,
-    story: body.story,
+    corePrompt,
     timePosition: body.timePosition,
     aspectRatio,
   });
@@ -122,7 +191,8 @@ export function createGenerationJob(
     status: "queued",
     createdAt: now,
     updatedAt: now,
-    modelName: settings.modelName,
+    modelName: imageProvider === "apimart" ? "gpt-image-2" : settings.modelName,
+    imageProvider,
     aspectRatio,
     promptTruncated: built.truncated,
     promptCharCount: built.charCount,
@@ -156,6 +226,9 @@ async function processGeneration(generationId: string): Promise<void> {
   const startedAt = Date.now();
   const current = getGeneration(generationId);
 
+  const adapter = current
+    ? getImageGenerationAdapter(current.imageProvider ?? "minimax")
+    : null;
   if (!current || !adapter) {
     processing.delete(generationId);
     return;
@@ -218,6 +291,7 @@ async function processGeneration(generationId: string): Promise<void> {
     const resultRelativeUrl = await saveGeneratedImage({
       generationId,
       bytes: result.imageBytes,
+      contentType: result.contentType,
     });
 
     updateGeneration(generationId, {
@@ -233,7 +307,8 @@ async function processGeneration(generationId: string): Promise<void> {
         requestId: current.requestId,
         generationId,
         durationMs: Date.now() - startedAt,
-        model: config.modelName,
+        model: current.modelName,
+        provider: current.imageProvider,
       })
     );
   } catch (error) {
@@ -258,6 +333,7 @@ export function toClientGeneration(record: GenerationRecord) {
     status: record.status,
     requestId: record.requestId,
     modelName: record.modelName,
+    imageProvider: record.imageProvider ?? "minimax",
     aspectRatio: record.aspectRatio,
     promptTruncated: record.promptTruncated,
     createdAt: record.createdAt,
@@ -284,6 +360,7 @@ export function toAdminGeneration(record: GenerationRecord) {
     requestId: record.requestId,
     status: record.status,
     modelName: record.modelName,
+    imageProvider: record.imageProvider ?? "minimax",
     aspectRatio: record.aspectRatio,
     promptTruncated: record.promptTruncated,
     promptCharCount: record.promptCharCount,

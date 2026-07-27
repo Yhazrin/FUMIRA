@@ -42,6 +42,8 @@ struct PosterKeywordHero: View {
     /// Permission and compact utility surfaces can keep the expressive keyword
     /// treatment without adding an unrelated English script label.
     var showsScriptLabel = true
+    /// Keeps all keyword segments on one line for space-constrained headers.
+    var compact = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -131,22 +133,30 @@ struct PosterKeywordHero: View {
 
     var body: some View {
         VStack(alignment: stackAlignment, spacing: PosterSpacing.sm) {
-            keywordStack
-            if moment != .invite, showsScriptLabel {
-                HandDrawnUnderline()
-                    .stroke(PosterPalette.leafGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .frame(width: underlineWidth, height: 10)
-                    .opacity(0.9)
-
-                Text(scriptLabel)
-                    .font(PosterTypography.script(22))
-                    .foregroundStyle(scriptTone)
+            if compact {
+                HStack(alignment: .lastTextBaseline, spacing: PosterSpacing.sm) {
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
+                        segmentView(segment, index: index)
+                    }
+                }
             } else {
-                Text("FUMIRA  /  FUTURE CAMERA")
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.7)
-                    .foregroundStyle(PosterPalette.skyDeep.opacity(0.72))
-                    .padding(.top, PosterSpacing.xs)
+                keywordStack
+                if moment != .invite, showsScriptLabel {
+                    HandDrawnUnderline()
+                        .stroke(PosterPalette.leafGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        .frame(width: underlineWidth, height: 10)
+                        .opacity(0.9)
+
+                    Text(scriptLabel)
+                        .font(PosterTypography.script(22))
+                        .foregroundStyle(scriptTone)
+                } else if moment == .invite {
+                    Text("FUMIRA  /  FUTURE CAMERA")
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.7)
+                        .foregroundStyle(PosterPalette.skyDeep.opacity(0.72))
+                        .padding(.top, PosterSpacing.xs)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: alignment)
@@ -184,15 +194,22 @@ struct PosterKeywordHero: View {
             }
         case .connecting:
             VStack(alignment: .trailing, spacing: PosterSpacing.xs) {
-                ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                    segmentView(segment, index: index)
+                HStack(spacing: PosterSpacing.sm) {
+                    segmentView(segments[0], index: 0)
+                    segmentView(segments[1], index: 1)
+                }
+                HStack(spacing: PosterSpacing.sm) {
+                    segmentView(segments[2], index: 2)
+                    segmentView(segments[3], index: 3)
                 }
             }
         case .ready, .reply:
             VStack(alignment: .leading, spacing: PosterSpacing.xs) {
-                ForEach(Array(segments.enumerated()), id: \.element.id) { index, segment in
-                    segmentView(segment, index: index)
+                HStack(spacing: PosterSpacing.sm) {
+                    segmentView(segments[0], index: 0)
+                    segmentView(segments[1], index: 1)
                 }
+                segmentView(segments[2], index: 2)
             }
         }
     }
@@ -206,6 +223,8 @@ struct PosterKeywordHero: View {
             .font(PosterTypography.display(size ?? fontSize))
             .foregroundStyle(segment.color)
             .rotationEffect(.degrees(rotation(for: index)))
+            .lineLimit(1)
+            .minimumScaleFactor(0.76)
             .overlay(alignment: .bottom) {
                 if segment.underlined {
                     HandDrawnUnderline()

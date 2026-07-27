@@ -15,8 +15,9 @@ duplicate/displaced invite title behavior, and eliminate the ochre accent.
   photorealistic 3D, continuous floating, neon gradients, or particle noise.
 - Camera preview, shutter, waveform, title, body copy, and CTA must remain
   stable under device tilt. Only decorative background planes may move.
-- Replace the ochre `moss` accent (`#C9B35A`) with a fresh leaf-green accent.
-  The new accent must not read as yellow, brown, gold, mustard, or fluorescent.
+- Replace the ochre `moss` accent (`#C9B35A`) with the Doraemon-like
+  `actionBlue` for controls, progress, and time selection. Landscape
+  illustration may retain leaf green as a non-interactive natural color.
 
 ## Waveform requirements
 
@@ -90,6 +91,17 @@ The effect must read as layered screen printing, not a floating glass card.
 - No continuous animation when the view is idle.
 - Avoid animating layout size, alignment, or padding.
 
+## System camera surface
+
+- The top camera chrome keeps one capsule on each side of the Dynamic Island.
+- The trailing capsule triggers a real ActivityKit Live Activity. On systems
+  that support transient Live Activities, the system presents the expanded
+  Dynamic Island camera deck; iOS 17 retains the standard Live Activity fallback.
+- Compact and minimal presentations show camera status and zoom. The expanded
+  presentation exposes flash, lens, grid, and aspect-ratio deep-link actions.
+- The WidgetKit extension renders state only. Capture and AVCaptureSession
+  ownership remain in the main app.
+
 ## Required tests and verification
 
 - Pure geometry tests prove the active peak is strictly taller than all
@@ -97,8 +109,8 @@ The effect must read as layered screen printing, not a floating glass card.
 - Continuity tests cover nearby selected values.
 - VoiceOver tests prove NOW adjusts to +1 day and -1 day and endpoints clamp.
 - Existing nonlinear time mapping tests remain unchanged and pass.
-- Verify no `#C9B35A`, “苔黄”, or direct `PosterPalette.moss` product use remains.
+- Verify no `#C9B35A`, “苔黄”, or direct `PosterPalette.moss` product use remains,
+  and no interactive control uses green as its active color.
 - Build the simulator target and run the full test suite.
 - Inspect Swift 6 concurrency diagnostics.
 - Verify Reduce Motion and Low Power behavior in code and previews.
-

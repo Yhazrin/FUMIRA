@@ -3,6 +3,7 @@ import Foundation
 struct AppDependencies {
     let camera: any CameraService
     let cameraPreview: any CameraPreviewFactory
+    let cameraActivity: any CameraLiveActivityService
     let hardware: any HardwareController
     let understanding: any ImageUnderstandingProvider
     let story: any StoryProvider
@@ -12,6 +13,34 @@ struct AppDependencies {
     let storage: any PosterStorage
     let haptics: any HapticsClient
     let motionField: any MotionFieldProviding
+
+    init(
+        camera: any CameraService,
+        cameraPreview: any CameraPreviewFactory,
+        hardware: any HardwareController,
+        understanding: any ImageUnderstandingProvider,
+        story: any StoryProvider,
+        generation: any GenerationProvider,
+        modelCatalog: any AIModelCatalogProvider,
+        modelConfigurationStore: any AIModelConfigurationStore,
+        storage: any PosterStorage,
+        haptics: any HapticsClient,
+        motionField: any MotionFieldProviding,
+        cameraActivity: any CameraLiveActivityService = MockCameraLiveActivityService()
+    ) {
+        self.camera = camera
+        self.cameraPreview = cameraPreview
+        self.cameraActivity = cameraActivity
+        self.hardware = hardware
+        self.understanding = understanding
+        self.story = story
+        self.generation = generation
+        self.modelCatalog = modelCatalog
+        self.modelConfigurationStore = modelConfigurationStore
+        self.storage = storage
+        self.haptics = haptics
+        self.motionField = motionField
+    }
 
     static var preview: AppDependencies {
         AppDependencies(
@@ -64,7 +93,8 @@ struct AppDependencies {
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
             storage: PhotoLibraryPosterStorage(),
             haptics: LiveHapticsClient(),
-            motionField: MockMotionFieldService()
+            motionField: MockMotionFieldService(),
+            cameraActivity: LiveCameraLiveActivityService()
         )
         #else
         let liveCamera = LiveCameraService()
@@ -79,7 +109,8 @@ struct AppDependencies {
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
             storage: PhotoLibraryPosterStorage(),
             haptics: LiveHapticsClient(),
-            motionField: CoreMotionFieldService()
+            motionField: CoreMotionFieldService(),
+            cameraActivity: LiveCameraLiveActivityService()
         )
         #endif
     }

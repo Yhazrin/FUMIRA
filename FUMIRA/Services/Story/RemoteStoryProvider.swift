@@ -32,7 +32,8 @@ actor RemoteStoryProvider: StoryProvider {
     private func createStory(request: StoryRequest) async throws -> TemporalStory {
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/stories"))
         urlRequest.httpMethod = "POST"
-        urlRequest.timeoutInterval = 95
+        // The relay may retry one structurally invalid story response.
+        urlRequest.timeoutInterval = 210
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try JSONEncoder().encode(StoryRelayRequest(
             understanding: SceneUnderstandingRelayDTO(request.understanding),
@@ -98,6 +99,11 @@ private struct SceneUnderstandingRelayDTO: Codable {
     let timeClues: [String]
     let changeDrivers: [String]
     let subjects: [SceneSubjectRelayDTO]
+    let cameraLock: CameraLockRelayDTO?
+    let spatialAnchors: [SpatialAnchorRelayDTO]?
+    let temporalLayers: [TemporalLayerRelayDTO]?
+    let storySeeds: [String]?
+    let hardConstraints: [String]?
 
     init(_ understanding: SceneUnderstanding) {
         summary = understanding.summary
@@ -106,6 +112,57 @@ private struct SceneUnderstandingRelayDTO: Codable {
         timeClues = understanding.timeClues
         changeDrivers = understanding.changeDrivers
         subjects = understanding.subjects.map(SceneSubjectRelayDTO.init)
+        cameraLock = understanding.cameraLock.map(CameraLockRelayDTO.init)
+        spatialAnchors = understanding.spatialAnchors?.map(SpatialAnchorRelayDTO.init)
+        temporalLayers = understanding.temporalLayers?.map(TemporalLayerRelayDTO.init)
+        storySeeds = understanding.storySeeds
+        hardConstraints = understanding.hardConstraints
+    }
+}
+
+private struct CameraLockRelayDTO: Codable {
+    let viewpoint: String?
+    let lensAndPerspective: String?
+    let horizon: String?
+    let depthStructure: String?
+
+    init(_ lock: CameraLock) {
+        viewpoint = lock.viewpoint
+        lensAndPerspective = lock.lensAndPerspective
+        horizon = lock.horizon
+        depthStructure = lock.depthStructure
+    }
+}
+
+private struct SpatialAnchorRelayDTO: Codable {
+    let name: String
+    let depth: String?
+    let position: String?
+    let geometry: String?
+    let identityLock: String?
+
+    init(_ anchor: SpatialAnchor) {
+        name = anchor.name
+        depth = anchor.depth
+        position = anchor.position
+        geometry = anchor.geometry
+        identityLock = anchor.identityLock
+    }
+}
+
+private struct TemporalLayerRelayDTO: Codable {
+    let layer: String
+    let visibleEvidence: String?
+    let pastPotential: String?
+    let futurePotential: String?
+    let confidence: Double?
+
+    init(_ layer: TemporalLayer) {
+        self.layer = layer.layer
+        visibleEvidence = layer.visibleEvidence
+        pastPotential = layer.pastPotential
+        futurePotential = layer.futurePotential
+        confidence = layer.confidence
     }
 }
 
@@ -144,13 +201,27 @@ private struct StoryBeatRelayDTO: Codable {
     let title: String
     let narrative: String
     let visualPrompt: String
+    let transitionCause: String?
+    let unchangedAnchors: [String]?
+    let foregroundDelta: String?
+    let midgroundDelta: String?
+    let backgroundDelta: String?
+    let subjectDelta: String?
+    let environmentDelta: String?
 
     var storyBeat: StoryBeat {
         StoryBeat(
             anchorYears: anchorYears,
             title: title,
             narrative: narrative,
-            visualPrompt: visualPrompt
+            visualPrompt: visualPrompt,
+            transitionCause: transitionCause,
+            unchangedAnchors: unchangedAnchors,
+            foregroundDelta: foregroundDelta,
+            midgroundDelta: midgroundDelta,
+            backgroundDelta: backgroundDelta,
+            subjectDelta: subjectDelta,
+            environmentDelta: environmentDelta
         )
     }
 }

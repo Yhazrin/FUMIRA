@@ -1,56 +1,30 @@
 import SwiftUI
 
+/// Shutter dwell stage — chrome only. The persistent hero hosts the photo body.
 struct ShutterFeedbackView: View {
     let model: AppModel
     var namespace: Namespace.ID
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var flashOpacity = 0.0
-
     var body: some View {
-        ZStack {
-            PosterPalette.canvas.ignoresSafeArea()
+        GeometryReader { proxy in
+            let layout = CameraCompositionGeometry.layout(
+                aspectRatio: model.cameraAspectRatio,
+                in: proxy.size
+            )
 
-            CapturedPhotoView(photo: model.capturedPhoto, cornerRadius: 0)
-            .modifier(CapturedPhotoGeometry(
-                namespace: namespace,
-                reduceMotion: reduceMotion
-            ))
-            .opacity(reduceMotion ? 0.85 : 0.7)
-            .ignoresSafeArea()
-
-            PosterPalette.canvas
-                .opacity(flashOpacity)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
+            // Same local place+measure path as ViewfinderView so the hero does
+            // not jump when the phase flips to shuttered.
+            HeroPhotoSlot(
+                owner: .shuttered,
+                aspectRatio: layout.heroFrame.width / max(layout.heroFrame.height, 1),
+                cornerRadius: layout.cornerRadius,
+                fixedFrame: layout.heroFrame
+            )
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .onAppear {
-            guard !reduceMotion else {
-                flashOpacity = 0.6
-                return
-            }
-            withAnimation(.linear(duration: PosterMotion.micro)) {
-                flashOpacity = 0.85
-            }
-            withAnimation(.linear(duration: PosterMotion.micro).delay(PosterMotion.micro)) {
-                flashOpacity = 0
-            }
-        }
+        .ignoresSafeArea()
         .accessibilityLabel("快门反馈")
         .accessibilityAddTraits(.updatesFrequently)
-    }
-}
-
-private struct CapturedPhotoGeometry: ViewModifier {
-    let namespace: Namespace.ID
-    let reduceMotion: Bool
-
-    func body(content: Content) -> some View {
-        if reduceMotion {
-            content
-        } else {
-            content.matchedGeometryEffect(id: "camera-photo", in: namespace)
-        }
     }
 }
 

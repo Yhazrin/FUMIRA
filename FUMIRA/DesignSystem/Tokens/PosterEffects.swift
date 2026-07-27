@@ -19,4 +19,19 @@ enum PosterEffects {
     static let cameraShutterRing = PosterPalette.paperWhite.opacity(0.92)
     static let cameraShutterFill = PosterPalette.paperWhite.opacity(0.88)
     static let cameraFlashWash = PosterPalette.paperWhite
+
+    /// Adaptive composition glass tint layered over the system material.
+    static let cameraCompositionLightTint = PosterPalette.paperWhite.opacity(0.10)
+    static let cameraCompositionDarkTint = PosterPalette.ink.opacity(0.18)
+    static let cameraCompositionStroke = PosterPalette.paperWhite.opacity(0.34)
+    static let cameraShutterBodyShadow = PosterPalette.cameraShutterBlueDeep.opacity(0.42)
+    static let cameraShutterFaceStroke = PosterPalette.cameraShutterBlue.opacity(0.20)
+    static let cameraShutterTopHighlight = PosterPalette.paperWhite.opacity(0.30)
+
+    static let photoPaperStroke = PosterPalette.ink.opacity(0.12)
+    static let photoPaperFiber = PosterPalette.ink.opacity(0.055)
+    static let photoPaperFooterMark = PosterPalette.ink.opacity(0.32)
+    static let photoPaperShadow = PosterPalette.ink.opacity(0.28)
+    static let photoPaperLandingShadowRadius: CGFloat = 20
+    static let photoPaperLandingShadowOffset: CGFloat = 13
 }

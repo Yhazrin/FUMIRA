@@ -2,82 +2,92 @@ import SwiftUI
 
 struct UnderstandingView: View {
     let model: AppModel
+    var namespace: Namespace.ID?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var scanPosition = -0.8
+    @State private var chromeVisible = false
 
     private var photoAspectRatio: CGFloat {
-        CGFloat(model.capturedPhoto?.displayAspectRatio ?? 3.0 / 4.0)
+        CGFloat(
+            model.generatedPhoto?.displayAspectRatio
+                ?? model.capturedPhoto?.displayAspectRatio
+                ?? 3.0 / 4.0
+        )
     }
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.skyDeep) {
-            VStack(alignment: .leading, spacing: PosterSpacing.lg) {
-                PosterTitleView(
-                    segments: ["先", "读懂", "这一刻"],
-                    color: PosterPalette.paperWhite,
-                    fontSize: 36
-                )
+        ZStack {
+            // Backdrop owned by RootView — keep page chrome transparent to it.
+            Color.clear
 
-                PhotoAspectContainer(
+            VStack(alignment: .leading, spacing: 0) {
+                Label("目标 \(model.generationTargetTime.compactLabel)", systemImage: "checkmark.seal.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(PosterPalette.actionBlueDeep)
+
+                Text("它已经到了，先不揭晓")
+                    .font(PosterTypography.display(32))
+                    .foregroundStyle(PosterPalette.ink)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, PosterSpacing.xs)
+                .opacity(chromeVisible ? 1 : 0)
+                .offset(y: chromeVisible ? 0 : -8)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, PosterSpacing.lg)
+            .padding(.top, PosterSpacing.xl + PosterSpacing.md)
+
+            // RootView's persistent hero lands just below the screen center,
+            // so the captured frame travels downward as it becomes paper.
+            GeometryReader { proxy in
+                let rootBounds = proxy.frame(in: .named(HeroCoordinateSpace.name))
+                let localFrame = HeroPhotoMetrics.understandingFrame(
                     aspectRatio: photoAspectRatio,
-                    maximumHeight: 400
-                ) {
-                    ZStack {
-                        CapturedPhotoView(photo: model.capturedPhoto)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    in: proxy.size
+                )
+                HeroPhotoFrameReporter(
+                    owner: .understanding,
+                    frame: localFrame.offsetBy(
+                        dx: rootBounds.minX,
+                        dy: rootBounds.minY
+                    ),
+                    cornerRadius: PosterRadius.photoPaper
+                )
+            }
 
-                        GeometryReader { proxy in
-                            Rectangle()
-                                .fill(PosterPalette.leafGreen)
-                                .frame(height: 4)
-                                .shadow(color: PosterPalette.leafGreen, radius: 12)
-                                .offset(y: proxy.size.height * scanPosition)
-                        }
-                        .opacity(reduceMotion ? 0 : 0.9)
-
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Label(
-                                    model.modelOption(for: .understanding)?.displayName ?? "图片理解",
-                                    systemImage: "viewfinder"
-                                )
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PosterPalette.ink)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(PosterPalette.leafGreen)
-                                .clipShape(Capsule())
-                                Spacer()
-                            }
-                            .padding(PosterSpacing.md)
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
-                }
-
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
                 VStack(alignment: .leading, spacing: PosterSpacing.sm) {
                     Text(model.pipelineStatusText)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(PosterPalette.paperWhite)
+                        .foregroundStyle(PosterPalette.ink)
 
                     ProgressView(value: model.understandingProgress)
-                        .tint(PosterPalette.leafGreen)
+                        .tint(PosterPalette.actionBlue)
                         .scaleEffect(x: 1, y: 2, anchor: .center)
 
-                    Text("\(Int(model.understandingProgress * 100))% · 正在识别主体、空间与变化线索")
+                    Text("\(Int(model.understandingProgress * 100))% · 正在读取生成照片中的可见细节，完成前保持封存")
                         .font(.footnote)
-                        .foregroundStyle(PosterPalette.paperWhite.opacity(0.72))
+                        .foregroundStyle(PosterPalette.mutedInk)
                 }
+                .opacity(chromeVisible ? 1 : 0)
+                .offset(y: chromeVisible ? 0 : 10)
 
-                Spacer(minLength: PosterSpacing.sm)
             }
+            .padding(.horizontal, PosterSpacing.lg)
+            .padding(.bottom, PosterSpacing.xl + PosterSpacing.md)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 1.6).repeatForever(autoreverses: true)) {
-                scanPosition = 0.8
+            if reduceMotion {
+                chromeVisible = true
+            } else {
+                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: PosterMotion.phaseTransition)) {
+                    chromeVisible = true
+                }
             }
         }
     }

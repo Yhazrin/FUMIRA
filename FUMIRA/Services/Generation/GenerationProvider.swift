@@ -2,11 +2,15 @@ import Foundation
 
 struct ImageGenerationRequest: Sendable {
     let photo: CapturedPhoto
-    let understanding: SceneUnderstanding
-    let story: TemporalStory
     let time: TimePosition
+    /// Mock/offline display only. Live remote generation ignores this; the
+    /// server authors the prompt from time + optional Scene Bible / beat.
+    let prompt: String
     let sessionID: UUID
     let model: AIModelOption
+    var understanding: SceneUnderstanding? = nil
+    var temporalStory: TemporalStory? = nil
+    var storyBeat: StoryBeat? = nil
 }
 
 protocol GenerationProvider: Sendable {
@@ -91,13 +95,9 @@ actor MockGenerationProvider: GenerationProvider {
                     continuation.yield(.completed(GeneratedFrame(
                         sessionID: request.sessionID,
                         time: request.time,
-                        storyBeatID: request.story.beat(for: request.time)?.id,
-                        prompt: request.story.generationPrompt(
-                            for: request.time,
-                            understanding: request.understanding
-                        ),
+                        prompt: request.prompt,
                         modelOptionID: request.model.id,
-                        imageData: nil
+                        imageData: request.photo.data
                     )))
                     continuation.finish()
                 } catch is CancellationError {

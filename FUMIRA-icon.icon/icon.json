@@ -19,18 +19,21 @@
     {
       "layers" : [
         {
+          "fill" : "automatic",
+          "glass" : true,
           "image-name" : "Plugin icon - 5.svg",
           "name" : "Plugin icon - 5",
-          "opacity" : 0.5,
+          "opacity" : 1,
           "position" : {
             "scale" : 0.9,
             "translation-in-points" : [
-              -18.030265431521457,
-              21.63373122156463
+              -21.237305248484176,
+              68.00145896478296
             ]
           }
         },
         {
+          "blend-mode" : "normal",
           "image-name" : "Plugin icon - 4.svg",
           "name" : "Plugin icon - 4",
           "position" : {
@@ -42,10 +45,13 @@
           }
         },
         {
+          "glass" : false,
           "image-name" : "Plugin icon - 3.svg",
-          "name" : "Plugin icon - 3"
+          "name" : "Plugin icon - 3",
+          "opacity" : 1
         },
         {
+          "glass" : false,
           "image-name" : "Plugin icon - 2.svg",
           "name" : "Plugin icon - 2",
           "position" : {

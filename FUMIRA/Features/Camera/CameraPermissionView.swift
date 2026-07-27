@@ -12,8 +12,8 @@ struct CameraPermissionView: View {
             if showPrompt {
                 promptContent
             } else {
-                // Quiet hold while already-authorized sessions jump to the viewfinder.
-                Color.clear
+                // Solid hold (not Color.clear) while auto-skipping to the viewfinder.
+                PosterPalette.canvas
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityLabel("正在进入取景器")
             }
@@ -29,9 +29,9 @@ struct CameraPermissionView: View {
 
             Image(systemName: "camera.fill")
                 .font(.system(size: 34, weight: .medium))
-                .foregroundStyle(PosterPalette.skyDeep)
+                .foregroundStyle(PosterPalette.actionBlueDeep)
                 .frame(width: 64, height: 64)
-                .background(PosterPalette.leafGreen.opacity(0.18))
+                .background(PosterPalette.actionBlue.opacity(0.14))
                 .clipShape(Circle())
                 .accessibilityHidden(true)
 

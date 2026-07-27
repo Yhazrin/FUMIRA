@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum CameraChromeMetrics {
+    static let topRowHeight: CGFloat = 48
+    static let islandSideCapsuleWidth: CGFloat = 60
+    static let islandSideCapsuleHeight: CGFloat = 44
+}
+
 /// Lightweight circular control for immersive camera chrome — no thick cards.
 struct CameraChromeButton: View {
     let systemImage: String

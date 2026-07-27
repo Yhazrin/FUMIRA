@@ -17,14 +17,15 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    continuation.yield(.progress(label: "整理相机原片", value: 0.12))
+                    continuation.yield(.progress(label: "封存源照片", value: 0.12))
                     let assetID = try await upload(photo: request.photo)
-                    continuation.yield(.progress(label: "MiniMax 正在理解画面", value: 0.48))
+                    continuation.yield(.progress(label: "正在读取源场景圣经", value: 0.48))
                     let understanding = try await understand(
                         assetID: assetID,
+                        targetTime: request.targetTime,
                         requestID: request.sessionID
                     )
-                    continuation.yield(.progress(label: "提取时间变化线索", value: 0.82))
+                    continuation.yield(.progress(label: "锁定空间锚点与时间层", value: 0.82))
                     continuation.yield(.completed(understanding))
                     continuation.finish()
                 } catch is CancellationError {
@@ -67,13 +68,19 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
         return try JSONDecoder().decode(UploadResponse.self, from: data).assetId
     }
 
-    private func understand(assetID: String, requestID: UUID) async throws -> SceneUnderstanding {
+    private func understand(
+        assetID: String,
+        targetTime: TimePosition,
+        requestID: UUID
+    ) async throws -> SceneUnderstanding {
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/understand"))
         urlRequest.httpMethod = "POST"
-        urlRequest.timeoutInterval = 95
+        // The relay may retry one malformed VLM response before returning.
+        urlRequest.timeoutInterval = 210
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try JSONEncoder().encode(UnderstandRequest(
             sourceAssetId: assetID,
+            targetTime: UnderstandingTargetTimeRelayDTO(targetTime),
             copyConstraints: .appLayout,
             requestId: requestID.uuidString
         ))
@@ -90,6 +97,22 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
         if error is DecodingError {
             return GenerationError.generationFailed(message: "图片理解返回格式异常，请重试。")
         }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut:
+                return GenerationError.timedOut
+            case .notConnectedToInternet,
+                 .networkConnectionLost,
+                 .cannotConnectToHost,
+                 .cannotFindHost,
+                 .dnsLookupFailed,
+                 .internationalRoamingOff,
+                 .dataNotAllowed:
+                return GenerationError.networkFailure
+            default:
+                return GenerationError.networkFailure
+            }
+        }
         return error
     }
 }
@@ -100,8 +123,19 @@ private struct UploadResponse: Decodable {
 
 private struct UnderstandRequest: Encodable {
     let sourceAssetId: String
+    let targetTime: UnderstandingTargetTimeRelayDTO
     let copyConstraints: UnderstandingCopyConstraintsRelayDTO
     let requestId: String
+}
+
+private struct UnderstandingTargetTimeRelayDTO: Codable {
+    let offsetYears: Double
+    let compactLabel: String
+
+    init(_ time: TimePosition) {
+        offsetYears = time.offsetYears
+        compactLabel = time.compactLabel
+    }
 }
 
 private struct UnderstandingCopyConstraintsRelayDTO: Codable {
@@ -135,6 +169,11 @@ private struct SceneUnderstandingDTO: Codable {
     let timeClues: [String]
     let changeDrivers: [String]
     let subjects: [SceneSubjectDTO]
+    let cameraLock: CameraLockDTO?
+    let spatialAnchors: [SpatialAnchorDTO]?
+    let temporalLayers: [TemporalLayerDTO]?
+    let storySeeds: [String]?
+    let hardConstraints: [String]?
 
     var sceneUnderstanding: SceneUnderstanding {
         SceneUnderstanding(
@@ -143,7 +182,64 @@ private struct SceneUnderstandingDTO: Codable {
             visualMood: visualMood,
             timeClues: timeClues,
             changeDrivers: changeDrivers,
-            subjects: subjects.map(\.sceneSubject)
+            subjects: subjects.map(\.sceneSubject),
+            cameraLock: cameraLock.map(\.cameraLock),
+            spatialAnchors: spatialAnchors?.map(\.spatialAnchor),
+            temporalLayers: temporalLayers?.map(\.temporalLayer),
+            storySeeds: storySeeds,
+            hardConstraints: hardConstraints
+        )
+    }
+}
+
+private struct CameraLockDTO: Codable {
+    let viewpoint: String?
+    let lensAndPerspective: String?
+    let horizon: String?
+    let depthStructure: String?
+
+    var cameraLock: CameraLock {
+        CameraLock(
+            viewpoint: viewpoint,
+            lensAndPerspective: lensAndPerspective,
+            horizon: horizon,
+            depthStructure: depthStructure
+        )
+    }
+}
+
+private struct SpatialAnchorDTO: Codable {
+    let name: String
+    let depth: String?
+    let position: String?
+    let geometry: String?
+    let identityLock: String?
+
+    var spatialAnchor: SpatialAnchor {
+        SpatialAnchor(
+            name: name,
+            depth: depth,
+            position: position,
+            geometry: geometry,
+            identityLock: identityLock
+        )
+    }
+}
+
+private struct TemporalLayerDTO: Codable {
+    let layer: String
+    let visibleEvidence: String?
+    let pastPotential: String?
+    let futurePotential: String?
+    let confidence: Double?
+
+    var temporalLayer: TemporalLayer {
+        TemporalLayer(
+            layer: layer,
+            visibleEvidence: visibleEvidence,
+            pastPotential: pastPotential,
+            futurePotential: futurePotential,
+            confidence: confidence
         )
     }
 }
@@ -168,15 +264,22 @@ private func decodeError(data: Data, fallback: GenerationError) -> GenerationErr
     guard let payload = try? JSONDecoder().decode(RelayAPIError.self, from: data) else {
         return fallback
     }
+    let message = payload.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
     switch payload.errorCode {
     case "invalid_source_asset", "invalid_image", "file_too_large", "unsupported_content_type":
         return .uploadFailure
     case "intelligence_network":
-        return .networkFailure
-    case "understanding_unavailable", "unauthorized":
+        // Server→MiniMax failed. Do NOT map to client networkFailure — Safari can
+        // still reach the Mac while the relay cannot reach the vendor.
+        return .generationFailed(
+            message: (message?.isEmpty == false)
+                ? message!
+                : "中转服务无法连接图片理解上游，请稍后重试。"
+        )
+    case "understanding_unavailable", "unauthorized", "vision_credentials_required":
         return .serverUnavailable
     default:
-        return .generationFailed(message: payload.userMessage ?? "图片理解失败，请重试。")
+        return .generationFailed(message: message ?? "图片理解失败，请重试。")
     }
 }
 

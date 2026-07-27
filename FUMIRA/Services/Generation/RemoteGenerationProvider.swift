@@ -4,6 +4,13 @@ import Foundation
 /// Flow: upload JPEG → create generation → poll until succeeded/failed → download result.
 /// Vendor credentials never leave the server.
 actor RemoteGenerationProvider: GenerationProvider {
+    static let defaultPollIntervalNanoseconds: UInt64 = 800_000_000
+    static let defaultMaxPollAttempts = 600
+    static let defaultPollingWindowSeconds =
+        Double(defaultPollIntervalNanoseconds)
+        / 1_000_000_000
+        * Double(defaultMaxPollAttempts)
+
     private let baseURL: URL
     private let session: URLSession
     private let pollIntervalNanoseconds: UInt64
@@ -14,8 +21,8 @@ actor RemoteGenerationProvider: GenerationProvider {
     init(
         baseURL: URL,
         session: URLSession = .shared,
-        pollIntervalNanoseconds: UInt64 = 800_000_000,
-        maxPollAttempts: Int = 180
+        pollIntervalNanoseconds: UInt64 = RemoteGenerationProvider.defaultPollIntervalNanoseconds,
+        maxPollAttempts: Int = RemoteGenerationProvider.defaultMaxPollAttempts
     ) {
         self.baseURL = baseURL
         self.session = session
@@ -65,15 +72,10 @@ actor RemoteGenerationProvider: GenerationProvider {
                     ))
                     let imageData = try await download(resultURL: resultURL)
 
-                    let prompt = request.story.generationPrompt(
-                        for: request.time,
-                        understanding: request.understanding
-                    )
                     continuation.yield(.completed(GeneratedFrame(
                         sessionID: request.sessionID,
                         time: request.time,
-                        storyBeatID: request.story.beat(for: request.time)?.id,
-                        prompt: prompt,
+                        prompt: request.prompt,
                         modelOptionID: request.model.id,
                         imageData: imageData
                     )))
@@ -158,16 +160,15 @@ actor RemoteGenerationProvider: GenerationProvider {
         inFlightRequestIDs.insert(requestId)
         defer { inFlightRequestIDs.remove(requestId) }
 
-        let storyText = request.story.generationPrompt(
-            for: request.time,
-            understanding: request.understanding
-        )
         let payload = CreateGenerationRequest(
             sourceAssetId: assetId,
             timePosition: TimePositionDTO(time: request.time),
-            story: storyText,
             aspectRatio: Self.aspectRatio(for: request.photo),
-            requestId: requestId
+            imageProvider: request.model.provider.imageGenerationRoute ?? "minimax",
+            requestId: requestId,
+            understanding: request.understanding.map(SceneUnderstandingRelayDTO.init),
+            temporalStory: request.temporalStory.map(TemporalStoryRelayDTO.init),
+            storyBeat: request.storyBeat.map(StoryBeatRelayDTO.init)
         )
 
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/generations"))
@@ -214,11 +215,17 @@ actor RemoteGenerationProvider: GenerationProvider {
             switch status.status {
             case "queued":
                 let fraction = min(0.5, 0.35 + Double(attempt) * 0.008)
-                onProgress("时间正在排队生长", fraction, .queued)
+                let label = attempt >= 180
+                    ? "生成服务仍在排队，已为你继续等待"
+                    : "时间正在排队生长"
+                onProgress(label, fraction, .queued)
                 try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
             case "processing":
                 let fraction = min(0.9, 0.5 + Double(attempt) * 0.01)
-                onProgress("时间正在生长", fraction, .processing)
+                let label = attempt >= 180
+                    ? "这一帧仍在精细生长，请继续等待"
+                    : "时间正在生长"
+                onProgress(label, fraction, .processing)
                 try await Task.sleep(nanoseconds: pollIntervalNanoseconds)
             case "succeeded":
                 onProgress("这一帧已经长成", 0.9, .finishing)
@@ -340,7 +347,7 @@ actor RemoteGenerationProvider: GenerationProvider {
         retryable: Bool?
     ) -> GenerationError {
         switch errorCode {
-        case "invalid_params", "invalid_aspect_ratio", "missing_story",
+        case "invalid_params", "invalid_aspect_ratio", "invalid_image_provider", "missing_prompt",
              "invalid_time_position", "invalid_source_asset", "missing_request_id":
             return .invalidParameters
         case "rate_limited":
@@ -370,9 +377,142 @@ private struct UploadResponse: Decodable {
 private struct CreateGenerationRequest: Encodable {
     let sourceAssetId: String
     let timePosition: TimePositionDTO
-    let story: String
     let aspectRatio: String
+    let imageProvider: String
     let requestId: String
+    let understanding: SceneUnderstandingRelayDTO?
+    let temporalStory: TemporalStoryRelayDTO?
+    let storyBeat: StoryBeatRelayDTO?
+}
+
+private struct SceneUnderstandingRelayDTO: Encodable {
+    let summary: String
+    let locationType: String
+    let visualMood: String
+    let timeClues: [String]
+    let changeDrivers: [String]
+    let subjects: [SceneSubjectRelayDTO]
+    let cameraLock: CameraLockRelayDTO?
+    let spatialAnchors: [SpatialAnchorRelayDTO]?
+    let temporalLayers: [TemporalLayerRelayDTO]?
+    let storySeeds: [String]?
+    let hardConstraints: [String]?
+
+    init(_ understanding: SceneUnderstanding) {
+        summary = understanding.summary
+        locationType = understanding.locationType
+        visualMood = understanding.visualMood
+        timeClues = understanding.timeClues
+        changeDrivers = understanding.changeDrivers
+        subjects = understanding.subjects.map(SceneSubjectRelayDTO.init)
+        cameraLock = understanding.cameraLock.map(CameraLockRelayDTO.init)
+        spatialAnchors = understanding.spatialAnchors?.map(SpatialAnchorRelayDTO.init)
+        temporalLayers = understanding.temporalLayers?.map(TemporalLayerRelayDTO.init)
+        storySeeds = understanding.storySeeds
+        hardConstraints = understanding.hardConstraints
+    }
+}
+
+private struct SceneSubjectRelayDTO: Encodable {
+    let name: String
+    let confidence: Double
+    let identityRule: String
+
+    init(_ subject: SceneSubject) {
+        name = subject.name
+        confidence = subject.confidence
+        identityRule = subject.identityRule
+    }
+}
+
+private struct CameraLockRelayDTO: Encodable {
+    let viewpoint: String?
+    let lensAndPerspective: String?
+    let horizon: String?
+    let depthStructure: String?
+
+    init(_ lock: CameraLock) {
+        viewpoint = lock.viewpoint
+        lensAndPerspective = lock.lensAndPerspective
+        horizon = lock.horizon
+        depthStructure = lock.depthStructure
+    }
+}
+
+private struct SpatialAnchorRelayDTO: Encodable {
+    let name: String
+    let depth: String?
+    let position: String?
+    let geometry: String?
+    let identityLock: String?
+
+    init(_ anchor: SpatialAnchor) {
+        name = anchor.name
+        depth = anchor.depth
+        position = anchor.position
+        geometry = anchor.geometry
+        identityLock = anchor.identityLock
+    }
+}
+
+private struct TemporalLayerRelayDTO: Encodable {
+    let layer: String
+    let visibleEvidence: String?
+    let pastPotential: String?
+    let futurePotential: String?
+    let confidence: Double?
+
+    init(_ layer: TemporalLayer) {
+        self.layer = layer.layer
+        visibleEvidence = layer.visibleEvidence
+        pastPotential = layer.pastPotential
+        futurePotential = layer.futurePotential
+        confidence = layer.confidence
+    }
+}
+
+private struct TemporalStoryRelayDTO: Encodable {
+    let title: String
+    let logline: String
+    let presentTruth: String
+    let identityRules: [String]
+    let beats: [StoryBeatRelayDTO]
+
+    init(_ story: TemporalStory) {
+        title = story.title
+        logline = story.logline
+        presentTruth = story.presentTruth
+        identityRules = story.identityRules
+        beats = story.beats.map(StoryBeatRelayDTO.init)
+    }
+}
+
+private struct StoryBeatRelayDTO: Encodable {
+    let anchorYears: Double
+    let title: String
+    let narrative: String
+    let visualPrompt: String
+    let transitionCause: String?
+    let unchangedAnchors: [String]?
+    let foregroundDelta: String?
+    let midgroundDelta: String?
+    let backgroundDelta: String?
+    let subjectDelta: String?
+    let environmentDelta: String?
+
+    init(_ beat: StoryBeat) {
+        anchorYears = beat.anchorYears
+        title = beat.title
+        narrative = beat.narrative
+        visualPrompt = beat.visualPrompt
+        transitionCause = beat.transitionCause
+        unchangedAnchors = beat.unchangedAnchors
+        foregroundDelta = beat.foregroundDelta
+        midgroundDelta = beat.midgroundDelta
+        backgroundDelta = beat.backgroundDelta
+        subjectDelta = beat.subjectDelta
+        environmentDelta = beat.environmentDelta
+    }
 }
 
 private struct CreateGenerationResponse: Decodable {

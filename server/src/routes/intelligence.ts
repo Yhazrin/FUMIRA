@@ -11,18 +11,28 @@ import type {
 export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: {
     sourceAssetId?: string;
+    targetTime?: { offsetYears?: number; compactLabel?: string };
     copyConstraints?: Partial<UnderstandingCopyConstraints>;
     requestId?: string;
   } }>(
     "/v1/understand",
     async (request, reply) => {
       const body = request.body;
-      if (!body?.sourceAssetId || !body.requestId?.trim()) {
-        return reply.code(400).send(error("invalid_body", "缺少图片或 requestId。", false));
+      if (
+        !body?.sourceAssetId
+        || !body.requestId?.trim()
+        || !Number.isFinite(body.targetTime?.offsetYears)
+        || !body.targetTime?.compactLabel?.trim()
+      ) {
+        return reply.code(400).send(error("invalid_body", "缺少目标图片、目标时间或 requestId。", false));
       }
       const copyConstraints = resolveUnderstandingCopyConstraints(body.copyConstraints);
       const result = await analyzeUploadedAsset({
         sourceAssetId: body.sourceAssetId,
+        targetTime: {
+          offsetYears: body.targetTime.offsetYears as number,
+          compactLabel: body.targetTime.compactLabel.trim(),
+        },
         copyConstraints,
         requestId: body.requestId.trim(),
       });

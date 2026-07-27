@@ -4,6 +4,8 @@ export type GenerationStatus =
   | "succeeded"
   | "failed";
 
+export type ImageGenerationProvider = "minimax" | "apimart";
+
 export type AspectRatio =
   | "1:1"
   | "16:9"
@@ -32,8 +34,21 @@ export interface TimePositionPayload {
 export interface CreateGenerationBody {
   sourceAssetId: string;
   timePosition: TimePositionPayload;
-  story: string;
+  /**
+   * Deprecated client-authored prompt. Ignored when present — the server always
+   * builds the authoritative core prompt from timePosition (+ optional bible/beat).
+   */
+  prompt?: string;
+  /** Backward-compatible field for older app builds. Ignored for prompt authorship. */
+  story?: string;
+  /** Optional Scene Bible from source understanding (story-driven generation). */
+  understanding?: SceneUnderstandingPayload;
+  /** Optional full story; nearest beat is selected when storyBeat is omitted. */
+  temporalStory?: TemporalStoryPayload;
+  /** Optional explicit target beat for story-driven compilation. */
+  storyBeat?: StoryBeatPayload;
   aspectRatio?: AspectRatio;
+  imageProvider?: ImageGenerationProvider;
   requestId: string;
   /** Explicit opt-in for single-person portrait subject_reference. Default false. */
   useSubjectReference?: boolean;
@@ -50,6 +65,7 @@ export interface GenerationRecord {
   finishedAt?: string;
   durationMs?: number;
   modelName: string;
+  imageProvider: ImageGenerationProvider;
   aspectRatio: AspectRatio;
   promptTruncated: boolean;
   promptCharCount: number;
@@ -99,6 +115,31 @@ export interface MiniMaxAdapter {
   generate(input: MiniMaxGenerateInput): Promise<MiniMaxGenerateResult>;
 }
 
+export type ImageGenerationAdapter = MiniMaxAdapter;
+
+export interface CameraLockPayload {
+  viewpoint?: string;
+  lensAndPerspective?: string;
+  horizon?: string;
+  depthStructure?: string;
+}
+
+export interface SpatialAnchorPayload {
+  name: string;
+  depth?: string;
+  position?: string;
+  geometry?: string;
+  identityLock?: string;
+}
+
+export interface TemporalLayerPayload {
+  layer: string;
+  visibleEvidence?: string;
+  pastPotential?: string;
+  futurePotential?: string;
+  confidence?: number;
+}
+
 export interface SceneUnderstandingPayload {
   summary: string;
   locationType: string;
@@ -110,6 +151,12 @@ export interface SceneUnderstandingPayload {
     confidence: number;
     identityRule: string;
   }>;
+  /** Optional Scene Bible extensions (backward compatible). */
+  cameraLock?: CameraLockPayload;
+  spatialAnchors?: SpatialAnchorPayload[];
+  temporalLayers?: TemporalLayerPayload[];
+  storySeeds?: string[];
+  hardConstraints?: string[];
 }
 
 /** Character budgets for image-analysis copy rendered by the client. */
@@ -128,6 +175,14 @@ export interface StoryBeatPayload {
   title: string;
   narrative: string;
   visualPrompt: string;
+  /** Optional panoramic story fields (backward compatible). */
+  transitionCause?: string;
+  unchangedAnchors?: string[];
+  foregroundDelta?: string;
+  midgroundDelta?: string;
+  backgroundDelta?: string;
+  subjectDelta?: string;
+  environmentDelta?: string;
 }
 
 export interface TemporalStoryPayload {
@@ -164,6 +219,7 @@ export type MiniMaxIntelligenceResult<T> =
 export interface MiniMaxIntelligenceAdapter {
   analyzeImage(input: {
     imageDataUrl: string;
+    targetTime: { offsetYears: number; compactLabel: string };
     copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>>;

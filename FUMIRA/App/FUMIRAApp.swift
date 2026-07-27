@@ -7,14 +7,24 @@ struct FUMIRAApp: App {
 
     init() {
         #if DEBUG
+        if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_LIVE_ACTIVITY"] == "trigger" {
+            let auditModel = AppModel(dependencies: .runtime)
+            auditModel.phase = .viewfinder
+            _model = State(initialValue: auditModel)
+            return
+        }
+
         if let phase = DebugAuditPhase.current {
-            _model = State(initialValue: PreviewFixtures.model(
+            let auditModel = PreviewFixtures.model(
                 phase: phase,
                 time: 0.35,
                 progress: 0.62,
                 photoAspectRatio: DebugAuditAspectRatio.current,
                 photoIsLandscape: DebugAuditPhotoOrientation.isLandscape
-            ))
+            )
+            auditModel.isModelSettingsPresented =
+                ProcessInfo.processInfo.environment["FUMIRA_AUDIT_SETTINGS"] == "1"
+            _model = State(initialValue: auditModel)
             return
         }
         #endif
@@ -24,15 +34,35 @@ struct FUMIRAApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(model.phase == .viewfinder ? nil : .light)
                 .task {
                     await model.prepare()
+                    #if DEBUG
+                    await runDebugAuditTransitionIfNeeded()
+                    #endif
                 }
                 .onOpenURL { url in
                     model.handleDeepLink(url)
                 }
         }
     }
+
+    #if DEBUG
+    private func runDebugAuditTransitionIfNeeded() async {
+        switch ProcessInfo.processInfo.environment["FUMIRA_AUDIT_TRANSITION"] {
+        case "photoDrop":
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled, model.phase == .shuttered else { return }
+            model.phase = .generating
+        case "result":
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled, model.phase == .generating else { return }
+            model.phase = .result
+        default:
+            return
+        }
+    }
+    #endif
 }
 
 #if DEBUG
@@ -51,7 +81,6 @@ private enum DebugAuditPhase {
         case "shuttered": .shuttered
         case "understanding": .understanding
         case "storyWriting": .storyWriting
-        case "storyReady": .storyReady
         case "generating": .generating
         case "result": .result
         case "share": .share

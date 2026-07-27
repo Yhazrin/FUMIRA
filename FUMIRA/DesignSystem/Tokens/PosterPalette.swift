@@ -30,13 +30,25 @@ enum PosterPalette {
     /// 深青蓝 — 叠层、生成标题、深色天空面
     static let skyDeep = Color(red: 61 / 255, green: 139 / 255, blue: 181 / 255) // #3D8BB5
 
+    /// 相机快门蓝 — 蓝白轻拟物快门外壳；仅用于拍摄主按钮
+    static let cameraShutterBlue = Color(red: 30 / 255, green: 156 / 255, blue: 224 / 255)
+
+    /// 相机快门蓝暗面 — 快门底座与极短投影
+    static let cameraShutterBlueDeep = Color(red: 18 / 255, green: 105 / 255, blue: 168 / 255)
+
+    /// 哆啦 A 梦蓝 — 所有可操作主按钮、进度与时间选中态
+    static let actionBlue = cameraShutterBlue
+
+    /// 哆啦 A 梦蓝暗面 — 按压、描边与高对比文字
+    static let actionBlueDeep = cameraShutterBlueDeep
+
     /// 草地浅绿 — 分层地形近层、浅色自然面
     static let grassLight = Color(red: 143 / 255, green: 203 / 255, blue: 126 / 255) // #8FCB7E
 
-    /// 深松绿 — 地形深部、进度、主按钮与生成页大色块
+    /// 深松绿 — 仅用于自然场景的地形深部与插画结构
     static let pine = Color(red: 42 / 255, green: 90 / 255, blue: 60 / 255) // #2A5A3C
 
-    /// 清新叶绿 — 仅选中态、关键字下划线、时间游标等 ≤5% 强调
+    /// 清新叶绿 — 仅用于自然场景与品牌下划线，不用于交互状态
     static let leafGreen = Color(red: 95 / 255, green: 168 / 255, blue: 104 / 255) // #5FA868
 
     /// 深墨黑 — 标题与重要操作
@@ -46,7 +58,7 @@ enum PosterPalette {
     static let mutedInk = Color(red: 110 / 255, green: 108 / 255, blue: 100 / 255) // #6E6C64
 
     /// 波形时间轴非选中竖条 — 低对比，可叠在白底或软渐层上
-    static let waveIdle = ink.opacity(0.22)
+    static let waveIdle = ink.opacity(0.18)
 
     /// 可恢复错误
     static let errorCoral = Color(red: 233 / 255, green: 94 / 255, blue: 82 / 255) // #E95E52
@@ -79,7 +91,7 @@ enum PosterPalette {
     /// - Important: Prefer ``pine``.
     static let parkGreen = pine
 
-    /// - Important: Prefer ``pine`` for generation surfaces / large park blocks.
+    /// - Important: Prefer ``pine`` for natural scene surfaces.
     static let growthGreen = pine
 
 }

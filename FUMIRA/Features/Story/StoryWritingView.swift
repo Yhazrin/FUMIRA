@@ -5,42 +5,72 @@ struct StoryWritingView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var activeYear = -100
+    @State private var chromeVisible = false
 
     private let years = [-100, -30, -10, 0, 10, 30, 100]
 
-    var body: some View {
-        PosterScreenContainer(background: PosterPalette.skyDeep) {
-            VStack(alignment: .leading, spacing: PosterSpacing.xl) {
-                PosterTitleView(
-                    segments: ["让", "时间", "开口"],
-                    color: PosterPalette.paperWhite,
-                    fontSize: 38
-                )
+    private var photoAspectRatio: CGFloat {
+        CGFloat(
+            model.generatedPhoto?.displayAspectRatio
+                ?? model.capturedPhoto?.displayAspectRatio
+                ?? 3.0 / 4.0
+        )
+    }
 
-                if let understanding = model.sceneUnderstanding {
-                    VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                        Text("AI 看见了")
+    /// Keep the story-seed thumbnail on the capture aspect (≈112pt tall, ≤88pt wide).
+    private var storyThumbnailWidth: CGFloat {
+        let ratio = max(photoAspectRatio, 0.01)
+        let maxHeight: CGFloat = 112
+        let maxWidth: CGFloat = 88
+        return min(maxWidth, max(44, maxHeight * ratio))
+    }
+
+    var body: some View {
+        PosterScreenContainer(background: Color.clear) {
+            VStack(alignment: .leading, spacing: PosterSpacing.xl) {
+                HStack(alignment: .top, spacing: PosterSpacing.md) {
+                    VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+                        Label("照片理解完成", systemImage: "sparkles")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.skyDeep)
-                            .textCase(.uppercase)
-                        Text(understanding.summary)
-                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(PosterPalette.actionBlueDeep)
+
+                        Text("故事正在成形")
+                            .font(PosterTypography.display(32))
                             .foregroundStyle(PosterPalette.ink)
+                            .lineLimit(2)
                     }
-                    .padding(PosterSpacing.lg)
-                    .background(PosterPalette.paperWhite)
-                    .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card))
+                    .opacity(chromeVisible ? 1 : 0)
+                    .offset(y: chromeVisible ? 0 : -6)
+
+                    Spacer(minLength: 0)
+
+                    // Thumbnail slot keeps the persistent hero alive through story writing.
+                    // Width follows capture aspect — never force a square 88×88 box.
+                    HeroPhotoSlot(
+                        owner: .storyWriting,
+                        aspectRatio: photoAspectRatio,
+                        maximumHeight: 112,
+                        cornerRadius: PosterRadius.photoPaper
+                    )
+                    .frame(width: storyThumbnailWidth)
+                    .opacity(chromeVisible ? 1 : 0)
                 }
+
+                Text("目标画面的细节已经成为故事依据；照片与完整描述会在最后一起揭晓。")
+                    .font(.body)
+                    .foregroundStyle(PosterPalette.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .opacity(chromeVisible ? 1 : 0)
 
                 HStack(spacing: 5) {
                     ForEach(years, id: \.self) { year in
                         VStack(spacing: 8) {
                             Circle()
-                                .fill(year == activeYear ? PosterPalette.leafGreen : PosterPalette.paperWhite)
+                                .fill(year == activeYear ? PosterPalette.actionBlue : PosterPalette.actionBlue.opacity(0.18))
                                 .frame(width: year == activeYear ? 20 : 10, height: year == activeYear ? 20 : 10)
                             Text(year == 0 ? "NOW" : String(format: "%+d", year))
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(PosterPalette.paperWhite)
+                                .foregroundStyle(year == activeYear ? PosterPalette.actionBlueDeep : PosterPalette.mutedInk)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
@@ -50,24 +80,35 @@ struct StoryWritingView: View {
                 .padding(.vertical, PosterSpacing.lg)
                 .overlay(alignment: .top) {
                     Rectangle()
-                        .fill(PosterPalette.paperWhite.opacity(0.35))
+                        .fill(PosterPalette.actionBlue.opacity(0.18))
                         .frame(height: 2)
                         .offset(y: 9)
                 }
+                .opacity(chromeVisible ? 1 : 0)
 
                 VStack(alignment: .leading, spacing: PosterSpacing.sm) {
                     Text(model.pipelineStatusText)
                         .font(.title2.weight(.bold))
-                        .foregroundStyle(PosterPalette.paperWhite)
+                        .foregroundStyle(PosterPalette.ink)
                     ProgressView(value: model.storyProgress)
-                        .tint(PosterPalette.leafGreen)
+                        .tint(PosterPalette.actionBlue)
                         .scaleEffect(x: 1, y: 2, anchor: .center)
-                    Text("故事模型正在把过去、现在与未来连成同一个地点的生命线。")
+                    Text("故事模型正在围绕已经生成的目标画面，连接过去、现在与未来。")
                         .font(.footnote)
-                        .foregroundStyle(PosterPalette.paperWhite.opacity(0.72))
+                        .foregroundStyle(PosterPalette.mutedInk)
                 }
+                .opacity(chromeVisible ? 1 : 0)
 
                 Spacer(minLength: PosterSpacing.lg)
+            }
+        }
+        .onAppear {
+            if reduceMotion {
+                chromeVisible = true
+            } else {
+                withAnimation(.timingCurve(0.22, 1, 0.36, 1, duration: PosterMotion.phaseTransition)) {
+                    chromeVisible = true
+                }
             }
         }
         .task {

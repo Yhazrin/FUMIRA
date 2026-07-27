@@ -7,10 +7,9 @@ enum AppPhase: Equatable, Sendable {
     case cameraPermission
     case viewfinder
     case shuttered
+    case generating
     case understanding
     case storyWriting
-    case storyReady
-    case generating
     case result
     case share
     case pipelineFailure

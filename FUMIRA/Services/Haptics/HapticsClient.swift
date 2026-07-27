@@ -4,6 +4,7 @@ enum HapticEvent: Sendable {
     case selection
     case timeDetent
     case timeAnchor
+    case shutterPress
     case shutter
     case reveal
     case save
