@@ -1,6 +1,11 @@
 import SwiftUI
 
 enum PosterMotion {
+    /// Page-stack scroll-driven fade+lift. Used by ``PosterScrollReveal`` so list
+    /// sections enter when their viewport threshold is reached instead of all at once.
+    static let scrollRevealDuration = 0.42
+    static let scrollRevealLag = 0.08
+
     // Durations (seconds) — flat poster motion language
     static let microMin = 0.10
     static let microMax = 0.22
@@ -75,4 +80,6 @@ enum PosterMotion {
     static let aperture = Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.58)
     static let shutter = Animation.timingCurve(0.7, 0, 0.84, 0, duration: 0.2)
     static let reveal = Animation.timingCurve(0.12, 0.78, 0.18, 1, duration: 0.72)
+    /// Soft lift for cards entering on scroll. iOS 17+ scrollTransition curve.
+    static let scrollReveal = Animation.timingCurve(0.22, 1, 0.36, 1, duration: scrollRevealDuration)
 }

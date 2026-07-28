@@ -10,6 +10,7 @@
 		00B4072E51F6715A46064D80 /* MotionFieldModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E0B060E918608EBA1721981 /* MotionFieldModel.swift */; };
 		0214A77A0FFCB9ED57DB2183 /* LiveCameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0ADCB3A58FBEC5C0450A059 /* LiveCameraService.swift */; };
 		07CE3DA12048AD23FC41D2EC /* RemoteUnderstandingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 720A705BCC018533FA13CAD9 /* RemoteUnderstandingProvider.swift */; };
+		0845C6F210CEF677B3742D77 /* PosterZoomTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F8C71E335F95A71BF31A8E /* PosterZoomTransition.swift */; };
 		0A56FAE1159C187BEF363115 /* FUMIRALiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7DC07F5D99115EA52CBEAA /* FUMIRALiveActivityBundle.swift */; };
 		0D92DE595FF455FD4B825C78 /* CameraCompositionGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FE2AF4AD4398B2C717EB85 /* CameraCompositionGeometryTests.swift */; };
 		0EBB9147A09ED73A0B3166DB /* FutureCamBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5823D95D80053245EE90DC6 /* FutureCamBody.swift */; };
@@ -28,6 +29,7 @@
 		23CCFD4E047B40C404BD4F16 /* ImageUnderstandingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */; };
 		283BD0A056F1860814BCDD0E /* PosterExportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97AAEF798A063ED932262263 /* PosterExportCard.swift */; };
 		29D9DC65D7062DCCB884557B /* TimePositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965576AD9AA198B9925C4116 /* TimePositionTests.swift */; };
+		30ABDD4BDD1B0A16219DB349 /* PosterZoomID.swift in Sources */ = {isa = PBXBuildFile; fileRef = B687965D4D82A26CE5F78AB3 /* PosterZoomID.swift */; };
 		32A7E40906ED936B1936AE68 /* PosterMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3C5474B0B8D27C0DDBB963 /* PosterMotion.swift */; };
 		346647DD342F7ADBF2D8EA3C /* RemoteGenerationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */; };
 		38831A33FFE897593276E173 /* CameraControlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ACAAB097318CD718D04F680 /* CameraControlTests.swift */; };
@@ -55,6 +57,7 @@
 		6B9F437DA2C42C355157BE52 /* HeroPhotoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1201C603B55FFB051E84EE9 /* HeroPhotoSurface.swift */; };
 		6BEEF715C8AC2E660E4EDEA3 /* PosterPressStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59E406EC4019E7A3F0784BC /* PosterPressStyle.swift */; };
 		6CDDE3D306B7E8B827CF3D06 /* AIModelConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F62345CBFEE6F4C9C8552DE /* AIModelConfigurationStore.swift */; };
+		6D78B97534626A914C4FEBC9 /* CameraCompositionCorners.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F2E4583BE754E45975EDC9B /* CameraCompositionCorners.swift */; };
 		7098042EC676833F21DE70EE /* AppPhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7679B4DA494ADD2A005C24BF /* AppPhase.swift */; };
 		712440EB96D62CDF09B0E02E /* StoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426AD81CA8813B1754B8E854 /* StoryProvider.swift */; };
 		71545CA1C3154C6ED91EE0E9 /* ShutterFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32DC55D3AB69BA24981B65BA /* ShutterFeedbackView.swift */; };
@@ -62,17 +65,22 @@
 		790C43F80CBE7459040C84C2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DBB78BA18D4224BAAA62DB /* AppModel.swift */; };
 		79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */; };
 		7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEB5A8653918B8E3544BFC /* RemoteStoryProvider.swift */; };
+		7F39561E1031DD0D1D9CFA24 /* PosterSensory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */; };
 		893ED3BD26DACA8A44490226 /* ShutterWaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */; };
+		942B6DE24F1C52068B963912 /* PosterSymbolBounce.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B1367803A4250AF37CC0BB2 /* PosterSymbolBounce.swift */; };
 		9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */; };
 		980D4299B93AD7FD75419F55 /* MotionFieldProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34902E8D8AD5DD5B2AA85E04 /* MotionFieldProviding.swift */; };
 		9865BA30CD7BC5E71C3EDDD8 /* GenerationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04EFD2BAB24C56390FE1422 /* GenerationView.swift */; };
 		994F2E2E21A94CDB59350F12 /* CameraLiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B7E4813F1E32365A8517A4 /* CameraLiveActivityService.swift */; };
 		99E754018208994ACDCC1A9F /* LiveHapticsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B68E209854C77B7C12721DA8 /* LiveHapticsClient.swift */; };
+		9C6C2BE30129463E504FA983 /* PosterStaggerReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A85722097A9AA1D8A905ADF /* PosterStaggerReveal.swift */; };
 		9CFA5CCAED0C6B13D9E5DDAA /* GenerationFailureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B5279CAFEEC36FF61D3AF1D /* GenerationFailureView.swift */; };
 		9E8E3FC2EE80DC814A175CAC /* AIPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5250C5671C43027FE916EC91 /* AIPipeline.swift */; };
 		A105B28967391BB722D2F221 /* CameraPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB587C2F53ADF0E74815B86D /* CameraPermissionView.swift */; };
 		A1427FB05CE0F83DA5D1B137 /* GenerationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 243297E75BDC73D76502065F /* GenerationProvider.swift */; };
+		A20E9649B4306CC69280976A /* PosterScrollReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4285F02A53FEE7C33EB1C3B2 /* PosterScrollReveal.swift */; };
 		A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */; };
+		A717F6623B1629BF5821DDFE /* PosterGlassButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76B5F94A3104D40C544DFABA /* PosterGlassButton.swift */; };
 		AC3DE3CD08F90EB6BBDD424C /* PosterCapsuleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A795369647DCD3796D878054 /* PosterCapsuleButton.swift */; };
 		ACF8DFBE1359040E90080C01 /* PhotoDropLanding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4754810FFE0687FC7CD3F903 /* PhotoDropLanding.swift */; };
 		AD3677B64872529BD54AAB06 /* LXGWMarkerGothic-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = ABAE834AFA62AF7D1C532131 /* LXGWMarkerGothic-Regular.ttf */; };
@@ -82,12 +90,14 @@
 		C5779E4D103E1FC70AE578DC /* CameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6755348B723E1E2090544371 /* CameraService.swift */; };
 		C59AB02FBEDD3646F288B73A /* PosterSpacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA2A9A9092D954539CE47D8 /* PosterSpacing.swift */; };
 		C85E0F5382EC5CDBEAEF60C0 /* CaveatBrush-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C371B539FFA0941C4F55F0F2 /* CaveatBrush-Regular.ttf */; };
+		CAF2D2057ECE7EA5A68C9455 /* PosterStaggerEntrance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4091E258118976ACAAE58F5 /* PosterStaggerEntrance.swift */; };
 		CC9564F3F5A7240742019CC3 /* ViewfinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */; };
 		D0BA2028CA6E88BDC14C1229 /* FlatParallaxModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */; };
 		D5D7D29F0CE2D8BBE3249FDA /* CameraLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DBE5E6011F2A13CDFEE4D9 /* CameraLiveActivityAttributes.swift */; };
 		D634280455F3F1B7470120B4 /* StatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A9D8D00C482FFD912D66F /* StatusPill.swift */; };
 		D6343860654B84A0E7610C59 /* PosterRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F813C0AC9E3A3902A11C9EF /* PosterRadius.swift */; };
 		D8D851644761BE458BF9017F /* ParkPosterBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 724CAB8C6F863D8E663A1F70 /* ParkPosterBackdrop.swift */; };
+		D8FEE8766E741D61225F76DC /* InAppDynamicIsland.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D025359177BD89F4AA680CB /* InAppDynamicIsland.swift */; };
 		D95241D281492B368518AA4D /* PosterKeywordHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */; };
 		DAC276DB674D1491F9A60A9A /* PhotoImportAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2F7FE7C4895729281A4B67 /* PhotoImportAdapter.swift */; };
 		DAC5CF90465E60FE3F7964FA /* TimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */; };
@@ -106,6 +116,7 @@
 		F6B7AE94AF7E3431AA213088 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */; };
 		F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */; };
 		FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */; };
+		FD84F6326AE5F6F88DC908D3 /* PosterBreath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8058176375A98A66217D33A /* PosterBreath.swift */; };
 		FF2048F8237E37B5C20D977E /* AppDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2029A8DCB17762A2BA51821F /* AppDependencies.swift */; };
 /* End PBXBuildFile section */
 
@@ -143,6 +154,7 @@
 /* Begin PBXFileReference section */
 		008AB16B3E586143B6C32988 /* HapticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticsClient.swift; sourceTree = "<group>"; };
 		01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraChromeButton.swift; sourceTree = "<group>"; };
+		02F8C71E335F95A71BF31A8E /* PosterZoomTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterZoomTransition.swift; sourceTree = "<group>"; };
 		042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTitleView.swift; sourceTree = "<group>"; };
 		0827B783C9AB999B8B2F7667 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
 		09DDDE905B093FADE1CBA842 /* GenerationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationState.swift; sourceTree = "<group>"; };
@@ -159,6 +171,7 @@
 		32DC55D3AB69BA24981B65BA /* ShutterFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShutterFeedbackView.swift; sourceTree = "<group>"; };
 		34902E8D8AD5DD5B2AA85E04 /* MotionFieldProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionFieldProviding.swift; sourceTree = "<group>"; };
 		38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseTransition.swift; sourceTree = "<group>"; };
+		39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSensory.swift; sourceTree = "<group>"; };
 		3B3EFE914BB920EA3A5D9353 /* ConnectionFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFeedbackView.swift; sourceTree = "<group>"; };
 		3C17BFDA29992D70384CE0E3 /* SharePosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePosterView.swift; sourceTree = "<group>"; };
 		3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPalette.swift; sourceTree = "<group>"; };
@@ -167,11 +180,13 @@
 		41CA81EFBD85C8A98C9F622A /* PhotoImportAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoImportAdapterTests.swift; sourceTree = "<group>"; };
 		422AD39779F43E2D65A911F8 /* PosterEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterEffects.swift; sourceTree = "<group>"; };
 		426AD81CA8813B1754B8E854 /* StoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryProvider.swift; sourceTree = "<group>"; };
+		4285F02A53FEE7C33EB1C3B2 /* PosterScrollReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterScrollReveal.swift; sourceTree = "<group>"; };
 		4475858E4BF39355D62646C5 /* UnderstandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnderstandingView.swift; sourceTree = "<group>"; };
 		46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRAAPIConfiguration.swift; sourceTree = "<group>"; };
 		4713B2304639B23F842E56AF /* AIModelCatalogProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelCatalogProvider.swift; sourceTree = "<group>"; };
 		4754810FFE0687FC7CD3F903 /* PhotoDropLanding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoDropLanding.swift; sourceTree = "<group>"; };
 		4979E34192BD4BB857653B33 /* PosterShareTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterShareTests.swift; sourceTree = "<group>"; };
+		4B1367803A4250AF37CC0BB2 /* PosterSymbolBounce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSymbolBounce.swift; sourceTree = "<group>"; };
 		4B87CAC950CA323970DFBE50 /* CoreMotionFieldService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreMotionFieldService.swift; sourceTree = "<group>"; };
 		4C0A9D8D00C482FFD912D66F /* StatusPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPill.swift; sourceTree = "<group>"; };
 		4F62345CBFEE6F4C9C8552DE /* AIModelConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelConfigurationStore.swift; sourceTree = "<group>"; };
@@ -187,14 +202,17 @@
 		720A705BCC018533FA13CAD9 /* RemoteUnderstandingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteUnderstandingProvider.swift; sourceTree = "<group>"; };
 		724CAB8C6F863D8E663A1F70 /* ParkPosterBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkPosterBackdrop.swift; sourceTree = "<group>"; };
 		7679B4DA494ADD2A005C24BF /* AppPhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPhase.swift; sourceTree = "<group>"; };
+		76B5F94A3104D40C544DFABA /* PosterGlassButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterGlassButton.swift; sourceTree = "<group>"; };
 		7C2FEAF2D6EE3D56DFAFAC63 /* PosterStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStorage.swift; sourceTree = "<group>"; };
 		7E0B060E918608EBA1721981 /* MotionFieldModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionFieldModel.swift; sourceTree = "<group>"; };
 		7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGenerationProvider.swift; sourceTree = "<group>"; };
+		7F2E4583BE754E45975EDC9B /* CameraCompositionCorners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCompositionCorners.swift; sourceTree = "<group>"; };
 		8031BC5C221FD8B69A35917F /* FUMIRATests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FUMIRATests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		87642B857DE795DFCEA95B4D /* FUMIRALiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FUMIRALiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8765ECEB8AD104AC0655B09E /* WaveTimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveTimeRail.swift; sourceTree = "<group>"; };
 		89DBE5E6011F2A13CDFEE4D9 /* CameraLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraLiveActivityAttributes.swift; sourceTree = "<group>"; };
 		8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalParkScene.swift; sourceTree = "<group>"; };
+		8D025359177BD89F4AA680CB /* InAppDynamicIsland.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InAppDynamicIsland.swift; sourceTree = "<group>"; };
 		8DB1CEF2A388FCB57CEF5828 /* TimePosition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePosition.swift; sourceTree = "<group>"; };
 		8E9AAD2C14EDA1F4E2C259F8 /* ModelSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSettingsView.swift; sourceTree = "<group>"; };
 		8EF77E2A66A4FD9A6183F059 /* CameraLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraLiveActivityWidget.swift; sourceTree = "<group>"; };
@@ -206,6 +224,7 @@
 		965576AD9AA198B9925C4116 /* TimePositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePositionTests.swift; sourceTree = "<group>"; };
 		97AAEF798A063ED932262263 /* PosterExportCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterExportCard.swift; sourceTree = "<group>"; };
 		9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUnderstandingProvider.swift; sourceTree = "<group>"; };
+		9A85722097A9AA1D8A905ADF /* PosterStaggerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStaggerReveal.swift; sourceTree = "<group>"; };
 		9B5279CAFEEC36FF61D3AF1D /* GenerationFailureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationFailureView.swift; sourceTree = "<group>"; };
 		9E1D21376F5EC41FF13568E4 /* PosterComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterComposer.swift; sourceTree = "<group>"; };
 		9EC3A6EA4A95C7C7FE8503E2 /* GenerationErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationErrorTests.swift; sourceTree = "<group>"; };
@@ -216,7 +235,9 @@
 		ABAE834AFA62AF7D1C532131 /* LXGWMarkerGothic-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "LXGWMarkerGothic-Regular.ttf"; sourceTree = "<group>"; };
 		AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturedPhotoView.swift; sourceTree = "<group>"; };
 		B0ADCB3A58FBEC5C0450A059 /* LiveCameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveCameraService.swift; sourceTree = "<group>"; };
+		B4091E258118976ACAAE58F5 /* PosterStaggerEntrance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStaggerEntrance.swift; sourceTree = "<group>"; };
 		B488656CA9757ABE0CE4EA51 /* CameraLiveActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraLiveActivityTests.swift; sourceTree = "<group>"; };
+		B687965D4D82A26CE5F78AB3 /* PosterZoomID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterZoomID.swift; sourceTree = "<group>"; };
 		B68E209854C77B7C12721DA8 /* LiveHapticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveHapticsClient.swift; sourceTree = "<group>"; };
 		B6EAFC12F5589EFDF64C7596 /* HardwareController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareController.swift; sourceTree = "<group>"; };
 		BB1765E4FF16F8B28A946F86 /* StoryWritingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryWritingView.swift; sourceTree = "<group>"; };
@@ -230,6 +251,7 @@
 		CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSession.swift; sourceTree = "<group>"; };
 		D59E406EC4019E7A3F0784BC /* PosterPressStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPressStyle.swift; sourceTree = "<group>"; };
 		D65EE3766769108908928C9B /* UploadImageEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadImageEncoder.swift; sourceTree = "<group>"; };
+		D8058176375A98A66217D33A /* PosterBreath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterBreath.swift; sourceTree = "<group>"; };
 		DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlatParallaxModifier.swift; sourceTree = "<group>"; };
 		E39E84C5D38FBD2F94A20BD0 /* FUMIRAApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRAApp.swift; sourceTree = "<group>"; };
 		EB1C46339D067C8F2F24BEB7 /* PosterTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTypography.swift; sourceTree = "<group>"; };
@@ -456,7 +478,16 @@
 			children = (
 				DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */,
 				38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */,
+				D8058176375A98A66217D33A /* PosterBreath.swift */,
+				76B5F94A3104D40C544DFABA /* PosterGlassButton.swift */,
 				D59E406EC4019E7A3F0784BC /* PosterPressStyle.swift */,
+				4285F02A53FEE7C33EB1C3B2 /* PosterScrollReveal.swift */,
+				39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */,
+				B4091E258118976ACAAE58F5 /* PosterStaggerEntrance.swift */,
+				9A85722097A9AA1D8A905ADF /* PosterStaggerReveal.swift */,
+				4B1367803A4250AF37CC0BB2 /* PosterSymbolBounce.swift */,
+				B687965D4D82A26CE5F78AB3 /* PosterZoomID.swift */,
+				02F8C71E335F95A71BF31A8E /* PosterZoomTransition.swift */,
 			);
 			path = Motion;
 			sourceTree = "<group>";
@@ -502,6 +533,7 @@
 		BF606F44E7F2565A31EB26E4 /* Viewfinder */ = {
 			isa = PBXGroup;
 			children = (
+				7F2E4583BE754E45975EDC9B /* CameraCompositionCorners.swift */,
 				32DC55D3AB69BA24981B65BA /* ShutterFeedbackView.swift */,
 				F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */,
 			);
@@ -556,6 +588,7 @@
 				670990386321679E71318ECF /* GenerationProgressRow.swift */,
 				1E96B4960353253FCA8384EC /* HeroPhotoSlot.swift */,
 				F1201C603B55FFB051E84EE9 /* HeroPhotoSurface.swift */,
+				8D025359177BD89F4AA680CB /* InAppDynamicIsland.swift */,
 				724CAB8C6F863D8E663A1F70 /* ParkPosterBackdrop.swift */,
 				4754810FFE0687FC7CD3F903 /* PhotoDropLanding.swift */,
 				A795369647DCD3796D878054 /* PosterCapsuleButton.swift */,
@@ -796,6 +829,7 @@
 				7098042EC676833F21DE70EE /* AppPhase.swift in Sources */,
 				DB1FFB0E6083B353899FA1E0 /* BluetoothPermissionView.swift in Sources */,
 				F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */,
+				6D78B97534626A914C4FEBC9 /* CameraCompositionCorners.swift in Sources */,
 				1998F5BC3E7367402AD9A4D4 /* CameraCompositionGeometry.swift in Sources */,
 				4B137517196AD141E139AE97 /* CameraLiveActivityAttributes.swift in Sources */,
 				994F2E2E21A94CDB59350F12 /* CameraLiveActivityService.swift in Sources */,
@@ -824,6 +858,7 @@
 				396FFEE2B899571D830BC74C /* HeroPhotoSlot.swift in Sources */,
 				6B9F437DA2C42C355157BE52 /* HeroPhotoSurface.swift in Sources */,
 				23CCFD4E047B40C404BD4F16 /* ImageUnderstandingProvider.swift in Sources */,
+				D8FEE8766E741D61225F76DC /* InAppDynamicIsland.swift in Sources */,
 				0214A77A0FFCB9ED57DB2183 /* LiveCameraService.swift in Sources */,
 				99E754018208994ACDCC1A9F /* LiveHapticsClient.swift in Sources */,
 				5D698237F36A50EB094BB245 /* MockMotionFieldService.swift in Sources */,
@@ -834,20 +869,29 @@
 				B136E911C8319B079CD18F7B /* PhaseTransition.swift in Sources */,
 				ACF8DFBE1359040E90080C01 /* PhotoDropLanding.swift in Sources */,
 				DAC276DB674D1491F9A60A9A /* PhotoImportAdapter.swift in Sources */,
+				FD84F6326AE5F6F88DC908D3 /* PosterBreath.swift in Sources */,
 				AC3DE3CD08F90EB6BBDD424C /* PosterCapsuleButton.swift in Sources */,
 				4CB2299257735711AAD95022 /* PosterComposer.swift in Sources */,
 				0F7F38450F6A3BA034C6FC94 /* PosterEffects.swift in Sources */,
 				283BD0A056F1860814BCDD0E /* PosterExportCard.swift in Sources */,
+				A717F6623B1629BF5821DDFE /* PosterGlassButton.swift in Sources */,
 				D95241D281492B368518AA4D /* PosterKeywordHero.swift in Sources */,
 				32A7E40906ED936B1936AE68 /* PosterMotion.swift in Sources */,
 				F52BB40AD845207CF1B3A517 /* PosterPalette.swift in Sources */,
 				6BEEF715C8AC2E660E4EDEA3 /* PosterPressStyle.swift in Sources */,
 				D6343860654B84A0E7610C59 /* PosterRadius.swift in Sources */,
 				F4F3244AEDAFBD874E8A516E /* PosterScreenContainer.swift in Sources */,
+				A20E9649B4306CC69280976A /* PosterScrollReveal.swift in Sources */,
+				7F39561E1031DD0D1D9CFA24 /* PosterSensory.swift in Sources */,
 				C59AB02FBEDD3646F288B73A /* PosterSpacing.swift in Sources */,
+				CAF2D2057ECE7EA5A68C9455 /* PosterStaggerEntrance.swift in Sources */,
+				9C6C2BE30129463E504FA983 /* PosterStaggerReveal.swift in Sources */,
 				3A6F24EB11DF17E741B25BBF /* PosterStorage.swift in Sources */,
+				942B6DE24F1C52068B963912 /* PosterSymbolBounce.swift in Sources */,
 				E234B574678CF28B21321117 /* PosterTitleView.swift in Sources */,
 				583EE574E6A1116210347351 /* PosterTypography.swift in Sources */,
+				30ABDD4BDD1B0A16219DB349 /* PosterZoomID.swift in Sources */,
+				0845C6F210CEF677B3742D77 /* PosterZoomTransition.swift in Sources */,
 				FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */,
 				346647DD342F7ADBF2D8EA3C /* RemoteGenerationProvider.swift in Sources */,
 				7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */,

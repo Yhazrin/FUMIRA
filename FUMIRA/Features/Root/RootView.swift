@@ -87,30 +87,39 @@ struct RootView: View {
             updateActiveHeroSlot(from: preferences)
         }
         .overlay(alignment: .topTrailing) {
-            if showsSettingsEntry {
-                Button {
-                    model.openSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PosterPalette.ink.opacity(0.72))
-                        .frame(width: 44, height: 44)
-                        .background(PosterPalette.canvas.opacity(0.88))
-                        .clipShape(Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(PosterPalette.line, lineWidth: 1)
-                        }
-                }
-                .padding(.trailing, PosterSpacing.lg)
-                .padding(.top, PosterSpacing.sm)
-                .accessibilityLabel("设置")
-                .accessibilityHint("打开通用设置；模型路由在高级选项中")
+        if showsSettingsEntry {
+            Button {
+                model.openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(PosterPalette.ink.opacity(0.72))
+                    .frame(width: 44, height: 44)
+                    .background(PosterPalette.canvas.opacity(0.88))
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(PosterPalette.line, lineWidth: 1)
+                    }
             }
+            .posterZoomSource(
+                namespace: sceneNamespace,
+                id: PosterZoomID.settingsCog,
+                cornerRadius: 22
+            )
+            .padding(.trailing, PosterSpacing.lg)
+            .padding(.top, PosterSpacing.sm)
+            .accessibilityLabel("设置")
+            .accessibilityHint("打开通用设置；模型路由在高级选项中")
         }
-        .sheet(isPresented: Bindable(model).isModelSettingsPresented) {
-            SettingsView(model: model)
-        }
+    }
+    .sheet(isPresented: Bindable(model).isModelSettingsPresented) {
+        SettingsView(model: model)
+            .posterZoomDestination(
+                namespace: sceneNamespace,
+                id: PosterZoomID.settingsCog
+            )
+    }
         .onAppear {
             syncMotionField()
         }

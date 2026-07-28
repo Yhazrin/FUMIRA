@@ -40,3 +40,9 @@ server/coverage/
 # Swift Package Manager
 .swiftpm/
 Package.resolved
+
+# XcodeGen derived build directory and ad-hoc snapshot dumps
+.build/
+.xcconfig
+.tmp-*.png
+.tmp-*.jpg

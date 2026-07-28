@@ -41,6 +41,7 @@ struct GenerationView: View {
                         .foregroundStyle(PosterPalette.actionBlue)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .posterPulse(period: 2.4)
                     Spacer(minLength: PosterSpacing.md)
                     Text(model.pipelineStatusText.isEmpty ? "准备出发" : model.pipelineStatusText)
                         .font(.footnote.weight(.semibold))
@@ -59,6 +60,7 @@ struct GenerationView: View {
                     RoundedRectangle(cornerRadius: PosterRadius.photoPaper, style: .continuous)
                         .stroke(PosterPalette.actionBlue.opacity(0.32), lineWidth: 1)
                 }
+                .posterBreath(min: 0.99, max: 1.01, period: 3.6)
 
                 VStack(spacing: PosterSpacing.md) {
                     GenerationProgressRow(
@@ -66,16 +68,19 @@ struct GenerationView: View {
                         progress: seedProgress,
                         isComplete: model.generationProgress >= 0.35
                     )
+                    .posterPulse(period: 1.4)
                     GenerationProgressRow(
                         title: "时间正在生长",
                         progress: growthProgress,
                         isComplete: model.generationProgress >= 0.9
                     )
+                    .posterPulse(period: 1.7)
                     GenerationProgressRow(
                         title: "收成这一帧",
                         progress: harvestProgress,
                         isComplete: model.generationProgress >= 1
                     )
+                    .posterPulse(period: 2.0)
                 }
 
                 Spacer(minLength: PosterSpacing.sm)
@@ -89,6 +94,7 @@ struct GenerationView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                 }
                 .buttonStyle(PosterPressStyle())
+                .posterSensoryFeedback(trigger: false, .impact(weight: .light))
                 .accessibilityHint("停止当前目标图片请求并回到取景页面")
             }
         }

@@ -138,6 +138,7 @@ struct ResultView: View {
                 .padding(PosterSpacing.md)
                 .accessibilityLabel("目标年份 \(generatedTime.compactLabel)")
                 .opacity(1 - 0.2 * revealProgress)
+                .posterSymbolBounce(trigger: generatedTime.compactLabel)
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
@@ -163,9 +164,11 @@ struct ResultView: View {
                 VStack(spacing: PosterSpacing.md) {
                     narrativeSection
                         .frame(width: contentWidth)
+                        .posterScrollReveal(reduceMotion: reduceMotion)
 
                     Divider()
                         .frame(width: contentWidth)
+                        .posterScrollReveal(reduceMotion: reduceMotion)
 
                     TimeRail(
                         value: model.selectedTime.normalized,
@@ -174,9 +177,12 @@ struct ResultView: View {
                         model.updateTime(normalized: normalized)
                     }
                     .frame(width: contentWidth)
+                    .posterScrollReveal(reduceMotion: reduceMotion)
 
                     primaryActions(width: contentWidth)
+                    .posterScrollReveal(reduceMotion: reduceMotion)
                     secondaryActions(width: contentWidth)
+                    .posterScrollReveal(reduceMotion: reduceMotion)
                 }
                 .padding(.bottom, max(safeAreaBottom, PosterSpacing.lg))
             }
@@ -260,6 +266,10 @@ struct ResultView: View {
         ) {
             model.openShare()
         }
+        .posterSensoryFeedback(
+            trigger: model.shareFeedbackMessage == "已保存到相册",
+            .success
+        )
     }
 
     private var regenerateButton: some View {

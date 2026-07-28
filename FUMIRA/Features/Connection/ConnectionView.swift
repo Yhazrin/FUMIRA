@@ -25,25 +25,14 @@ struct ConnectionView: View {
 
                 Spacer(minLength: 0)
 
-                Button {
-                    model.beginPhoneOnlyPath()
-                } label: {
-                    Label("进入时间相机", systemImage: "camera.aperture")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(PosterPalette.paperWhite)
-                        .padding(.horizontal, PosterSpacing.lg)
-                        .frame(minHeight: 58)
-                        .frame(maxWidth: .infinity)
-                        .background(PosterPalette.actionBlue)
-                        .clipShape(Capsule())
-                        .shadow(color: PosterEffects.floating, radius: 12, y: 6)
-                }
-                .buttonStyle(ConnectionStartPressStyle())
-                // Half-width capsule, optically centered on the invite.
+                PosterGlassButton(
+                    title: "进入时间相机",
+                    systemImage: "camera.aperture",
+                    accessibilityHint: "打开相机，拍下一张给时间的照片",
+                    action: { model.beginPhoneOnlyPath() }
+                )
                 .containerRelativeFrame(.horizontal, count: 2, span: 1, spacing: 0)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel("进入时间相机")
-                .accessibilityHint("打开相机，拍下一张给时间的照片")
                 .flatMotionEntrance(
                     isVisible: didAppear,
                     reduceMotion: reduceMotion,
@@ -60,13 +49,25 @@ struct ConnectionView: View {
 }
 
 private struct FUMIRAWordmark: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var didAppear = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("FUMIRA")
-                .font(PosterTypography.script(78))
-                .tracking(1.2)
-                .foregroundStyle(PosterPalette.ink)
-                .rotationEffect(.degrees(-2.5), anchor: .leading)
+            HStack(spacing: 0) {
+                ForEach(Array("FUMIRA".enumerated()), id: \.offset) { index, character in
+                    Text(String(character))
+                        .font(PosterTypography.script(78))
+                        .tracking(1.2)
+                        .foregroundStyle(PosterPalette.ink)
+                        .rotationEffect(.degrees(-2.5), anchor: .leading)
+                        .posterStaggerEntrance(
+                            isVisible: didAppear,
+                            index: index,
+                            reduceMotion: reduceMotion
+                        )
+                }
+            }
 
             HStack(spacing: PosterSpacing.sm) {
                 Capsule()
@@ -76,15 +77,23 @@ private struct FUMIRAWordmark: View {
                     .font(.caption2.weight(.bold))
                     .tracking(2.1)
                     .foregroundStyle(PosterPalette.skyDeep.opacity(0.85))
+                    .posterStaggerEntrance(
+                        isVisible: didAppear,
+                        index: 6,
+                        reduceMotion: reduceMotion
+                    )
             }
             .padding(.top, -6)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("FUMIRA 时间相机")
+        .onAppear {
+            didAppear = true
+        }
     }
 }
 
-private struct ConnectionStartPressStyle: ButtonStyle {
+struct ConnectionStartPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {

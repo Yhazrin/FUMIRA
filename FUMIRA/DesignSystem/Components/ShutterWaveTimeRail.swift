@@ -122,7 +122,7 @@ struct ShutterWaveTimeRail: View {
             }
             .frame(height: stageHeight)
 
-            landmarkLabelsRow
+            scrubbingYearCapsule
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .ignore)
@@ -153,22 +153,38 @@ struct ShutterWaveTimeRail: View {
         return "\(timePosition.compactLabel)，目标 \(yearLabel) 年，\(direction)"
     }
 
-    private var landmarkLabelsRow: some View {
-        HStack {
-            Text("-100")
-                .frame(minWidth: 32, alignment: .leading)
-                .rotationEffect(chromeRotation)
-            Spacer(minLength: 0)
-            Text("NOW")
-                .rotationEffect(chromeRotation)
-            Spacer(minLength: 0)
-            Text("+100")
-                .frame(minWidth: 32, alignment: .trailing)
-                .rotationEffect(chromeRotation)
+    /// "Year" capsule that floats above the wave rail while the user is
+    /// actively scrubbing. Hidden when the rail is idle. Replaces the old
+    /// "-100 / NOW / +100" landmark strip and is less prescriptive: the
+    /// caption just reads the current year.
+    private var scrubbingYearCapsule: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "calendar")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(PosterPalette.cameraShutterBlue)
+            Text(yearLabel)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(PosterPalette.paperWhite)
+                .monospacedDigit()
         }
-        .font(.caption2.weight(.medium))
-        .foregroundStyle(PosterPalette.paperWhite.opacity(0.7))
-        .padding(.horizontal, barInset)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(PosterPalette.ink.opacity(0.78))
+        .clipShape(Capsule())
+        .overlay {
+            Capsule(style: .continuous)
+                .stroke(PosterPalette.paperWhite.opacity(0.18), lineWidth: 0.5)
+        }
+        .rotationEffect(chromeRotation)
+        .opacity(isDragging ? 1 : 0)
+        .scaleEffect(isDragging ? 1 : 0.86)
+        .animation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : .spring(response: 0.34, dampingFraction: 0.86),
+            value: isDragging
+        )
+        .frame(maxWidth: .infinity, alignment: .center)
         .accessibilityHidden(true)
     }
 
@@ -457,7 +473,7 @@ private struct MorphingShutterCursor: View {
                 )
                 Capsule(style: .continuous)
                     .fill(
-                        PosterPalette.paperWhite.opacity(
+                        PosterPalette.actionBlue.opacity(
                             Double(0.34 * ghostStrength * (0.55 + 0.45 * morphProgress))
                         )
                     )
@@ -471,7 +487,7 @@ private struct MorphingShutterCursor: View {
             // Flat-color base and short top travel suggest a physical key while
             // staying within FUMIRA's graphic poster language.
             Capsule(style: .continuous)
-                .fill(PosterPalette.cameraShutterBlueDeep)
+                .fill(PosterPalette.paperWhite)
                 .frame(
                     width: max(barWidth, morphSize.width),
                     height: max(barWidth, morphSize.height)
@@ -480,10 +496,10 @@ private struct MorphingShutterCursor: View {
                 .opacity(ringOpacity)
 
             Capsule(style: .continuous)
-                .fill(PosterPalette.cameraShutterBlue)
+                .fill(PosterPalette.paperWhite.opacity(0.96))
                 .overlay {
                     Capsule(style: .continuous)
-                        .fill(PosterPalette.cameraShutterBlue)
+                        .fill(PosterPalette.actionBlue)
                         .opacity(morphProgress)
                 }
                 .frame(
@@ -514,13 +530,13 @@ private struct MorphingShutterCursor: View {
                 .opacity(ringOpacity)
                 .overlay {
                     Capsule(style: .continuous)
-                        .stroke(PosterEffects.cameraShutterFaceStroke, lineWidth: 1)
+                        .stroke(PosterPalette.actionBlue.opacity(0.45), lineWidth: 1)
                         .opacity(ringOpacity)
                 }
                 .offset(y: -1 + pressOffset * openAmount)
 
             Circle()
-                .fill(PosterPalette.cameraShutterBlue)
+                .fill(PosterPalette.actionBlue)
                 .frame(width: 8, height: 8)
                 .opacity(ringOpacity)
                 .offset(y: -1 + pressOffset * openAmount)

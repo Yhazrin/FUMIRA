@@ -32,6 +32,7 @@ struct ConnectionFeedbackView: View {
                     StatusPill(icon: "checkmark.circle.fill", label: "已连接", isActive: true)
                     StatusPill(icon: "battery.75", label: "\(snapshot.batteryLevel)%")
                 }
+                .posterPulse(period: 1.8)
 
                 Text(snapshot.name)
                     .font(PosterTypography.script(24))

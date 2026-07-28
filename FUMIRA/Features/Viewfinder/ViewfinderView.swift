@@ -93,22 +93,24 @@ struct ViewfinderChromeOverlay: View {
     @State private var controlsAreReady = false
     @State private var albumPickerItem: PhotosPickerItem?
     @State private var captureOrientation: UIDeviceOrientation = .portrait
+    @State private var islandState: IslandState = .collapsed
 
     var body: some View {
-        VStack(spacing: 0) {
-            topChrome
-                .padding(.horizontal, PosterSpacing.md)
-                .padding(.top, PosterSpacing.sm)
-                .allowsHitTesting(controlsAreReady)
+        ZStack(alignment: .top) {
+            VStack(spacing: 0) {
+                topChrome
+                    .padding(.top, PosterSpacing.sm)
+                    .allowsHitTesting(controlsAreReady)
 
-            Spacer(minLength: 0)
-                .allowsHitTesting(false)
+                Spacer(minLength: 0)
+                    .allowsHitTesting(false)
 
-            bottomChrome
-                .padding(.horizontal, PosterSpacing.xs)
-                .padding(.bottom, PosterSpacing.md)
-                .safeAreaPadding(.bottom)
-                .allowsHitTesting(controlsAreReady)
+                bottomChrome
+                    .padding(.horizontal, PosterSpacing.md)
+                    .padding(.bottom, PosterSpacing.xl)
+                    .safeAreaPadding(.bottom)
+                    .allowsHitTesting(controlsAreReady)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .cameraHardwareCapture(isEnabled: controlsAreReady && !model.isPipelineBusy) {
@@ -136,40 +138,87 @@ struct ViewfinderChromeOverlay: View {
                 albumPickerItem = nil
             }
         }
+        .onChange(of: model.isPipelineBusy) { _, busy in
+            withAnimation(
+                reduceMotion
+                    ? .linear(duration: PosterMotion.reduced)
+                    : .spring(response: 0.34, dampingFraction: 0.84)
+            ) {
+                if busy {
+                    islandState = .recording
+                } else if islandState == .recording {
+                    islandState = .collapsed
+                }
+            }
+        }
     }
 
     /// One capsule per side. The trailing capsule requests the real ActivityKit
     /// system surface; no in-app panel imitates the Dynamic Island.
+    @ViewBuilder
     private var topChrome: some View {
-        HStack {
-            albumPickerButton
-
-            Spacer(minLength: 0)
-
-            Button {
-                Task { await model.triggerCameraLiveActivity() }
-            } label: {
-                Image(systemName: "camera.aperture")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(PosterPalette.paperWhite)
-                    .rotationEffect(chromeRotation)
-                    .frame(
-                        width: CameraChromeMetrics.islandSideCapsuleWidth,
-                        height: CameraChromeMetrics.islandSideCapsuleHeight
-                    )
-                    .background(PosterEffects.cameraChromeFill)
-                    .clipShape(Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(PosterPalette.cameraShutterBlue, lineWidth: 1)
-                    }
-                    .contentShape(Capsule())
+        let isMerged = islandState == .expanded
+        HStack(spacing: isMerged ? 0 : PosterSpacing.xs) {
+            if !isMerged {
+                albumPickerButton
+                    .transition(.scale.combined(with: .opacity))
+                Spacer(minLength: 0)
             }
-            .buttonStyle(PosterPressStyle())
-            .accessibilityLabel("展开灵动岛相机控制")
-            .accessibilityValue("当前倍率 \(formattedZoom)")
-            .accessibilityHint("触发系统实时活动；长按灵动岛也可展开控制")
+
+            // Centerpiece: the in-app Dynamic Island. In the merged/expanded
+            // form it spans the full available width and the side capsules
+            // hide, so the whole top row reads as one continuous black pill.
+            InAppDynamicIsland(
+                state: $islandState,
+                timeCaption: islandCaption,
+                primaryActionTitle: "去取景",
+                primaryAction: {},
+                expandedMaxWidth: isMerged ? .infinity : nil,
+                controls: isMerged ? cameraIslandControls : []
+            )
+            .frame(maxWidth: isMerged ? .infinity : nil)
+            .allowsHitTesting(controlsAreReady)
+
+            if !isMerged {
+                Spacer(minLength: 0)
+                Button {
+                    withAnimation(
+                        reduceMotion
+                            ? .linear(duration: PosterMotion.reduced)
+                            : .spring(response: 0.30, dampingFraction: 0.78)
+                    ) {
+                        islandState = .expanded
+                    }
+                } label: {
+                    Image(systemName: "camera.aperture")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(PosterPalette.paperWhite)
+                        .rotationEffect(chromeRotation)
+                        .frame(
+                            width: CameraChromeMetrics.islandSideCapsuleWidth,
+                            height: CameraChromeMetrics.islandSideCapsuleHeight
+                        )
+                        .background(PosterEffects.cameraChromeFill)
+                        .clipShape(Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(PosterPalette.cameraShutterBlue, lineWidth: 1)
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(PosterPressStyle())
+                .accessibilityLabel("展开时间相机灵动岛")
+                .accessibilityValue("当前倍率 \(formattedZoom)")
+                .accessibilityHint("点击/长按展开 app 内灵动岛，查看目标时间与快门")
+            }
         }
+        .padding(.horizontal, isMerged ? PosterSpacing.lg : PosterSpacing.xl)
+        .animation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : .spring(response: 0.40, dampingFraction: 0.86),
+            value: isMerged
+        )
         .frame(maxWidth: .infinity)
         .frame(height: CameraChromeMetrics.topRowHeight, alignment: .top)
     }
@@ -301,6 +350,89 @@ struct ViewfinderChromeOverlay: View {
         }
         return String(format: "%.1f×", value)
     }
+
+    /// Short caption shown inside the in-app Dynamic Island. Reflects the
+    /// currently selected time (e.g. "25 年后" or "此刻").
+    private var islandCaption: String {
+        if abs(model.selectedTime.offsetDays) < 0.5 {
+            return "此刻"
+        }
+        return model.selectedTime.compactLabel
+    }
+
+    /// Approximate top safe-area inset used to keep the island clear of the
+    /// status bar. We don't read the real one here because RootView already
+    /// places the chrome inside the safe area — this offset is the room
+    /// between the safe area and the top of the camera chrome.
+    private var topSafeAreaInset: CGFloat { 0 }
+
+    /// Camera controls shown inside the expanded island. Same chrome that
+    /// used to live in the side capsules of the top chrome (aspect ratio,
+    /// flip lens, flash, grid). Tapping any of them closes the island after
+    /// applying the change.
+    private var cameraIslandControls: [IslandControl] {
+        [
+            IslandControl(
+                id: "aspect",
+                systemImage: aspectIconName,
+                label: model.cameraAspectRatio.label,
+                isEnabled: true,
+                action: {
+                    model.selectCameraAspectRatio(model.cameraAspectRatio.next)
+                    closeIsland()
+                }
+            ),
+            IslandControl(
+                id: "flip",
+                systemImage: "arrow.triangle.2.circlepath",
+                label: "翻转",
+                isEnabled: model.cameraControlSnapshot.canSwitchCamera,
+                action: {
+                    Task { await model.switchCameraLens() }
+                    closeIsland()
+                }
+            ),
+            IslandControl(
+                id: "flash",
+                systemImage: model.cameraControlSnapshot.flashMode.systemImageName,
+                label: model.cameraControlSnapshot.flashMode.accessibilityLabel,
+                isEnabled: model.cameraControlSnapshot.supportsFlash,
+                action: {
+                    Task { await model.cycleFlashMode() }
+                }
+            ),
+            IslandControl(
+                id: "grid",
+                systemImage: model.isCameraGridEnabled ? "grid.circle.fill" : "grid",
+                label: model.isCameraGridEnabled ? "网格·开" : "网格·关",
+                isEnabled: true,
+                action: {
+                    model.toggleCameraGrid()
+                }
+            )
+        ]
+    }
+
+    /// SF Symbol used for the aspect-ratio control. Mirrors what the chrome
+    /// icon used to show in the older design.
+    private var aspectIconName: String {
+        switch model.cameraAspectRatio {
+        case .fullScreen: "rectangle.expand.vertical"
+        case .widescreen: "rectangle"
+        case .classic: "rectangle.portrait"
+        case .square: "square"
+        }
+    }
+
+    private func closeIsland() {
+        withAnimation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : .easeInOut(duration: 0.20)
+        ) {
+            islandState = .collapsed
+        }
+    }
 }
 
 /// PhotosPicker Transferable for JPEG / PNG / HEIC library bytes.
@@ -361,11 +493,15 @@ private struct CameraCompositionGlass: View {
                 .fill(adaptiveTint, style: FillStyle(eoFill: true))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(PosterEffects.cameraCompositionStroke, lineWidth: 1)
-                .frame(width: cropFrame.width, height: cropFrame.height)
-                .position(x: cropFrame.midX, y: cropFrame.midY)
-                .opacity(drawsFrame ? 1 : 0)
+            // The white frame is gone; corner focus brackets live in
+            // ``CameraCompositionCorners`` so the crop reads as a real camera
+            // AF viewfinder rather than a rounded rectangle.
+            if drawsFrame {
+                CameraCompositionCorners(
+                    frame: cropFrame,
+                    cornerRadius: cornerRadius
+                )
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)

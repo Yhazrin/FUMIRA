@@ -76,6 +76,7 @@ struct SharePosterView: View {
     private var feedbackRow: some View {
         if let message = model.shareFeedbackMessage {
             StatusPill(icon: "checkmark.circle.fill", label: message, isActive: true)
+                .posterSymbolBounce(trigger: message)
                 .accessibilityLabel(message)
         } else if let error = model.lastErrorMessage {
             StatusPill(icon: "exclamationmark.triangle.fill", label: error)

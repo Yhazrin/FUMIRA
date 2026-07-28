@@ -70,6 +70,12 @@ export interface GenerationRecord {
   promptTruncated: boolean;
   promptCharCount: number;
   resultRelativeUrl?: string;
+  /** Optional URL of the post-repair image (relative to PUBLIC_BASE_URL). */
+  repairedResultRelativeUrl?: string;
+  /** Number of repair attempts run so far; capped at 1 per generation. */
+  repairAttempts?: number;
+  /** Last validation summary kept for admin telemetry; never returned to the app client. */
+  validationSummary?: GenerationValidationResult;
   errorCode?: string;
   userMessage?: string;
   retryable?: boolean;
@@ -229,4 +235,53 @@ export interface MiniMaxIntelligenceAdapter {
     copyConstraints: StoryCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<TemporalStoryPayload>>;
+}
+
+/**
+ * Dual-image VLM compare of source photo vs generated target photo.
+ * Returned only when a generation passes through the optional post validator.
+ */
+export interface GenerationValidationResult {
+  cameraConsistency: number;
+  anchorPreservation: number;
+  identityConsistency: number;
+  temporalCoverage: number;
+  eraCoherence: number;
+  storyAlignment: number;
+  problems: string[];
+  repairInstructions: string[];
+  shouldRegenerate: boolean;
+}
+
+export interface ValidationCopyConstraints {
+  problem: 80;
+  repairInstruction: 120;
+}
+
+export interface PostGenerationValidationInput {
+  sourceBytes: Buffer;
+  sourceContentType: string;
+  targetBytes: Buffer;
+  targetContentType: string;
+  targetTime: { offsetYears: number; compactLabel: string };
+  understanding: SceneUnderstandingPayload | null;
+  storyBeat: StoryBeatPayload | null;
+  requestId: string;
+}
+
+export type PostGenerationValidationResult =
+  | { ok: true; value: GenerationValidationResult }
+  | MiniMaxIntelligenceFailure;
+
+export interface PostGenerationValidationAdapter {
+  validate(
+    input: PostGenerationValidationInput
+  ): Promise<PostGenerationValidationResult>;
+}
+
+/** Same shape returned by the standalone parseValidationResponse helper. */
+export interface RepairPlan {
+  shouldRegenerate: boolean;
+  problems: string[];
+  repairInstructions: string[];
 }

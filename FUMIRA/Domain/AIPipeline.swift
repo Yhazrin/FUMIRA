@@ -97,10 +97,40 @@ enum UnderstandingCopyPolicy {
     static let timeClue = 24
     static let changeDriver = 24
     static let subjectName = 18
-    static let identityRule = 48
+    static let identityRule = 80
+    /// CameraLock fields (viewpoint / lensAndPerspective / horizon / depthStructure).
+    static let cameraLockField = 80
+    /// SpatialAnchor name.
+    static let spatialAnchorName = 24
+    /// SpatialAnchor depth label.
+    static let spatialAnchorDepth = 16
+    /// SpatialAnchor position string.
+    static let spatialAnchorPosition = 96
+    /// SpatialAnchor geometry / material / silhouette.
+    static let spatialAnchorGeometry = 96
+    /// SpatialAnchor identityLock.
+    static let spatialAnchorIdentity = 96
+    /// TemporalLayer.layer (one of the six required systems).
+    static let temporalLayerName = 28
+    /// TemporalLayer.visibleEvidence.
+    static let temporalLayerEvidence = 96
+    /// TemporalLayer.pastPotential / futurePotential.
+    static let temporalLayerPotential = 96
+    /// Scene Bible storySeeds (slightly looser than change drivers).
+    static let storySeed = 56
+    /// HardConstraint sentence.
+    static let hardConstraint = 96
 
     static func limit(_ value: String, to maximum: Int) -> String {
         GeneratedCopyLimiter.limit(value, to: maximum)
+    }
+
+    /// Limit an optional field; returns nil if the source is nil or empty after trimming.
+    static func limitOrNil(_ value: String?, to maximum: Int) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return limit(trimmed, to: maximum)
     }
 }
 
@@ -131,6 +161,18 @@ struct CameraLock: Hashable, Codable, Sendable {
     var lensAndPerspective: String?
     var horizon: String?
     var depthStructure: String?
+
+    init(
+        viewpoint: String? = nil,
+        lensAndPerspective: String? = nil,
+        horizon: String? = nil,
+        depthStructure: String? = nil
+    ) {
+        self.viewpoint = UnderstandingCopyPolicy.limitOrNil(viewpoint, to: UnderstandingCopyPolicy.cameraLockField)
+        self.lensAndPerspective = UnderstandingCopyPolicy.limitOrNil(lensAndPerspective, to: UnderstandingCopyPolicy.cameraLockField)
+        self.horizon = UnderstandingCopyPolicy.limitOrNil(horizon, to: UnderstandingCopyPolicy.cameraLockField)
+        self.depthStructure = UnderstandingCopyPolicy.limitOrNil(depthStructure, to: UnderstandingCopyPolicy.cameraLockField)
+    }
 }
 
 struct SpatialAnchor: Hashable, Codable, Sendable {
@@ -139,6 +181,20 @@ struct SpatialAnchor: Hashable, Codable, Sendable {
     var position: String?
     var geometry: String?
     var identityLock: String?
+
+    init(
+        name: String,
+        depth: String? = nil,
+        position: String? = nil,
+        geometry: String? = nil,
+        identityLock: String? = nil
+    ) {
+        self.name = UnderstandingCopyPolicy.limit(name, to: UnderstandingCopyPolicy.spatialAnchorName)
+        self.depth = UnderstandingCopyPolicy.limitOrNil(depth, to: UnderstandingCopyPolicy.spatialAnchorDepth)
+        self.position = UnderstandingCopyPolicy.limitOrNil(position, to: UnderstandingCopyPolicy.spatialAnchorPosition)
+        self.geometry = UnderstandingCopyPolicy.limitOrNil(geometry, to: UnderstandingCopyPolicy.spatialAnchorGeometry)
+        self.identityLock = UnderstandingCopyPolicy.limitOrNil(identityLock, to: UnderstandingCopyPolicy.spatialAnchorIdentity)
+    }
 }
 
 struct TemporalLayer: Hashable, Codable, Sendable {
@@ -147,6 +203,20 @@ struct TemporalLayer: Hashable, Codable, Sendable {
     var pastPotential: String?
     var futurePotential: String?
     var confidence: Double?
+
+    init(
+        layer: String,
+        visibleEvidence: String? = nil,
+        pastPotential: String? = nil,
+        futurePotential: String? = nil,
+        confidence: Double? = nil
+    ) {
+        self.layer = UnderstandingCopyPolicy.limit(layer, to: UnderstandingCopyPolicy.temporalLayerName)
+        self.visibleEvidence = UnderstandingCopyPolicy.limitOrNil(visibleEvidence, to: UnderstandingCopyPolicy.temporalLayerEvidence)
+        self.pastPotential = UnderstandingCopyPolicy.limitOrNil(pastPotential, to: UnderstandingCopyPolicy.temporalLayerPotential)
+        self.futurePotential = UnderstandingCopyPolicy.limitOrNil(futurePotential, to: UnderstandingCopyPolicy.temporalLayerPotential)
+        self.confidence = confidence
+    }
 }
 
 struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
@@ -203,14 +273,14 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
         self.storySeeds = storySeeds.map {
             Array(
                 $0.prefix(8).map {
-                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.changeDriver)
+                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.storySeed)
                 }.filter { !$0.isEmpty }
             )
         }
         self.hardConstraints = hardConstraints.map {
             Array(
                 $0.prefix(8).map {
-                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.identityRule)
+                    UnderstandingCopyPolicy.limit($0, to: UnderstandingCopyPolicy.hardConstraint)
                 }.filter { !$0.isEmpty }
             )
         }
@@ -238,6 +308,73 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
                 confidence: 0.91,
                 identityRule: "维持地平线高度，让城市密度随年代变化"
             )
+        ],
+        cameraLock: CameraLock(
+            viewpoint: "中景对称视角",
+            lensAndPerspective: "中等焦段、轻微广角",
+            horizon: "位于画面上三分之一",
+            depthStructure: "前景树木、中景步道、背景城市轮廓"
+        ),
+        spatialAnchors: [
+            SpatialAnchor(
+                name: "三棵景观树",
+                depth: "前景",
+                position: "画面左侧 1/3 处",
+                geometry: "三棵相互错开的高大乔木",
+                identityLock: "保留三棵树的相对位置和树冠轮廓"
+            ),
+            SpatialAnchor(
+                name: "中央步道",
+                depth: "中景",
+                position: "由近及远向画面中心延伸",
+                geometry: "连续铺装面，与两侧草坡形成三段式深度",
+                identityLock: "保留透视方向与中心轴"
+            ),
+            SpatialAnchor(
+                name: "城市天际线",
+                depth: "背景",
+                position: "画面最上沿",
+                geometry: "中等高度建筑群的连续轮廓",
+                identityLock: "维持地平线高度，允许建筑密度随年代变化"
+            )
+        ],
+        temporalLayers: [
+            TemporalLayer(
+                layer: "vegetation",
+                visibleEvidence: "前景树木年轻、草坡平整",
+                pastPotential: "树木更矮、草坡未铺设",
+                futurePotential: "树木长大成荫、草坡自然起伏",
+                confidence: 0.95
+            ),
+            TemporalLayer(
+                layer: "infrastructure",
+                visibleEvidence: "中央步道为新修铺装",
+                pastPotential: "步道未铺设或为临时线",
+                futurePotential: "铺装更新、增设座椅或路灯",
+                confidence: 0.9
+            ),
+            TemporalLayer(
+                layer: "architecture",
+                visibleEvidence: "远处可见低层建筑群",
+                pastPotential: "建筑稀疏或为低矮房屋",
+                futurePotential: "建筑密度增高，可加一两座新楼",
+                confidence: 0.8
+            ),
+            TemporalLayer(
+                layer: "movableObjects",
+                visibleEvidence: "原图未见显著动态主体",
+                pastPotential: "无抢镜主体",
+                futurePotential: "保持主体稳定即可",
+                confidence: 0.6
+            )
+        ],
+        storySeeds: [
+            "同一片土地在世代之间被反复照料",
+            "城市与公园的关系以密度变化呈现"
+        ],
+        hardConstraints: [
+            "不得新增抢镜的行人或动物",
+            "保持树木位置与步道轴线"
         ]
     )
 }
@@ -308,7 +445,7 @@ enum StoryCopyPolicy {
     static let title = 16
     static let logline = 56
     static let presentTruth = 72
-    static let identityRule = 48
+    static let identityRule = 80
     static let beatTitle = 14
     static let beatNarrative = 72
     static let visualPrompt = 140

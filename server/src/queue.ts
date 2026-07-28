@@ -22,15 +22,28 @@ import type {
   ImageGenerationAdapter,
   ImageGenerationProvider,
 } from "./types.js";
-// TODO(P2 validation): wire `buildValidationPrompt` / `shouldAttemptRepair`
-// from `./validation.js` after first successful generation when dual-image
-// VLM compare is available. Keep generation succeeding without auto-redraw for now.
+import {
+  getPostGenerationValidationAdapter,
+  planFromValidation,
+  runPostGenerationValidation,
+} from "./validationService.js";
+import { shouldAttemptRepair, DEFAULT_REPAIR_INSTRUCTION } from "./validation.js";
+import type {
+  SceneUnderstandingPayload,
+  StoryBeatPayload,
+} from "./types.js";
 
 const adapters = new Map<ImageGenerationProvider, ImageGenerationAdapter>();
 const processing = new Set<string>();
 const promptByGeneration = new Map<
   string,
-  { prompt: string; useSubjectReference: boolean }
+  {
+    prompt: string;
+    useSubjectReference: boolean;
+    understanding: SceneUnderstandingPayload | null;
+    storyBeat: StoryBeatPayload | null;
+    targetTime: { offsetYears: number; compactLabel: string };
+  }
 >();
 
 export function setImageGenerationAdapter(
@@ -201,6 +214,9 @@ export function createGenerationJob(
   promptByGeneration.set(record.generationId, {
     prompt: built.prompt,
     useSubjectReference: Boolean(body.useSubjectReference),
+    understanding: body.understanding ?? null,
+    storyBeat: beat ?? null,
+    targetTime: body.timePosition,
   });
 
   putGeneration(record);
@@ -285,6 +301,7 @@ async function processGeneration(generationId: string): Promise<void> {
           durationMs: Date.now() - startedAt,
         })
       );
+      promptByGeneration.delete(generationId);
       return;
     }
 
@@ -294,11 +311,46 @@ async function processGeneration(generationId: string): Promise<void> {
       contentType: result.contentType,
     });
 
+    const primaryRelativeUrl = resultRelativeUrl;
     updateGeneration(generationId, {
       status: "succeeded",
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      resultRelativeUrl,
+      resultRelativeUrl: primaryRelativeUrl,
+    });
+
+    // Post-generation validation + at-most-one repair, only when validation is
+    // enabled and we have enough metadata to compare source vs target.
+    const finalRelativeUrl = await maybeRepair({
+      generationId,
+      requestId: current.requestId,
+      sourceBytes: asset.bytes,
+      sourceContentType: asset.contentType,
+      targetBytes: result.imageBytes,
+      targetContentType: result.contentType,
+      targetTime: stored?.targetTime ?? {
+        offsetYears: 0,
+        compactLabel: "NOW",
+      },
+      understanding: stored?.understanding ?? null,
+      storyBeat: stored?.storyBeat ?? null,
+      aspectRatio: current.aspectRatio,
+      adapter,
+      useSubjectReference: Boolean(stored?.useSubjectReference),
+    });
+    const finalUrl = finalRelativeUrl ?? primaryRelativeUrl;
+    promptByGeneration.delete(generationId);
+
+    updateGeneration(generationId, {
+      resultRelativeUrl: finalUrl,
+      updatedAt: new Date().toISOString(),
+    });
+
+    updateGeneration(generationId, {
+      status: "succeeded",
+      finishedAt: new Date().toISOString(),
+      durationMs: Date.now() - startedAt,
+      resultRelativeUrl: finalUrl,
     });
 
     console.info(
@@ -325,6 +377,120 @@ async function processGeneration(generationId: string): Promise<void> {
   } finally {
     processing.delete(generationId);
   }
+}
+
+/**
+ * Run an optional dual-image VLM validate against the just-generated image,
+ * and at most once trigger a regenerate with a repair-instruction augmented
+ * prompt. Returns the relative URL of the chosen final image, or `null`
+ * when no validation was performed / the primary result is the final image.
+ */
+async function maybeRepair(input: {
+  generationId: string;
+  requestId: string;
+  sourceBytes: Buffer;
+  sourceContentType: string;
+  targetBytes: Buffer;
+  targetContentType: string;
+  targetTime: { offsetYears: number; compactLabel: string };
+  understanding: SceneUnderstandingPayload | null;
+  storyBeat: StoryBeatPayload | null;
+  aspectRatio: ImageGenerationAdapter["generate"] extends (args: infer A) => unknown
+    ? (A extends { aspectRatio: infer R } ? R : never)
+    : never;
+  adapter: ImageGenerationAdapter;
+  useSubjectReference: boolean;
+}): Promise<string | null> {
+  const validator = getPostGenerationValidationAdapter();
+  if (!validator) return null;
+  const validationStart = Date.now();
+  const validation = await runPostGenerationValidation({
+    sourceAssetId: input.generationId,
+    sourceContentType: input.sourceContentType,
+    targetBytes: input.targetBytes,
+    targetContentType: input.targetContentType,
+    targetTime: input.targetTime,
+    understanding: input.understanding,
+    storyBeat: input.storyBeat,
+    requestId: input.requestId,
+  }).catch(() => null);
+  if (!validation) return null;
+  if (!validation.ok) {
+    console.info(
+      JSON.stringify({
+        event: "validation_failed",
+        requestId: input.requestId,
+        generationId: input.generationId,
+        errorCode: validation.errorCode,
+        durationMs: Date.now() - validationStart,
+      })
+    );
+    return null;
+  }
+  const value = validation.value;
+  console.info(
+    JSON.stringify({
+      event: "validation_succeeded",
+      requestId: input.requestId,
+      generationId: input.generationId,
+      cameraConsistency: value.cameraConsistency,
+      anchorPreservation: value.anchorPreservation,
+      identityConsistency: value.identityConsistency,
+      temporalCoverage: value.temporalCoverage,
+      eraCoherence: value.eraCoherence,
+      storyAlignment: value.storyAlignment,
+      shouldRegenerate: value.shouldRegenerate,
+      durationMs: Date.now() - validationStart,
+    })
+  );
+  if (!shouldAttemptRepair(value)) return null;
+  const plan = planFromValidation(value);
+  const repairInstructions =
+    plan?.repairInstructions ?? [DEFAULT_REPAIR_INSTRUCTION];
+  const repairPrompt = buildRepairPrompt(repairInstructions);
+  const repair = await input.adapter.generate({
+    prompt: repairPrompt,
+    imageDataUrl: toJpegDataUrl(input.sourceBytes, input.sourceContentType),
+    aspectRatio: input.aspectRatio as never,
+    useSubjectReference: input.useSubjectReference,
+    requestId: input.requestId,
+    generationId: `${input.generationId}-repair`,
+  });
+  if (!repair.ok) {
+    console.info(
+      JSON.stringify({
+        event: "repair_failed",
+        requestId: input.requestId,
+        generationId: input.generationId,
+        errorCode: repair.errorCode,
+      })
+    );
+    return null;
+  }
+  const repairedUrl = await saveGeneratedImage({
+    generationId: `${input.generationId}-repair`,
+    bytes: repair.imageBytes,
+    contentType: repair.contentType,
+  });
+  console.info(
+    JSON.stringify({
+      event: "repair_succeeded",
+      requestId: input.requestId,
+      generationId: input.generationId,
+      repairUrl: repairedUrl,
+      problems: value.problems,
+      repairInstructions,
+    })
+  );
+  return repairedUrl;
+}
+
+function buildRepairPrompt(instructions: string[]): string {
+  return [
+    "上一轮结果被判定为时间分布不均，按下列修复指令重画：",
+    ...instructions.map((line, index) => `${index + 1}. ${line}`),
+    "其它约束（构图、空间锚点、相机、连续性约束）保持不变。",
+  ].join("\n");
 }
 
 export function toClientGeneration(record: GenerationRecord) {

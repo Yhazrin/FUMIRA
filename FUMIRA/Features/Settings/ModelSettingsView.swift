@@ -16,6 +16,7 @@ struct SettingsView: View {
                 } header: {
                     Text("关于")
                 }
+                .posterStaggerReveal(index: 0)
 
                 Section {
                     Toggle(
@@ -35,6 +36,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("网格也可在取景器左上角开关。")
                 }
+                .posterStaggerReveal(index: 1)
 
                 Section {
                     Picker(
@@ -66,6 +68,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("选择只影响最终图片生成。图片理解与故事仍使用各自的模型路由，服务密钥保存在 FUMIRA 后台。")
                 }
+                .posterStaggerReveal(index: 2)
 
                 Section {
                     NavigationLink {
@@ -83,6 +86,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("App 只保存路由 ID。供应商密钥与具体模型版本由 FUMIRA 后台管理，不会写入客户端。普通使用无需进入此页。")
                 }
+                .posterStaggerReveal(index: 3)
 
                 if let message = model.lastErrorMessage {
                     Section {
@@ -90,6 +94,7 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(PosterPalette.errorCoral)
                     }
+                    .posterStaggerReveal(index: 4)
                 }
             }
             .navigationTitle("设置")

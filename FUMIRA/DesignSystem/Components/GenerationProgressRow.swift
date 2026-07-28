@@ -16,6 +16,7 @@ struct GenerationProgressRow: View {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(PosterPalette.actionBlue)
+                        .posterSymbolBounce(trigger: isComplete)
                 }
             }
 

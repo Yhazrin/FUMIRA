@@ -15,10 +15,34 @@ const bounds: Record<
   timeClue: { defaultValue: 24, minimum: 8, maximum: 48 },
   changeDriver: { defaultValue: 24, minimum: 8, maximum: 48 },
   subjectName: { defaultValue: 18, minimum: 4, maximum: 36 },
-  identityRule: { defaultValue: 48, minimum: 16, maximum: 100 },
+  /** Subject identity rule; raised to mirror the V2 StoryBeat identityRule. */
+  identityRule: { defaultValue: 80, minimum: 16, maximum: 120 },
 };
 
-const sceneBibleFieldLimit = 64;
+/**
+ * Per-field character budgets for the Scene Bible extension fields.
+ * Field-specific limits let the VLM write a full sentence for layers / seeds
+ * instead of forcing every free-form field into the same 64-char ceiling.
+ */
+const sceneBibleBudgets = {
+  cameraLockField: 80,
+  spatialAnchorName: 24,
+  spatialAnchorDepth: 16,
+  spatialAnchorPosition: 96,
+  spatialAnchorGeometry: 96,
+  spatialAnchorIdentity: 96,
+  temporalLayerName: 28,
+  temporalLayerEvidence: 96,
+  temporalLayerPotential: 96,
+  storySeed: 56,
+  hardConstraint: 96,
+} as const;
+
+type SceneBibleBudgetKey = keyof typeof sceneBibleBudgets;
+
+function sceneBibleBudget(key: SceneBibleBudgetKey): number {
+  return sceneBibleBudgets[key];
+}
 
 export function resolveUnderstandingCopyConstraints(
   requested?: Partial<UnderstandingCopyConstraints>
@@ -40,15 +64,21 @@ export function normalizeSceneUnderstandingCopy(
 ): SceneUnderstandingPayload {
   const cameraLock = value.cameraLock
     ? {
-        viewpoint: optionalLimit(value.cameraLock.viewpoint, sceneBibleFieldLimit),
+        viewpoint: optionalLimit(
+          value.cameraLock.viewpoint,
+          sceneBibleBudget("cameraLockField")
+        ),
         lensAndPerspective: optionalLimit(
           value.cameraLock.lensAndPerspective,
-          sceneBibleFieldLimit
+          sceneBibleBudget("cameraLockField")
         ),
-        horizon: optionalLimit(value.cameraLock.horizon, sceneBibleFieldLimit),
+        horizon: optionalLimit(
+          value.cameraLock.horizon,
+          sceneBibleBudget("cameraLockField")
+        ),
         depthStructure: optionalLimit(
           value.cameraLock.depthStructure,
-          sceneBibleFieldLimit
+          sceneBibleBudget("cameraLockField")
         ),
       }
     : undefined;
@@ -74,30 +104,51 @@ export function normalizeSceneUnderstandingCopy(
     spatialAnchors: value.spatialAnchors
       ?.slice(0, 8)
       .map((anchor) => ({
-        name: limit(anchor.name, constraints.subjectName),
-        depth: optionalLimit(anchor.depth, 16),
-        position: optionalLimit(anchor.position, sceneBibleFieldLimit),
-        geometry: optionalLimit(anchor.geometry, sceneBibleFieldLimit),
-        identityLock: optionalLimit(anchor.identityLock, constraints.identityRule),
+        name: limit(anchor.name, sceneBibleBudget("spatialAnchorName")),
+        depth: optionalLimit(
+          anchor.depth,
+          sceneBibleBudget("spatialAnchorDepth")
+        ),
+        position: optionalLimit(
+          anchor.position,
+          sceneBibleBudget("spatialAnchorPosition")
+        ),
+        geometry: optionalLimit(
+          anchor.geometry,
+          sceneBibleBudget("spatialAnchorGeometry")
+        ),
+        identityLock: optionalLimit(
+          anchor.identityLock,
+          sceneBibleBudget("spatialAnchorIdentity")
+        ),
       }))
       .filter((anchor) => Boolean(anchor.name)),
     temporalLayers: value.temporalLayers
       ?.slice(0, 8)
       .map((layer) => ({
-        layer: limit(layer.layer, 28),
-        visibleEvidence: optionalLimit(layer.visibleEvidence, sceneBibleFieldLimit),
-        pastPotential: optionalLimit(layer.pastPotential, sceneBibleFieldLimit),
-        futurePotential: optionalLimit(layer.futurePotential, sceneBibleFieldLimit),
+        layer: limit(layer.layer, sceneBibleBudget("temporalLayerName")),
+        visibleEvidence: optionalLimit(
+          layer.visibleEvidence,
+          sceneBibleBudget("temporalLayerEvidence")
+        ),
+        pastPotential: optionalLimit(
+          layer.pastPotential,
+          sceneBibleBudget("temporalLayerPotential")
+        ),
+        futurePotential: optionalLimit(
+          layer.futurePotential,
+          sceneBibleBudget("temporalLayerPotential")
+        ),
         confidence: layer.confidence,
       }))
       .filter((layer) => Boolean(layer.layer)),
     storySeeds: value.storySeeds
       ?.slice(0, 8)
-      .map((item) => limit(item, constraints.changeDriver))
+      .map((item) => limit(item, sceneBibleBudget("storySeed")))
       .filter(Boolean),
     hardConstraints: value.hardConstraints
       ?.slice(0, 8)
-      .map((item) => limit(item, constraints.identityRule))
+      .map((item) => limit(item, sceneBibleBudget("hardConstraint")))
       .filter(Boolean),
   };
 }

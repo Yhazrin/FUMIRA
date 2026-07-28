@@ -5,6 +5,9 @@ import { LiveAPIMartAdapter } from "./apimart/liveAdapter.js";
 import { LiveMiniMaxAdapter } from "./minimax/liveAdapter.js";
 import { LiveMiniMaxIntelligenceAdapter } from "./minimax/liveIntelligenceAdapter.js";
 import { setMiniMaxIntelligenceAdapter } from "./intelligence.js";
+import { LiveMiniMaxValidationAdapter } from "./minimax/liveValidationAdapter.js";
+import { MockValidationAdapter } from "./minimax/mockValidationAdapter.js";
+import { setPostGenerationValidationAdapter } from "./validationService.js";
 import { MockMiniMaxAdapter } from "./minimax/mockAdapter.js";
 import {
   setImageGenerationAdapter,
@@ -25,6 +28,10 @@ export interface BuildAppOptions {
   apiMartAdapter?: MiniMaxAdapter | null;
   /** Force a specific image-understanding / story adapter (tests). */
   intelligenceAdapter?: import("./types.js").MiniMaxIntelligenceAdapter | null;
+  /** Force a specific dual-image validation adapter (tests). */
+  validationAdapter?: import("./types.js").PostGenerationValidationAdapter | null;
+  /** Disable the live validation binding even when keys exist (tests). */
+  disableLiveValidation?: boolean;
   /** Skip binding listen — for inject() tests. */
   skipListen?: boolean;
 }
@@ -64,6 +71,23 @@ export async function buildApp(options: BuildAppOptions = {}) {
     ));
   } else {
     setMiniMaxIntelligenceAdapter(null);
+  }
+
+  if (options.validationAdapter !== undefined) {
+    setPostGenerationValidationAdapter(options.validationAdapter);
+  } else if (options.disableLiveValidation) {
+    setPostGenerationValidationAdapter(null);
+  } else if (config.minimaxMock) {
+    // Default to a passing mock validator in mock mode so the queue can
+    // exercise the validation pipeline without a live VLM round-trip.
+    setPostGenerationValidationAdapter(new MockValidationAdapter());
+  } else if (config.minimaxApiKey) {
+    setPostGenerationValidationAdapter(new LiveMiniMaxValidationAdapter(
+      config.minimaxApiKey,
+      config.minimaxVlmApiKey
+    ));
+  } else {
+    setPostGenerationValidationAdapter(null);
   }
 
   const app = Fastify({

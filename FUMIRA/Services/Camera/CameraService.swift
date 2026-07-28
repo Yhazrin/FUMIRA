@@ -83,6 +83,17 @@ enum CameraAspectRatio: String, CaseIterable, Sendable, Equatable {
             return 1
         }
     }
+
+    /// Cycles through the standard ratios. Used by the in-app Dynamic Island
+    /// control so the chrome stays self-contained.
+    var next: CameraAspectRatio {
+        switch self {
+        case .fullScreen: .widescreen
+        case .widescreen: .classic
+        case .classic: .square
+        case .square: .fullScreen
+        }
+    }
 }
 
 struct CameraControlSnapshot: Sendable, Equatable {

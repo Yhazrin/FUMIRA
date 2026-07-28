@@ -17,6 +17,9 @@ struct PhotoDropLanding: View {
     @State private var angle: Double = 0
     @State private var shadowLift: CGFloat = 18
     @State private var didSettle = false
+    /// Bumped once when the paper comes to rest so a one-shot sensory + symbol
+    /// cue can fire. Reset between drops so a fresh photo triggers again.
+    @State private var landingToken: Int = 0
 
     var body: some View {
         PhotoAspectContainer(
@@ -48,6 +51,8 @@ struct PhotoDropLanding: View {
         )
         .accessibilityElement(children: .contain)
         .onAppear(perform: settleTiltIfNeeded)
+        .posterSensoryFeedback(trigger: landingToken, .success)
+        .posterSymbolBounce(trigger: landingToken)
     }
 
     private func settleTiltIfNeeded() {
@@ -58,6 +63,7 @@ struct PhotoDropLanding: View {
         if reduceMotion {
             angle = restTilt
             shadowLift = 10
+            landingToken &+= 1
             return
         }
 
@@ -68,6 +74,7 @@ struct PhotoDropLanding: View {
         withAnimation(.timingCurve(0.16, 0.88, 0.18, 1, duration: PosterMotion.page)) {
             angle = restTilt
             shadowLift = 10
+            landingToken &+= 1
         }
     }
 

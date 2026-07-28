@@ -7,9 +7,16 @@ import type {
 /**
  * Deterministic mock MiniMax adapter for CI / local flow tests.
  * Supports injectable failure modes via prompt markers (test-only).
+ *
+ * Each generated call is appended to `calls` so tests can assert how many
+ * attempts happened, e.g. whether post-generation validation triggered a
+ * single repair redraw.
  */
 export class MockMiniMaxAdapter implements MiniMaxAdapter {
+  readonly calls: MiniMaxGenerateInput[] = [];
+
   async generate(input: MiniMaxGenerateInput): Promise<MiniMaxGenerateResult> {
+    this.calls.push(input);
     if (input.prompt.includes("__FORCE_2013__")) {
       return {
         ok: false,
