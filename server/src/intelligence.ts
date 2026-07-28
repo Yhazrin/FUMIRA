@@ -57,19 +57,22 @@ export async function writeTemporalStory(input: {
   if (!adapter) return unavailable("story_unavailable", "时间故事暂未就绪。");
   const result = await adapter.writeStory(input);
   if (!result.ok) return result;
-  // Promote V1 (optional targetBeat) → V2 (required targetBeat).
-  // If the model returned a targetBeat, keep it; otherwise fall back to
-  // nearest canonical — but the validation layer should catch this.
+
+  // generation.v2 promises an exact target beat. Silently substituting a
+  // nearby canonical beat makes the contract appear valid while rendering the
+  // wrong year, so fail visibly and allow a clean retry instead.
+  if (!result.value.targetBeat) {
+    return invalidAIResponse("时间故事缺少精确目标节点，请重试。");
+  }
+
   const targetOffsetYears = input.targetTime.offsetDays / 365.25;
   const v2 = promoteToV2(result.value, targetOffsetYears, input.copyConstraints);
   return { ok: true, value: v2 };
 }
 
 /**
- * Generate a single exact target beat for a browse-year generation.
- * The model produces narrative + visual changes for the exact requested year;
- * the server overwrites anchorYears and attaches the program-authoritative
- * ExactTarget identity so the client can verify match.
+ * Generate one exact target beat for a browse-year generation while retaining
+ * the causal and identity contract of the story the user is already browsing.
  */
 export async function writeTargetBeat(input: {
   understanding: SceneUnderstandingPayload;
@@ -77,7 +80,12 @@ export async function writeTargetBeat(input: {
     title: string;
     presentTruth: string;
     identityRules: string[];
-    canonicalBeats: Array<{ anchorYears: number; title: string; narrative: string; visualPrompt: string }>;
+    canonicalBeats: Array<{
+      anchorYears: number;
+      title: string;
+      narrative: string;
+      visualPrompt: string;
+    }>;
   };
   target: ExactTarget;
   requestId: string;
@@ -88,25 +96,43 @@ export async function writeTargetBeat(input: {
   if (!adapter) return unavailable("story_unavailable", "时间故事暂未就绪。");
 
   const targetOffsetYears = input.target.offsetDays / 365.25;
-
-  // Use the story adapter to generate a single beat for the exact target.
-  // We construct a minimal story request with the target as the only beat.
   const result = await adapter.writeStory({
     understanding: input.understanding,
     targetTime: input.target,
     copyConstraints: {
-      title: 16, logline: 56, presentTruth: 72, identityRule: 48,
-      beatTitle: 14, beatNarrative: 72, visualPrompt: 110,
+      title: 16,
+      logline: 56,
+      presentTruth: 72,
+      identityRule: 48,
+      beatTitle: 14,
+      beatNarrative: 72,
+      visualPrompt: 110,
     },
     requestId: input.requestId,
-  });
+    storyContext: input.storyContext,
+    exactTargetOnly: true,
+  } as Parameters<MiniMaxIntelligenceAdapter["writeStory"]>[0]);
 
   if (!result.ok) return result;
+  if (!result.value.targetBeat) {
+    return invalidAIResponse("精确年份节点生成失败，请重试。");
+  }
 
-  // Find the targetBeat from the model response, or fall back to nearest canonical.
-  const modelBeat = result.value.targetBeat ?? nearestBeat(result.value.beats, targetOffsetYears);
+  const normalized = normalizeTemporalStoryCopy(
+    { ...result.value, beats: result.value.beats },
+    {
+      title: 16,
+      logline: 56,
+      presentTruth: 72,
+      identityRule: 48,
+      beatTitle: 14,
+      beatNarrative: 72,
+      visualPrompt: 110,
+    }
+  );
+  const modelBeat = normalized.targetBeat;
+  if (!modelBeat) return invalidAIResponse("精确年份节点生成失败，请重试。");
 
-  // Overwrite with program-authoritative time identity.
   const targetBeat: StoryBeatPayload = {
     anchorYears: targetOffsetYears,
     title: modelBeat.title,
@@ -118,15 +144,13 @@ export async function writeTargetBeat(input: {
   return { ok: true, targetBeat };
 }
 
-function nearestBeat(beats: StoryBeatPayload[], offsetYears: number): StoryBeatPayload {
-  if (!beats.length) {
-    return { anchorYears: offsetYears, title: "", narrative: "", visualPrompt: "" };
-  }
-  return beats.reduce((best, beat) =>
-    Math.abs(beat.anchorYears - offsetYears) < Math.abs(best.anchorYears - offsetYears)
-      ? beat
-      : best
-  );
+function invalidAIResponse(userMessage: string) {
+  return {
+    ok: false as const,
+    errorCode: "invalid_ai_response",
+    userMessage,
+    retryable: true,
+  };
 }
 
 function unavailable(errorCode: string, userMessage: string, retryable = true) {
