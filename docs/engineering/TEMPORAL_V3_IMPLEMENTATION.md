@@ -1,215 +1,183 @@
-# Temporal Generation V3 — Implemented Pipeline
+# Temporal Generation V3 — Runtime Implementation
 
 ## Status
 
-This document describes executable server behavior in the
-`prompt-v3-scene-evolution` branch. It is not a future proposal.
-
-The structured generation path is now:
+This document describes code that exists in the
+`prompt-v3-scene-evolution` branch and PR #1. It is not a speculative migration
+plan.
 
 ```text
-V2 understanding or V3 source image
-        ↓
-SceneGraph v1
-        ↓
-TemporalRenderPlan v1
-        ↓
-PromptCompiler V3
-        ↓
-MiniMax image generation
-        ↓
-Generated-image SceneGraph
-        ↓
-VisualCritic v1
-        ↓ fail threshold
-One controlled correction generation
+source image
+  -> SceneGraph v1
+  -> exact TemporalRenderPlan v1
+  -> PromptCompiler V3
+  -> MiniMax image-01
+  -> generated-image SceneGraph
+  -> VisualCritic v1
+  -> optional single correction generation
 ```
 
-The user-facing story remains separate from the machine-facing render plan.
-Story text can provide continuity, but it no longer serves as the sole rendering
-instruction.
+The core architectural rule is:
 
-## Existing iOS clients
+> Narrative copy explains the world to the user. A structured render plan tells
+> the image model what each visible region must do.
 
-The iOS client may continue sending `contextVersion: generation.v2`.
+## V2 clients receive V3 behavior
 
-`POST /v1/generations` now performs an asynchronous preparation step:
+An existing iOS request using `contextVersion: generation.v2` is upgraded before
+queueing:
 
-1. convert V2 `SceneUnderstanding` into a typed provisional `SceneGraph`;
-2. submit the graph, exact target and existing story continuity to the V3
-   temporal planner;
-3. receive a region-addressable `TemporalRenderPlan`;
-4. queue an internal `generation.v3` request;
-5. compile the final provider prompt with `PromptCompilerV3`.
+1. The server analyzes the original uploaded image with the V3 SceneGraph VLM.
+2. If live graph analysis fails, the V2 understanding payload is expanded into
+   a conservative typed graph.
+3. The server sends `SceneGraph + ExactTarget + story continuity` to the
+   temporal planner.
+4. If live planning fails or validation rejects the result, a deterministic
+   region-by-region plan is produced.
+5. The request is internally converted to `generation.v3`.
+6. PromptCompiler V3 compiles region actions for `image-01`.
 
-If the remote temporal planner is unavailable or returns an invalid plan, the
-server uses a deterministic region-by-region plan rather than falling back to a
-single flat `visualPrompt`.
+The old flat story prompt is therefore not used for any structured generation,
+even during provider degradation.
 
-Direct queue callers also receive the deterministic V2-to-V3 fallback.
+## Immutable preparation cache
 
-## New intelligence endpoints
+The process keeps bounded caches for:
 
-### Analyze a SceneGraph
+- SceneGraph by `sourceAssetId`;
+- TemporalRenderPlan by source asset, exact target, graph and story continuity.
 
-`POST /v1/scene-graphs`
+A repeated `regenerate_same_target` request with the same immutable inputs reuses
+the same plan and `planId`. It does not ask the planner to reinterpret the world.
+The cache is bounded to 128 prepared contexts per process.
+
+## Source time baseline
+
+`offsetDays` is the authoritative temporal distance. `sourceDateISO` is optional:
 
 ```json
 {
-  "sourceAssetId": "UUID",
-  "requestId": "UUID"
+  "offsetDays": 9131.25,
+  "offsetYears": 25,
+  "compactLabel": "25 年后",
+  "sourceDateISO": "2010-07-28"
 }
 ```
 
-Response:
+When the source date is known, the target calendar date is calculated from the
+photograph's capture time. When it is unknown, the final image prompt states only
+the relative offset. This prevents a scanned 1990 photograph from being treated
+as though it was captured on the server's current date.
 
-```json
-{
-  "schemaVersion": "scene-graph-response.v1",
-  "requestId": "UUID",
-  "derivedFromV2": false,
-  "sceneGraph": {
-    "schemaVersion": "scene-graph.v1",
-    "baseline": {},
-    "camera": {},
-    "regions": [],
-    "globalDrivers": [],
-    "uncertainties": []
-  }
+## SceneGraph v1
+
+The live VLM creates 4–16 regions covering visible foreground, midground,
+background and sky.
+
+```ts
+interface SceneRegion {
+  id: string;
+  screenZone: ScreenZone;
+  boundingBox?: NormalizedBox;
+  depth: SceneDepth;
+  category: SceneCategory;
+  sourceState: {
+    description: string;
+    materials: string[];
+    condition: string;
+    identityFeatures: string[];
+  };
+  persistence: RegionPersistence;
+  temporalPolicy: TemporalPolicy;
+  confidence: number;
+  salience: number;
 }
 ```
 
-The live VLM analyzes 4–16 regions across foreground, midground, background and
-sky. Every region receives:
+Persistence and temporal policy are separate because the following are not the
+same kind of continuity:
 
-- stable ID;
-- coarse screen zone and optional normalized bounding box;
-- depth and semantic category;
-- source appearance, material and identity evidence;
-- persistence class;
-- temporal policy;
-- confidence and salience.
+- a person's identity;
+- a station building's spatial geometry;
+- a tree's planting position;
+- a passing vehicle;
+- replaceable signage;
+- a temporary pedestrian.
 
-### Plan one exact target world
+Temporal policies:
 
-`POST /v1/render-plans`
+- `lock`
+- `age_in_place`
+- `grow`
+- `renovate`
+- `replace_by_era`
+- `may_disappear`
+- `free_evolution`
 
-```json
-{
-  "sceneGraph": { "schemaVersion": "scene-graph.v1" },
-  "target": {
-    "offsetDays": 9131.25,
-    "targetDateISO": "2051-07-28",
-    "compactLabel": "25 年后"
-  },
-  "storyContext": {
-    "title": "站前的时间回声",
-    "presentTruth": "当前场景事实",
-    "identityRules": ["保持人物身份"],
-    "canonicalBeats": []
-  },
-  "continuityMode": "age_progression",
-  "requestId": "UUID"
+The analyzer treats visible image text as untrusted scene content and does not
+follow instructions embedded in signs, screens or posters.
+
+## TemporalRenderPlan v1
+
+Every source region must be evaluated exactly once.
+
+```ts
+interface RegionTemporalChange {
+  regionId: string;
+  action:
+    | "preserve"
+    | "age"
+    | "grow"
+    | "renovate"
+    | "replace"
+    | "remove"
+    | "add_related";
+  magnitude: "subtle" | "moderate" | "major" | "transformative";
+  targetState: string;
+  causalReason: string;
+  visibleEvidence: string[];
 }
 ```
 
-Response:
+A region appears either in `regionChanges` or `unchangedRegionIds`, never both.
+Validation rejects:
 
-```json
-{
-  "schemaVersion": "render-plan-response.v1",
-  "requestId": "UUID",
-  "deterministicFallback": false,
-  "targetPlan": {
-    "schemaVersion": "temporal-render-plan.v1",
-    "planId": "sha256-prefix",
-    "exactTarget": {},
-    "horizonBand": "decades",
-    "globalWorldState": {},
-    "regionChanges": [],
-    "additions": [],
-    "removals": [],
-    "crossRegionCouplings": [],
-    "unchangedRegionIds": [],
-    "subjectContinuityMode": "age_progression",
-    "prohibitedDrift": [],
-    "coverage": {}
-  }
-}
-```
+- unknown or duplicate region IDs;
+- contradictory changed/unchanged policies;
+- unevaluated regions;
+- missing target state or causal reason;
+- no environmental change for a multi-month or longer scene containing an
+  environment;
+- insufficient changed domains for the horizon;
+- coverage metadata that contradicts actual actions.
 
-Every source region must be evaluated exactly once. It must either receive a
-region change or appear in `unchangedRegionIds`. A region cannot appear in both.
+The plan also contains:
 
-## Native V3 generation request
-
-```json
-{
-  "contextVersion": "generation.v3",
-  "sourceAssetId": "UUID",
-  "requestId": "UUID",
-  "aspectRatio": "3:4",
-  "timePosition": {
-    "normalized": 0.5,
-    "offsetDays": 9131.25,
-    "offsetYears": 25,
-    "compactLabel": "25 年后"
-  },
-  "structuredContext": {
-    "schemaVersion": "generation-context.v3",
-    "sceneGraph": { "schemaVersion": "scene-graph.v1" },
-    "targetPlan": { "schemaVersion": "temporal-render-plan.v1" },
-    "temporalStory": { "schemaVersion": "temporal-story.v2" },
-    "generationMode": "captured_target",
-    "qualityPolicy": {
-      "visualCriticEnabled": true,
-      "maxRegenerations": 1,
-      "thresholds": {
-        "cameraConsistency": 0.78,
-        "requiredChangeCompletion": 0.72,
-        "environmentEvolution": 0.62,
-        "eraCoherence": 0.72
-      }
-    }
-  }
-}
-```
-
-The server overwrites `targetPlan.exactTarget` from the program-authoritative
-`timePosition.offsetDays` before validation and compilation.
-
-## PromptCompiler V3
-
-The compiler emits an operational edit contract rather than narrative prose.
-The required order is:
-
-1. `TARGET`
-2. `CAMERA LOCK`
-3. `CONTINUITY`
-4. `REGION EDITS`
-5. `WORLD COHERENCE`
-6. `PROHIBITED`
-
-Optional sections are admitted only when the 1,500-character provider budget
-allows them:
-
-- cross-region rules;
+- exact target and time horizon;
+- global environmental, technology and activity state;
 - justified additions and removals;
-- coverage check;
-- uncertainty handling.
+- cross-region material and era couplings;
+- prohibited drift;
+- explicit coverage diagnostics.
 
-A region instruction resembles:
+## Time-horizon behavior
 
-```text
-R4 middle_right/background/architecture -> RENOVATE major:
-retain position and recognizable volume; update facade and access
-infrastructure for the target era; cause: one maintenance and renewal cycle
-```
+| Horizon | Primary processes |
+|---|---|
+| hours–days | light, weather, temporary activity and traffic |
+| months | season, vegetation state, decoration and temporary construction |
+| years | wear, maintenance, vehicles, shops and incremental growth |
+| decades | human aging, mature vegetation, renovation and technology turnover |
+| centuries | rebuilding, ruins, ecological succession and cultural replacement |
+| millennia | climate, geomorphology, archaeology and civilizational discontinuity |
+| deep time | geology and ecology; modern short-lived subjects are released |
 
-The compiler keeps region IDs, spatial locators and actions even when target
-state prose must be compressed.
+The planner evaluates every region but does not force every region to change.
+Stable regions are explicitly preserved.
 
-## Continuity modes
+## Subject continuity
+
+Modes:
 
 - `identity_persists`
 - `age_progression`
@@ -218,50 +186,80 @@ state prose must be compressed.
 - `site_only`
 - `time_traveler`
 
-Deep-time ordinary scenes default to `site_only`. A modern object that remains
-across geological time must be explicitly represented as `time_traveler` or an
-intentional anomalous object anchor.
+Examples:
 
-## Visual critic and controlled repair
+- person, 20 years later → `age_progression`;
+- person, 500 years later → `lineage_or_successor` or `site_only`;
+- Xiaomi SU7 intentionally crossing geological time → `time_traveler`;
+- ordinary street one million years later → `site_only`.
 
-After the first successful image generation, the live adapter:
+MiniMax `subject_reference` is a strong portrait-style identity constraint. The
+server suppresses it for `site_only` and `lineage_or_successor` at both the
+preparation layer and provider boundary, even when an older client requests it.
 
-1. analyzes the generated image into a second SceneGraph;
-2. compares source graph, generated graph and target plan;
-3. produces `visual-critic.v1` scores and exact missed region IDs.
+## PromptCompiler V3
 
-The critic measures:
+Required sections:
+
+1. `TARGET`
+2. `CAMERA LOCK`
+3. `CONTINUITY`
+4. `REGION EDITS`
+5. `WORLD COHERENCE`
+6. `PROHIBITED`
+
+Example:
+
+```text
+R4 middle_right/background/architecture -> RENOVATE major:
+retain location and recognizable volume; update facade and accessibility
+infrastructure; cause: one long maintenance and renewal cycle
+```
+
+Budget behavior:
+
+1. Fixed constraints are deliberately compact.
+2. Every changed region first receives a compact action line.
+3. Only after all region IDs survive does the compiler expand high-salience
+   regions with more target-state detail.
+4. Optional couplings, additions, coverage and uncertainty are admitted last.
+5. Extreme scenes use an emergency format that retains all 16 region IDs,
+   camera lock, coherence and prohibitions under 1,500 characters.
+
+Untrusted model strings are sanitized before compilation. Angle-bracket
+boundaries, null bytes and control characters are not passed through unchanged.
+
+## VisualCritic v1
+
+After a successful image generation:
+
+1. the result is analyzed into another SceneGraph;
+2. source graph, generated graph and target plan are compared;
+3. scores and exact missed target region IDs are returned.
+
+Scores:
 
 - camera consistency;
 - spatial topology consistency;
 - principal identity consistency;
-- required region-change completion;
+- required change completion;
 - environmental evolution;
-- era coherence;
-- unexplained changes;
-- camera drift.
+- era coherence.
 
-If configured thresholds fail, the server creates one correction prompt. It
-preserves already successful regions and explicitly addresses only missed region
-IDs and detected camera drift. The original source image remains the generation
-reference, preventing recursive degradation.
+A visually polished output still fails when the person changes but planned
+architecture, vegetation, surfaces or background remain frozen.
 
-The repaired output is analyzed again. The server keeps the candidate with the
-higher weighted critic score.
+## Controlled repair
 
-Generation records store:
+When thresholds fail and one retry is allowed:
 
-- `renderPlanId`;
-- final `visualCritic` result;
-- `regenerationCount`;
-- V3 prompt hash and section diagnostics.
+- the original source image remains the generation reference;
+- successful camera and regions are explicitly preserved;
+- only missed region IDs and detected camera drift are appended as corrections;
+- the repaired image is analyzed again;
+- the higher weighted critic score is retained.
 
-The normal polling response exposes only:
-
-- `qualityStatus`: `passed`, `best_effort`, `not_scored`, or omitted for legacy;
-- `regenerationCount`.
-
-Raw prompts, image bytes and private scene graphs are not exposed to the client.
+The retry is corrective, not a new random story or a new render plan.
 
 ## Operational controls
 
@@ -274,31 +272,42 @@ VISUAL_CRITIC_ENVIRONMENT_THRESHOLD=0.62
 VISUAL_CRITIC_ERA_THRESHOLD=0.72
 ```
 
-Threshold overrides in a V3 request are clamped. The server-level maximum
-regeneration count remains the operator authority.
+Request-level threshold overrides are clamped. The server-level maximum retry
+count remains authoritative.
 
-## Validation rules
+## Observability
 
-A SceneGraph is rejected when it has:
+Generation records store:
 
-- no regions;
-- more than 16 regions;
-- duplicate or missing IDs;
-- invalid normalized boxes;
-- missing descriptions or scores.
+- prompt compiler version and hash;
+- section character counts and compacted sections;
+- immutable `renderPlanId`;
+- critic scores and failure lists;
+- regeneration count;
+- duration and provider error metadata.
 
-A TemporalRenderPlan is rejected when it has:
+Client polling exposes `qualityStatus` and `regenerationCount`. Full plan and
+critic diagnostics remain admin-only. Raw prompts and image bytes are not logged.
 
-- unknown or duplicate changed region IDs;
-- a region in both changed and unchanged lists;
-- an unevaluated source region;
-- missing target state or causal reason;
-- no environmental change for a multi-month or longer scene with environment;
-- insufficient changed domains for the time horizon;
-- coverage metadata that contradicts actual region changes.
+## Implemented tests
 
-## Remaining client migration
+The branch includes regressions for:
 
-The server implementation is additive. A later iOS migration may display
-SceneGraph or RenderPlan diagnostics, but no client change is required for V2
-requests to receive V3 planning and compilation today.
+- exact target strictness;
+- required whole-scene prompt sections;
+- typed V2-to-V3 conversion;
+- non-person environmental evolution;
+- contradictory region policies;
+- deep-time continuity;
+- all 16 region IDs surviving prompt budgeting;
+- prompt-boundary/control-character sanitization;
+- controlled critic repair prompts;
+- visual critic threshold behavior;
+- trusted source-date handling.
+
+## Current external limitation
+
+The repository's GitHub Actions job currently terminates before it exposes any
+workflow steps, logs or the configured always-uploaded diagnostics artifact. The
+PR remains intentionally unmerged until the repository/runner issue is resolved
+or the branch is validated in a working Node 20 environment.
