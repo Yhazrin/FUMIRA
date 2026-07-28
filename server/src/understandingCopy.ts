@@ -150,6 +150,59 @@ export function normalizeSceneUnderstandingCopy(
       ?.slice(0, 8)
       .map((item) => limit(item, sceneBibleBudget("hardConstraint")))
       .filter(Boolean),
+    sceneGraph: value.sceneGraph
+      ? {
+          baseline: {
+            locationType: limit(value.sceneGraph.baseline.locationType, 80),
+            broadCulturalContext: optionalLimit(
+              value.sceneGraph.baseline.broadCulturalContext,
+              160
+            ),
+            probableCaptureEra: optionalLimit(
+              value.sceneGraph.baseline.probableCaptureEra,
+              80
+            ),
+            season: optionalLimit(value.sceneGraph.baseline.season, 48),
+            timeOfDay: optionalLimit(value.sceneGraph.baseline.timeOfDay, 48),
+            weather: optionalLimit(value.sceneGraph.baseline.weather, 80),
+          },
+          cameraLock: {
+            viewpoint: optionalLimit(value.sceneGraph.cameraLock.viewpoint, 160),
+            lensAndPerspective: optionalLimit(
+              value.sceneGraph.cameraLock.lensAndPerspective,
+              160
+            ),
+            horizon: optionalLimit(value.sceneGraph.cameraLock.horizon, 120),
+            depthStructure: optionalLimit(
+              value.sceneGraph.cameraLock.depthStructure,
+              200
+            ),
+          },
+          regions: value.sceneGraph.regions.slice(0, 16).map((region) => ({
+            id: limit(region.id, 48),
+            depth: region.depth,
+            category: region.category,
+            description: limit(region.description, 220),
+            spatialAnchor: limit(region.spatialAnchor, 180),
+            materials: region.materials
+              .slice(0, 8)
+              .map((item) => limit(item, 80))
+              .filter(Boolean),
+            currentCondition: limit(region.currentCondition, 160),
+            confidence: region.confidence,
+            salience: region.salience,
+            temporalPolicy: region.temporalPolicy,
+          })).filter((region) => Boolean(region.id && region.description)),
+          globalDrivers: value.sceneGraph.globalDrivers
+            .slice(0, 10)
+            .map((item) => limit(item, 180))
+            .filter(Boolean),
+          uncertainties: value.sceneGraph.uncertainties
+            .slice(0, 8)
+            .map((item) => limit(item, 160))
+            .filter(Boolean),
+        }
+      : undefined,
   };
 }
 

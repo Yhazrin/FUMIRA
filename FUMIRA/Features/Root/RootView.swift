@@ -10,6 +10,9 @@ struct RootView: View {
     @State private var heroSlot: HeroSlotPreference?
     @State private var availableHeroSlots: [HeroSlotOwner: HeroSlotPreference] = [:]
     @State private var shutterFlash = 0.0
+    @State private var cameraEntryProgress: CGFloat = 0
+    @State private var isEnteringCamera = false
+    @State private var cameraEntryTask: Task<Void, Never>?
 
     var body: some View {
         // Full-bleed root geometry must match ViewfinderView's ignoresSafeArea
@@ -73,6 +76,16 @@ struct RootView: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
                     .zIndex(60)
+
+                if cameraEntryProgress > 0.001 {
+                    CameraIrisTransitionOverlay(
+                        progress: cameraEntryProgress,
+                        center: UnitPoint(x: 0.5, y: 0.46)
+                    )
+                    .ignoresSafeArea()
+                    .allowsHitTesting(isEnteringCamera)
+                    .zIndex(100)
+                }
             }
             .frame(width: rootSize.width, height: rootSize.height)
             .coordinateSpace(name: HeroCoordinateSpace.name)
@@ -123,7 +136,14 @@ struct RootView: View {
         .onAppear {
             syncMotionField()
         }
+        #if DEBUG
+        .task {
+            await runCameraEntryAuditIfNeeded()
+        }
+        #endif
         .onDisappear {
+            cameraEntryTask?.cancel()
+            cameraEntryTask = nil
             model.motionField.deactivate()
         }
         .onChange(of: model.phase) { _, phase in
@@ -211,7 +231,7 @@ struct RootView: View {
     private var phaseContent: some View {
         switch model.phase {
         case .connection:
-            ConnectionView(model: model)
+            ConnectionView(model: model, onLaunchCamera: beginCameraEntry)
                 .transition(.posterPhase(reduceMotion: reduceMotion))
 
         case .bluetoothPermission:
@@ -223,7 +243,7 @@ struct RootView: View {
                 ConnectionFeedbackView(model: model, snapshot: snapshot)
                     .transition(.posterPhase(reduceMotion: reduceMotion))
             } else {
-                ConnectionView(model: model)
+                ConnectionView(model: model, onLaunchCamera: beginCameraEntry)
             }
 
         case .cameraPermission:
@@ -277,12 +297,63 @@ struct RootView: View {
         }
     }
 
+    private func beginCameraEntry() {
+        guard !isEnteringCamera else { return }
+        guard !reduceMotion else {
+            model.beginPhoneOnlyPath()
+            return
+        }
+
+        isEnteringCamera = true
+        cameraEntryTask?.cancel()
+        withAnimation(.timingCurve(0.58, 0, 0.78, 0.18, duration: 0.34)) {
+            cameraEntryProgress = 1
+        }
+
+        cameraEntryTask = Task { @MainActor in
+            do {
+                try await Task<Never, Never>.sleep(for: .milliseconds(350))
+                try Task.checkCancellation()
+                model.beginPhoneOnlyPath()
+
+                try await Task<Never, Never>.sleep(for: .milliseconds(45))
+                try Task.checkCancellation()
+                withAnimation(.timingCurve(0.16, 0.84, 0.24, 1, duration: 0.48)) {
+                    cameraEntryProgress = 0
+                }
+
+                try await Task<Never, Never>.sleep(for: .milliseconds(490))
+                isEnteringCamera = false
+                cameraEntryTask = nil
+            } catch {
+                cameraEntryProgress = 0
+                isEnteringCamera = false
+                cameraEntryTask = nil
+            }
+        }
+    }
+
+    #if DEBUG
+    private func runCameraEntryAuditIfNeeded() async {
+        guard
+            ProcessInfo.processInfo.environment["FUMIRA_AUDIT_CAMERA_ENTRY"] == "1",
+            model.phase == .connection
+        else {
+            return
+        }
+
+        try? await Task<Never, Never>.sleep(for: .milliseconds(700))
+        guard !Task.isCancelled, model.phase == .connection else { return }
+        beginCameraEntry()
+    }
+    #endif
+
     /// Camera capture and the first paper landing share full-screen geometry.
     /// Utility/review pages keep system safe areas so compact titles never sit
     /// beneath status-bar or home-indicator content.
     private var usesFullBleedRoot: Bool {
         switch model.phase {
-        case .viewfinder, .shuttered, .understanding:
+        case .connection, .viewfinder, .shuttered, .understanding:
             true
         default:
             false

@@ -174,6 +174,7 @@ private struct SceneUnderstandingDTO: Codable {
     let temporalLayers: [TemporalLayerDTO]?
     let storySeeds: [String]?
     let hardConstraints: [String]?
+    let sceneGraph: SceneGraphDTO?
 
     var sceneUnderstanding: SceneUnderstanding {
         SceneUnderstanding(
@@ -187,7 +188,74 @@ private struct SceneUnderstandingDTO: Codable {
             spatialAnchors: spatialAnchors?.map(\.spatialAnchor),
             temporalLayers: temporalLayers?.map(\.temporalLayer),
             storySeeds: storySeeds,
-            hardConstraints: hardConstraints
+            hardConstraints: hardConstraints,
+            sceneGraph: sceneGraph.map(\.sceneGraph)
+        )
+    }
+}
+
+private struct SceneGraphDTO: Codable {
+    let baseline: SceneBaselineDTO
+    let cameraLock: CameraLockDTO
+    let regions: [SceneRegionDTO]
+    let globalDrivers: [String]
+    let uncertainties: [String]
+
+    var sceneGraph: SceneGraph {
+        SceneGraph(
+            baseline: baseline.sceneBaseline,
+            cameraLock: cameraLock.cameraLock,
+            regions: regions.map(\.sceneRegion),
+            globalDrivers: globalDrivers,
+            uncertainties: uncertainties
+        )
+    }
+}
+
+private struct SceneBaselineDTO: Codable {
+    let locationType: String
+    let broadCulturalContext: String?
+    let probableCaptureEra: String?
+    let season: String?
+    let timeOfDay: String?
+    let weather: String?
+
+    var sceneBaseline: SceneBaseline {
+        SceneBaseline(
+            locationType: locationType,
+            broadCulturalContext: broadCulturalContext,
+            probableCaptureEra: probableCaptureEra,
+            season: season,
+            timeOfDay: timeOfDay,
+            weather: weather
+        )
+    }
+}
+
+private struct SceneRegionDTO: Codable {
+    let id: String
+    let depth: SceneDepth
+    let category: SceneRegionCategory
+    let description: String
+    let spatialAnchor: String
+    let materials: [String]
+    let currentCondition: String
+    let confidence: Double
+    let salience: Double
+    let temporalPolicy: TemporalPolicy
+
+    var sceneRegion: SceneRegion {
+        SceneRegion(
+            id: id,
+            depth: depth,
+            category: category,
+            description: description,
+            spatialAnchor: spatialAnchor,
+            materials: materials,
+            currentCondition: currentCondition,
+            confidence: confidence,
+            salience: salience,
+            temporalPolicy: temporalPolicy
         )
     }
 }

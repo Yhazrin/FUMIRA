@@ -333,11 +333,274 @@ describe("fumira-server", () => {
     assert.match(built.prompt, /Preserve source camera/);
   });
 
+  it("accepts V3 scene graph + render plan and compiles prompt server-side", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+    assert.equal(upload.statusCode, 201);
+    const { assetId } = upload.json();
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      payload: {
+        contextVersion: "generation.v3",
+        sourceAssetId: assetId,
+        requestId: "req-structured-1",
+        aspectRatio: "3:4",
+        timePosition: {
+          normalized: 0.5,
+          offsetDays: 9131,
+          offsetYears: 25,
+          compactLabel: "25 年后",
+        },
+        structuredContext: {
+          schemaVersion: "generation-context.v3",
+          understanding: {
+            summary: "一座安静的城市公园",
+            locationType: "城市公园",
+            visualMood: "安静、开阔",
+            timeClues: ["年轻树木"],
+            changeDrivers: ["植被生长"],
+            subjects: [
+              { name: "三棵树木", confidence: 0.97, identityRule: "保留树木相对位置" },
+            ],
+            sceneGraph: {
+              baseline: { locationType: "城市公园" },
+              cameraLock: {
+                viewpoint: "中景对称",
+                horizon: "画面上三分之一",
+              },
+              regions: [{
+                id: "trees",
+                depth: "foreground",
+                category: "vegetation",
+                description: "前景树木",
+                spatialAnchor: "画面左侧",
+                materials: ["树干", "树冠"],
+                currentCondition: "年轻",
+                confidence: 0.97,
+                salience: 0.9,
+                temporalPolicy: "evolve",
+              }],
+              globalDrivers: ["植被生长"],
+              uncertainties: [],
+            },
+          },
+          story: {
+            schemaVersion: "temporal-story.v3",
+            title: "公园的时间回声",
+            logline: "安静公园跨越百年的变化",
+            presentTruth: "一座安静的城市公园",
+            identityRules: ["保持原图主体与构图"],
+            beats: [
+              { anchorYears: -100, title: "百年前", narrative: "荒地", visualPrompt: "荒地" },
+              { anchorYears: -30, title: "三十年前", narrative: "绿化", visualPrompt: "初生树木" },
+              { anchorYears: -10, title: "十年前", narrative: "规模", visualPrompt: "年轻树木" },
+              { anchorYears: 0, title: "今天", narrative: "公园", visualPrompt: "现代公园" },
+              { anchorYears: 10, title: "十年后", narrative: "茂盛", visualPrompt: "茂盛树木" },
+              { anchorYears: 30, title: "三十年后", narrative: "扩张", visualPrompt: "高楼林立" },
+              { anchorYears: 100, title: "百年后", narrative: "未来", visualPrompt: "未来城市" },
+            ],
+            targetBeat: {
+              anchorYears: 25,
+              title: "二十五年后",
+              narrative: "精确25年变化",
+              visualPrompt: "精确25年视觉",
+              renderPlan: {
+                exactTarget: {
+                  offsetDays: 9131,
+                  targetDateISO: "2051-07-28",
+                  compactLabel: "25 年后",
+                },
+                horizonBand: "decades",
+                subjectContinuityMode: "identity_persists",
+                globalEraState: "二十五年后的完整公园",
+                regionChanges: [{
+                  regionId: "trees",
+                  action: "grow",
+                  magnitude: "major",
+                  targetAppearance: "树冠成熟并扩大",
+                  causalReason: "二十五年自然生长",
+                }],
+                crossRegionCouplings: ["植被与设施属于同一年代"],
+                mustPreserve: ["相机机位"],
+                allowedEraAdditions: ["有依据的公园设施"],
+                prohibitedDrift: ["不得只改一个主体"],
+                coverage: {
+                  foreground: true,
+                  midground: false,
+                  background: false,
+                  builtEnvironment: false,
+                  naturalEnvironment: true,
+                  principalSubject: true,
+                },
+              },
+            },
+          },
+          generationMode: "captured_target",
+        },
+      },
+    });
+    assert.equal(create.statusCode, 202);
+    const { generationId, status } = create.json();
+    assert.equal(status, "queued");
+
+    const finished = await waitForGeneration(generationId, 3000);
+    assert.ok(finished);
+    assert.equal(finished.status, "succeeded");
+    assert.equal(finished.promptVersion, "v3");
+    assert.ok(finished.promptHash);
+    assert.ok(finished.promptCharCount <= 1500);
+    assert.ok(finished.sectionCharCounts);
+    assert.ok(Array.isArray(finished.truncatedSections));
+
+    const poll = await app.inject({
+      method: "GET",
+      url: `/v1/generations/${generationId}`,
+    });
+    assert.equal(poll.statusCode, 200);
+    const body = poll.json();
+    assert.equal(body.status, "succeeded");
+    assert.match(body.resultUrl, /\/v1\/results\//);
+  });
+
+  it("rejects V2 structured context with missing targetBeat", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+    const { assetId } = upload.json();
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      payload: {
+        contextVersion: "generation.v2",
+        sourceAssetId: assetId,
+        requestId: "req-missing-tb",
+        aspectRatio: "3:4",
+        timePosition: { normalized: 0, offsetDays: 0, offsetYears: 0, compactLabel: "NOW" },
+        structuredContext: {
+          schemaVersion: "generation-context.v2",
+          understanding: {
+            summary: "x", locationType: "x", visualMood: "x",
+            timeClues: [], changeDrivers: [], subjects: [],
+          },
+          story: {
+            schemaVersion: "temporal-story.v2",
+            title: "x", logline: "x", presentTruth: "x",
+            identityRules: [],
+            beats: [
+              { anchorYears: -100, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: -30, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: -10, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: 0, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: 10, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: 30, title: "a", narrative: "b", visualPrompt: "c" },
+              { anchorYears: 100, title: "a", narrative: "b", visualPrompt: "c" },
+            ],
+          },
+          generationMode: "captured_target",
+        },
+      },
+    });
+    assert.equal(create.statusCode, 400);
+    assert.equal(create.json().errorCode, "missing_target_beat");
+  });
+
+  it("structured context prompt includes targetBeat content, not nearest canonical", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+    const { assetId } = upload.json();
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      payload: {
+        contextVersion: "generation.v2",
+        sourceAssetId: assetId,
+        requestId: "req-targetbeat-1",
+        aspectRatio: "3:4",
+        timePosition: {
+          normalized: 0.5,
+          offsetDays: 9131,
+          offsetYears: 25,
+          compactLabel: "25 年后",
+        },
+        structuredContext: {
+          schemaVersion: "generation-context.v2",
+          understanding: {
+            summary: "公园",
+            locationType: "城市公园",
+            visualMood: "安静",
+            timeClues: [],
+            changeDrivers: [],
+            subjects: [],
+          },
+          story: {
+            schemaVersion: "temporal-story.v2",
+            title: "回声",
+            logline: "变化",
+            presentTruth: "公园",
+            identityRules: [],
+            beats: [
+              { anchorYears: -100, title: "百年前", narrative: "荒地", visualPrompt: "荒地、泥土路" },
+              { anchorYears: -30, title: "三十年前", narrative: "绿化", visualPrompt: "初生树木" },
+              { anchorYears: -10, title: "十年前", narrative: "规模", visualPrompt: "年轻树木" },
+              { anchorYears: 0, title: "今天", narrative: "公园", visualPrompt: "现代公园" },
+              { anchorYears: 10, title: "十年后", narrative: "茂盛", visualPrompt: "茂盛树木" },
+              { anchorYears: 30, title: "三十年后", narrative: "扩张", visualPrompt: "高楼林立和密集城市" },
+              { anchorYears: 100, title: "百年后", narrative: "未来", visualPrompt: "未来城市景观" },
+            ],
+            targetBeat: {
+              anchorYears: 25,
+              title: "二十五年后",
+              narrative: "精确二十五年变化",
+              visualPrompt: "精确的二十五年视觉变化效果",
+            },
+          },
+          generationMode: "captured_target",
+        },
+      },
+    });
+    assert.equal(create.statusCode, 202);
+    const { generationId } = create.json();
+    const finished = await waitForGeneration(generationId, 3000);
+    assert.ok(finished);
+    assert.equal(finished.status, "succeeded");
+    // The mock adapter receives the compiled prompt — verify it was used.
+    assert.equal(finished.promptVersion, "v3");
+  });
+
   it("runs understanding and seven-beat story through the configured intelligence adapter", async () => {
     const { buildApp } = await import("../src/index.js");
     const overlong = "这是一段故意超过页面字符预算的动态故事文字".repeat(8);
     let analyzedTargetTime: { offsetYears: number; compactLabel: string } | undefined;
-    let storyTargetTime: { offsetYears: number; compactLabel: string } | undefined;
+    let storyTargetTime:
+      | { offsetDays: number; targetDateISO: string; compactLabel: string }
+      | undefined;
     const intelligence: MiniMaxIntelligenceAdapter = {
       async analyzeImage(input) {
         analyzedTargetTime = input.targetTime;
@@ -368,6 +631,43 @@ describe("fumira-server", () => {
               narrative: overlong,
               visualPrompt: overlong,
             })),
+          },
+        };
+      },
+      async writeExactTargetPlan(input) {
+        return {
+          ok: true as const,
+          value: {
+            anchorYears: input.target.offsetDays / 365.25,
+            title: "精确目标",
+            narrative: "全场景在同一年代连续变化",
+            visualPrompt: "前中后景协调演化",
+            exactTarget: input.target,
+            renderPlan: {
+              exactTarget: input.target,
+              horizonBand: "decades",
+              subjectContinuityMode: "identity_persists",
+              globalEraState: "目标时代的完整场景",
+              regionChanges: [{
+                regionId: "whole-scene",
+                action: "age",
+                magnitude: "moderate",
+                targetAppearance: "主体与环境共同呈现目标年代",
+                causalReason: "时间累积",
+              }],
+              crossRegionCouplings: ["所有层级属于同一年代"],
+              mustPreserve: ["相机机位"],
+              allowedEraAdditions: ["有因果依据的时代元素"],
+              prohibitedDrift: ["不得只改变单一主体"],
+              coverage: {
+                foreground: true,
+                midground: true,
+                background: true,
+                builtEnvironment: true,
+                naturalEnvironment: true,
+                principalSubject: true,
+              },
+            },
           },
         };
       },
@@ -442,10 +742,8 @@ describe("fumira-server", () => {
         },
       });
       assert.equal(story.statusCode, 200);
-      assert.deepEqual(storyTargetTime, {
-        offsetYears: 25,
-        compactLabel: "25 年后",
-      });
+      assert.equal(storyTargetTime?.offsetDays, 25 * 365.25);
+      assert.equal(storyTargetTime?.compactLabel, "25 年后");
       const storyBody = story.json();
       assert.deepEqual(storyBody.story.beats.map((beat: { anchorYears: number }) => beat.anchorYears), [-100, -30, -10, 0, 10, 30, 100]);
       assert.equal(storyBody.copyConstraints.title, 8);
@@ -456,6 +754,8 @@ describe("fumira-server", () => {
       assert.ok(Array.from(storyBody.story.beats[0].title).length <= 6);
       assert.ok(Array.from(storyBody.story.beats[0].narrative).length <= 28);
       assert.ok(Array.from(storyBody.story.beats[0].visualPrompt).length <= 44);
+      assert.equal(storyBody.story.schemaVersion, "temporal-story.v3");
+      assert.ok(storyBody.story.targetBeat.renderPlan);
     } finally {
       await intelligenceApp.close();
     }

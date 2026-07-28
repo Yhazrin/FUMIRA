@@ -2,116 +2,91 @@ import SwiftUI
 
 struct ConnectionView: View {
     let model: AppModel
+    let onLaunchCamera: () -> Void
 
-    @State private var didAppear = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    init(
+        model: AppModel,
+        onLaunchCamera: @escaping () -> Void = {}
+    ) {
+        self.model = model
+        self.onLaunchCamera = onLaunchCamera
+    }
 
     var body: some View {
-        ZStack {
-            ParkPosterBackdrop(motionField: model.motionField)
+        GeometryReader { proxy in
+            ZStack {
+                Image("ConnectionBackdrop")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
                 FUMIRAWordmark()
-                    .padding(.top, 64)
-                    .flatMotionEntrance(isVisible: didAppear, reduceMotion: reduceMotion)
-
-                PosterKeywordHero(moment: .invite, fontSize: 46)
-                    .padding(.top, PosterSpacing.xl)
-                    .flatMotionEntrance(
-                        isVisible: didAppear,
-                        reduceMotion: reduceMotion,
-                        delay: .milliseconds(90)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
+                    .padding(.horizontal, PosterSpacing.lg)
+                    .padding(
+                        .top,
+                        proxy.safeAreaInsets.top + PosterSpacing.xl + 12
                     )
 
-                Spacer(minLength: 0)
-
-                PosterGlassButton(
-                    title: "进入时间相机",
-                    systemImage: "camera.aperture",
-                    accessibilityHint: "打开相机，拍下一张给时间的照片",
-                    action: { model.beginPhoneOnlyPath() }
-                )
-                .containerRelativeFrame(.horizontal, count: 2, span: 1, spacing: 0)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .flatMotionEntrance(
-                    isVisible: didAppear,
-                    reduceMotion: reduceMotion,
-                    delay: .milliseconds(220)
-                )
-                .padding(.bottom, 62)
+                CameraLaunchIconButton(action: onLaunchCamera)
+                    .position(
+                        x: proxy.size.width * 0.5,
+                        y: proxy.size.height * 0.46
+                    )
             }
-            .padding(.horizontal, PosterSpacing.lg)
-        }
-        .onAppear {
-            didAppear = true
         }
     }
 }
 
 private struct FUMIRAWordmark: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var didAppear = false
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 0) {
-                ForEach(Array("FUMIRA".enumerated()), id: \.offset) { index, character in
-                    Text(String(character))
-                        .font(PosterTypography.script(78))
-                        .tracking(1.2)
-                        .foregroundStyle(PosterPalette.ink)
-                        .rotationEffect(.degrees(-2.5), anchor: .leading)
-                        .posterStaggerEntrance(
-                            isVisible: didAppear,
-                            index: index,
-                            reduceMotion: reduceMotion
-                        )
-                }
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            Text("FUMIRA")
+                .font(PosterTypography.script(68))
+                .foregroundStyle(PosterPalette.actionBlueDeep)
 
             HStack(spacing: PosterSpacing.sm) {
                 Capsule()
-                    .fill(PosterPalette.leafGreen)
-                    .frame(width: 54, height: 5)
+                    .fill(PosterPalette.toyRed)
+                    .frame(width: 32, height: 4)
+
                 Text("TIME CAMERA")
-                    .font(.caption2.weight(.bold))
-                    .tracking(2.1)
-                    .foregroundStyle(PosterPalette.skyDeep.opacity(0.85))
-                    .posterStaggerEntrance(
-                        isVisible: didAppear,
-                        index: 6,
-                        reduceMotion: reduceMotion
-                    )
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.76))
             }
-            .padding(.top, -6)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("FUMIRA 时间相机")
-        .onAppear {
-            didAppear = true
-        }
     }
 }
 
-struct ConnectionStartPressStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+private struct CameraLaunchIconButton: View {
+    let action: () -> Void
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(
-                x: 1,
-                y: reduceMotion || !configuration.isPressed ? 1 : 0.94
-            )
-            .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(
-                reduceMotion
-                    ? .linear(duration: PosterMotion.reduced)
-                    : PosterMotion.press,
-                value: configuration.isPressed
-            )
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "camera.aperture")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(PosterPalette.paperWhite)
+                .frame(width: 88, height: 88)
+                .background(PosterPalette.actionBlueDeep)
+                .clipShape(Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(PosterPressStyle())
+        .accessibilityLabel("进入时间相机")
+        .accessibilityHint("打开相机，拍下一张给时间的照片")
     }
 }
 
 #Preview("Invite") {
-    ConnectionView(model: PreviewFixtures.model(phase: .connection))
+    ConnectionView(
+        model: PreviewFixtures.model(phase: .connection)
+    )
 }

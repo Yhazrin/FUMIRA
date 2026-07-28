@@ -628,6 +628,20 @@ private actor TracingStoryProvider: StoryProvider {
         self.trace = trace
     }
 
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        guard let beat = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: target
+        ).targetBeat else {
+            throw GenerationError.generationFailed(message: "测试目标节点生成失败。")
+        }
+        return beat
+    }
+
     func write(
         request: StoryRequest
     ) async -> AsyncThrowingStream<StoryEvent, Error> {

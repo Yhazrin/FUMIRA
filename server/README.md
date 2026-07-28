@@ -48,17 +48,19 @@ Mock mode (`MINIMAX_MOCK=true`) does not call MiniMax and does not need the prox
 |--------|------|-------|
 | POST/GET | `/health` | Coarse readiness for both image providers |
 | POST | `/v1/uploads` | multipart JPEG/HEIC ≤ 10MB |
-| POST | `/v1/generations` | source asset + exact-time `prompt`; returns 202 + `generationId` |
+| POST | `/v1/generations` | source asset + Generation Context V3; returns 202 + `generationId` |
 | GET | `/v1/generations/:id` | poll status / resultUrl |
 | GET | `/v1/results/:filename` | download generated JPEG/PNG |
-| POST | `/v1/understand` | analyzes the generated target image at its exact target time |
-| POST | `/v1/stories` | writes a timeline anchored to that generated image |
+| POST | `/v1/understand` | source-photo SceneGraph analysis |
+| POST | `/v1/stories` | seven canonical beats + separate exact target render plan |
+| POST | `/v1/target-beats` | re-plan one browsed exact time |
 | GET | `/v1/admin/generations` | Bearer admin list |
 | PATCH | `/v1/admin/settings` | enable/disable + prompt template |
 
 `imageProvider` on `/v1/generations` accepts `minimax` or `apimart`; omitted
 values default to MiniMax for compatibility with older app builds.
 
-The app pipeline is intentionally ordered as generation → generated-image
-understanding → story. The relay still accepts the legacy `story` request field
-as a prompt alias for older builds, but current clients send `prompt`.
+The app pipeline is source upload → SceneGraph understanding → canonical story →
+exact `TemporalRenderPlan` → PromptCompiler V3 → image generation → optional
+visual critic and one repair pass. Legacy flat-story requests remain supported;
+current clients send structured `generation.v3`.

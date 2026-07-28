@@ -42,6 +42,15 @@ enum PosterPalette {
     /// 哆啦 A 梦蓝暗面 — 按压、描边与高对比文字
     static let actionBlueDeep = cameraShutterBlueDeep
 
+    /// 玩具红 — 首屏镜头口袋 / 快门点睛，不用于错误状态
+    static let toyRed = Color(red: 232 / 255, green: 42 / 255, blue: 52 / 255)
+
+    /// 铃铛黄 — 首屏启动镜头的温暖点睛色
+    static let bellYellow = Color(red: 255 / 255, green: 211 / 255, blue: 58 / 255)
+
+    /// 亮蓝暗线 — 首屏圆形镜头的阴影与外描边
+    static let actionBlueShadow = Color(red: 7 / 255, green: 89 / 255, blue: 153 / 255)
+
     /// 草地浅绿 — 分层地形近层、浅色自然面
     static let grassLight = Color(red: 143 / 255, green: 203 / 255, blue: 126 / 255) // #8FCB7E
 

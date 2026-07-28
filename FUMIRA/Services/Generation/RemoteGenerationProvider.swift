@@ -72,10 +72,13 @@ actor RemoteGenerationProvider: GenerationProvider {
                     ))
                     let imageData = try await download(resultURL: resultURL)
 
+                    // Prompt is now compiled server-side; store a marker for diagnostics.
                     continuation.yield(.completed(GeneratedFrame(
                         sessionID: request.sessionID,
                         time: request.time,
-                        prompt: request.prompt,
+                        storyBeatID: request.storyBeat?.id
+                            ?? request.temporalStory?.generationBeat(for: request.time)?.id,
+                        prompt: "[server-compiled-v3]",
                         modelOptionID: request.model.id,
                         imageData: imageData
                     )))
@@ -160,15 +163,28 @@ actor RemoteGenerationProvider: GenerationProvider {
         inFlightRequestIDs.insert(requestId)
         defer { inFlightRequestIDs.remove(requestId) }
 
+        guard
+            let understanding = request.understanding,
+            let story = request.temporalStory,
+            let targetBeat = request.storyBeat ?? story.generationBeat(for: request.time),
+            targetBeat.renderPlan != nil
+        else {
+            throw GenerationError.invalidParameters
+        }
+
         let payload = CreateGenerationRequest(
+            contextVersion: "generation.v3",
             sourceAssetId: assetId,
             timePosition: TimePositionDTO(time: request.time),
             aspectRatio: Self.aspectRatio(for: request.photo),
             imageProvider: request.model.provider.imageGenerationRoute ?? "minimax",
             requestId: requestId,
-            understanding: request.understanding.map(SceneUnderstandingRelayDTO.init),
-            temporalStory: request.temporalStory.map(TemporalStoryRelayDTO.init),
-            storyBeat: request.storyBeat.map(StoryBeatRelayDTO.init)
+            structuredContext: StructuredContextDTO(
+                schemaVersion: "generation-context.v3",
+                understanding: UnderstandingRelayDTO(understanding),
+                story: StoryContextRelayDTO(story, targetBeat: targetBeat),
+                generationMode: "captured_target"
+            )
         )
 
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/generations"))
@@ -348,7 +364,10 @@ actor RemoteGenerationProvider: GenerationProvider {
     ) -> GenerationError {
         switch errorCode {
         case "invalid_params", "invalid_aspect_ratio", "invalid_image_provider", "missing_prompt",
-             "invalid_time_position", "invalid_source_asset", "missing_request_id":
+             "invalid_time_position", "invalid_source_asset", "missing_request_id",
+             "invalid_generation_contract", "missing_target_beat",
+             "invalid_target_beat", "missing_scene_graph",
+             "missing_temporal_render_plan", "unsupported_schema_version":
             return .invalidParameters
         case "rate_limited":
             return .rateLimited
@@ -375,28 +394,35 @@ private struct UploadResponse: Decodable {
 }
 
 private struct CreateGenerationRequest: Encodable {
+    let contextVersion: String
     let sourceAssetId: String
     let timePosition: TimePositionDTO
     let aspectRatio: String
     let imageProvider: String
     let requestId: String
-    let understanding: SceneUnderstandingRelayDTO?
-    let temporalStory: TemporalStoryRelayDTO?
-    let storyBeat: StoryBeatRelayDTO?
+    let structuredContext: StructuredContextDTO
 }
 
-private struct SceneUnderstandingRelayDTO: Encodable {
+private struct StructuredContextDTO: Encodable {
+    let schemaVersion: String
+    let understanding: UnderstandingRelayDTO
+    let story: StoryContextRelayDTO
+    let generationMode: String
+}
+
+private struct UnderstandingRelayDTO: Encodable {
     let summary: String
     let locationType: String
     let visualMood: String
     let timeClues: [String]
     let changeDrivers: [String]
-    let subjects: [SceneSubjectRelayDTO]
+    let subjects: [SubjectRelayDTO]
     let cameraLock: CameraLockRelayDTO?
     let spatialAnchors: [SpatialAnchorRelayDTO]?
     let temporalLayers: [TemporalLayerRelayDTO]?
     let storySeeds: [String]?
     let hardConstraints: [String]?
+    let sceneGraph: SceneGraph?
 
     init(_ understanding: SceneUnderstanding) {
         summary = understanding.summary
@@ -404,16 +430,17 @@ private struct SceneUnderstandingRelayDTO: Encodable {
         visualMood = understanding.visualMood
         timeClues = understanding.timeClues
         changeDrivers = understanding.changeDrivers
-        subjects = understanding.subjects.map(SceneSubjectRelayDTO.init)
+        subjects = understanding.subjects.map(SubjectRelayDTO.init)
         cameraLock = understanding.cameraLock.map(CameraLockRelayDTO.init)
         spatialAnchors = understanding.spatialAnchors?.map(SpatialAnchorRelayDTO.init)
         temporalLayers = understanding.temporalLayers?.map(TemporalLayerRelayDTO.init)
         storySeeds = understanding.storySeeds
         hardConstraints = understanding.hardConstraints
+        sceneGraph = understanding.sceneGraph
     }
 }
 
-private struct SceneSubjectRelayDTO: Encodable {
+private struct SubjectRelayDTO: Encodable {
     let name: String
     let confidence: Double
     let identityRule: String
@@ -471,23 +498,27 @@ private struct TemporalLayerRelayDTO: Encodable {
     }
 }
 
-private struct TemporalStoryRelayDTO: Encodable {
+private struct StoryContextRelayDTO: Encodable {
+    let schemaVersion: String
     let title: String
     let logline: String
     let presentTruth: String
     let identityRules: [String]
-    let beats: [StoryBeatRelayDTO]
+    let beats: [StoryBeatContextRelayDTO]
+    let targetBeat: StoryBeatContextRelayDTO
 
-    init(_ story: TemporalStory) {
+    init(_ story: TemporalStory, targetBeat: StoryBeat) {
+        schemaVersion = "temporal-story.v3"
         title = story.title
         logline = story.logline
         presentTruth = story.presentTruth
         identityRules = story.identityRules
-        beats = story.beats.map(StoryBeatRelayDTO.init)
+        beats = story.beats.map { StoryBeatContextRelayDTO($0) }
+        self.targetBeat = StoryBeatContextRelayDTO(targetBeat)
     }
 }
 
-private struct StoryBeatRelayDTO: Encodable {
+private struct StoryBeatContextRelayDTO: Encodable {
     let anchorYears: Double
     let title: String
     let narrative: String
@@ -499,6 +530,8 @@ private struct StoryBeatRelayDTO: Encodable {
     let backgroundDelta: String?
     let subjectDelta: String?
     let environmentDelta: String?
+    let exactTarget: ExactTargetContextRelayDTO?
+    let renderPlan: TemporalRenderPlan?
 
     init(_ beat: StoryBeat) {
         anchorYears = beat.anchorYears
@@ -512,6 +545,20 @@ private struct StoryBeatRelayDTO: Encodable {
         backgroundDelta = beat.backgroundDelta
         subjectDelta = beat.subjectDelta
         environmentDelta = beat.environmentDelta
+        exactTarget = beat.exactTarget.map { ExactTargetContextRelayDTO($0) }
+        renderPlan = beat.renderPlan
+    }
+}
+
+private struct ExactTargetContextRelayDTO: Encodable {
+    let offsetDays: Double
+    let targetDateISO: String
+    let compactLabel: String
+
+    init(_ target: ExactTarget) {
+        offsetDays = target.offsetDays
+        targetDateISO = target.targetDateISO
+        compactLabel = target.compactLabel
     }
 }
 

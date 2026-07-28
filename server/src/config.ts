@@ -44,8 +44,8 @@ export const config = {
   minimaxTimeoutMs: 240_000,
   apiMartTimeoutMs: positiveNumberEnv("APIMART_TIMEOUT_MS", 420_000),
   apiMartPollIntervalMs: 2_000,
-  /** Raised for panoramic V2 prompts + upgraded continuity footer. */
-  promptMaxChars: 2400,
+  /** Provider-safe ceiling; V3 compacts required scene coverage field-by-field. */
+  promptMaxChars: 1500,
   allowedAspectRatios: [
     "1:1",
     "16:9",

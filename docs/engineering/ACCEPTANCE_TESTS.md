@@ -71,17 +71,18 @@
 
 ### 首屏 / 相机视觉
 
-- Connection reads as a full-screen flat poster: centered keyword hero
-  (ink/pine/leafGreen + hand underline), `ParkPosterBackdrop`, no settings gear /
-  「模型后台」. Supporting copy does not repeat the hero headline.
-- Copy invites with「给时间，一张照片」; generation uses
-  「时间正在生长」; result uses「未来的回信」.
+- Connection reads as a full-screen blue/white time portal with restrained red
+  and yellow accents. It has one aperture icon entry control and no settings gear.
+- Tapping entry closes eight aperture blades, swaps phase while sealed, then
+  reopens. Reduce Motion skips geometry travel.
 - Viewfinder has no bottom white control card; preview is full-bleed with
   top/bottom scrims only.
 - Viewfinder shows `WaveTimeRail` on the bottom scrim, centered shutter, circular
   album import / grid chrome (flip moves to top with flash when live-capable);
   time chip is minimal (`NOW · year`), not a slogan block.
 - Feature code has no raw `Color(red:)` product tokens.
+- Four rounded focus brackets sit outside the crop corners and remain legible on
+  both bright and dark previews.
 
 ## Accessibility
 

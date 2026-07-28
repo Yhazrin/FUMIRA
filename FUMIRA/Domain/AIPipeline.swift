@@ -219,6 +219,66 @@ struct TemporalLayer: Hashable, Codable, Sendable {
     }
 }
 
+enum SceneDepth: String, Hashable, Codable, Sendable {
+    case foreground
+    case midground
+    case background
+    case sky
+}
+
+enum SceneRegionCategory: String, Hashable, Codable, Sendable {
+    case person
+    case animal
+    case vehicle
+    case vegetation
+    case architecture
+    case infrastructure
+    case surface
+    case signage
+    case furniture
+    case landscape
+    case other
+}
+
+enum TemporalPolicy: String, Hashable, Codable, Sendable {
+    case lockGeometry = "lock_geometry"
+    case ageInPlace = "age_in_place"
+    case evolve
+    case replaceByEra = "replace_by_era"
+    case mayDisappear = "may_disappear"
+    case transient
+}
+
+struct SceneRegion: Hashable, Codable, Sendable {
+    let id: String
+    let depth: SceneDepth
+    let category: SceneRegionCategory
+    let description: String
+    let spatialAnchor: String
+    let materials: [String]
+    let currentCondition: String
+    let confidence: Double
+    let salience: Double
+    let temporalPolicy: TemporalPolicy
+}
+
+struct SceneBaseline: Hashable, Codable, Sendable {
+    let locationType: String
+    let broadCulturalContext: String?
+    let probableCaptureEra: String?
+    let season: String?
+    let timeOfDay: String?
+    let weather: String?
+}
+
+struct SceneGraph: Hashable, Codable, Sendable {
+    let baseline: SceneBaseline
+    let cameraLock: CameraLock
+    let regions: [SceneRegion]
+    let globalDrivers: [String]
+    let uncertainties: [String]
+}
+
 struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
     let id: UUID
     let summary: String
@@ -233,6 +293,8 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
     var temporalLayers: [TemporalLayer]?
     var storySeeds: [String]?
     var hardConstraints: [String]?
+    /// Machine-facing full-scene decomposition. UI copy remains in the fields above.
+    var sceneGraph: SceneGraph?
 
     init(
         id: UUID = UUID(),
@@ -246,7 +308,8 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
         spatialAnchors: [SpatialAnchor]? = nil,
         temporalLayers: [TemporalLayer]? = nil,
         storySeeds: [String]? = nil,
-        hardConstraints: [String]? = nil
+        hardConstraints: [String]? = nil,
+        sceneGraph: SceneGraph? = nil
     ) {
         self.id = id
         self.summary = UnderstandingCopyPolicy.limit(summary, to: UnderstandingCopyPolicy.summary)
@@ -284,6 +347,7 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
                 }.filter { !$0.isEmpty }
             )
         }
+        self.sceneGraph = sceneGraph
     }
 
     static let parkReference = SceneUnderstanding(
@@ -375,8 +439,135 @@ struct SceneUnderstanding: Identifiable, Hashable, Codable, Sendable {
         hardConstraints: [
             "不得新增抢镜的行人或动物",
             "保持树木位置与步道轴线"
-        ]
+        ],
+        sceneGraph: SceneGraph(
+            baseline: SceneBaseline(
+                locationType: "城市公园",
+                broadCulturalContext: "当代公共绿地",
+                probableCaptureEra: "当代",
+                season: nil,
+                timeOfDay: "白天",
+                weather: "晴朗"
+            ),
+            cameraLock: CameraLock(
+                viewpoint: "中景对称视角",
+                lensAndPerspective: "中等焦段、轻微广角",
+                horizon: "位于画面上三分之一",
+                depthStructure: "前景树木、中景步道、背景城市轮廓"
+            ),
+            regions: [
+                SceneRegion(
+                    id: "foreground-trees",
+                    depth: .foreground,
+                    category: .vegetation,
+                    description: "前景三棵景观树与草坡",
+                    spatialAnchor: "画面左侧与中央前景",
+                    materials: ["树干", "树冠", "草地"],
+                    currentCondition: "树木较年轻，草坡平整",
+                    confidence: 0.95,
+                    salience: 0.9,
+                    temporalPolicy: .evolve
+                ),
+                SceneRegion(
+                    id: "midground-path",
+                    depth: .midground,
+                    category: .surface,
+                    description: "向画面中心延伸的铺装步道",
+                    spatialAnchor: "中央透视轴",
+                    materials: ["铺装材料"],
+                    currentCondition: "新修且磨损较少",
+                    confidence: 0.94,
+                    salience: 0.88,
+                    temporalPolicy: .ageInPlace
+                ),
+                SceneRegion(
+                    id: "background-skyline",
+                    depth: .background,
+                    category: .architecture,
+                    description: "远处连续城市天际线",
+                    spatialAnchor: "画面上沿地平线",
+                    materials: ["建筑立面", "玻璃"],
+                    currentCondition: "中等密度建筑群",
+                    confidence: 0.82,
+                    salience: 0.72,
+                    temporalPolicy: .replaceByEra
+                )
+            ],
+            globalDrivers: ["植被自然生长", "公共空间维护", "城市密度变化"],
+            uncertainties: ["无法从单帧确定季节"]
+        )
     )
+}
+
+struct ExactTarget: Hashable, Codable, Sendable {
+    let offsetDays: Double
+    let targetDateISO: String
+    let compactLabel: String
+}
+
+enum HorizonBand: String, Hashable, Codable, Sendable {
+    case hoursDays = "hours_days"
+    case months
+    case years
+    case decades
+    case centuries
+    case millennia
+    case deepTime = "deep_time"
+}
+
+enum SubjectContinuityMode: String, Hashable, Codable, Sendable {
+    case identityPersists = "identity_persists"
+    case lineageOrSuccessor = "lineage_or_successor"
+    case objectRemains = "object_remains"
+    case siteOnly = "site_only"
+    case timeTraveler = "time_traveler"
+}
+
+enum RegionChangeAction: String, Hashable, Codable, Sendable {
+    case preserve
+    case age
+    case grow
+    case renovate
+    case replace
+    case remove
+    case addRelated = "add_related"
+}
+
+enum RegionChangeMagnitude: String, Hashable, Codable, Sendable {
+    case subtle
+    case moderate
+    case major
+    case transformative
+}
+
+struct RegionTemporalChange: Hashable, Codable, Sendable {
+    let regionId: String
+    let action: RegionChangeAction
+    let magnitude: RegionChangeMagnitude
+    let targetAppearance: String
+    let causalReason: String
+}
+
+struct RenderPlanCoverage: Hashable, Codable, Sendable {
+    let foreground: Bool
+    let midground: Bool
+    let background: Bool
+    let builtEnvironment: Bool
+    let naturalEnvironment: Bool
+    let principalSubject: Bool
+}
+
+struct TemporalRenderPlan: Hashable, Codable, Sendable {
+    let exactTarget: ExactTarget
+    let horizonBand: HorizonBand
+    let subjectContinuityMode: SubjectContinuityMode
+    let globalEraState: String
+    let regionChanges: [RegionTemporalChange]
+    let crossRegionCouplings: [String]
+    let mustPreserve: [String]
+    let allowedEraAdditions: [String]
+    let prohibitedDrift: [String]
+    let coverage: RenderPlanCoverage
 }
 
 struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
@@ -392,6 +583,11 @@ struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
     var backgroundDelta: String?
     var subjectDelta: String?
     var environmentDelta: String?
+    /// Program-generated exact target identity — present only on the precise
+    /// target beat, never on canonical browsing beats.
+    let exactTarget: ExactTarget?
+    /// Machine-facing detailed plan; independent from concise UI copy budgets.
+    let renderPlan: TemporalRenderPlan?
 
     init(
         id: UUID = UUID(),
@@ -405,7 +601,9 @@ struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
         midgroundDelta: String? = nil,
         backgroundDelta: String? = nil,
         subjectDelta: String? = nil,
-        environmentDelta: String? = nil
+        environmentDelta: String? = nil,
+        exactTarget: ExactTarget? = nil,
+        renderPlan: TemporalRenderPlan? = nil
     ) {
         self.id = id
         self.anchorYears = anchorYears
@@ -435,6 +633,8 @@ struct StoryBeat: Identifiable, Hashable, Codable, Sendable {
         self.environmentDelta = environmentDelta.map {
             StoryCopyPolicy.limit($0, to: StoryCopyPolicy.beatNarrative)
         }
+        self.exactTarget = exactTarget
+        self.renderPlan = renderPlan
     }
 }
 
@@ -462,6 +662,9 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
     let presentTruth: String
     let identityRules: [String]
     let beats: [StoryBeat]
+    /// Exact beat matching the user's chosen target year — never the nearest
+    /// canonical node. Used for image generation to avoid semantic mismatch.
+    let targetBeat: StoryBeat?
 
     init(
         id: UUID = UUID(),
@@ -469,7 +672,8 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
         logline: String,
         presentTruth: String,
         identityRules: [String],
-        beats: [StoryBeat]
+        beats: [StoryBeat],
+        targetBeat: StoryBeat? = nil
     ) {
         self.id = id
         self.title = StoryCopyPolicy.limit(title, to: StoryCopyPolicy.title)
@@ -480,6 +684,23 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
             .map { StoryCopyPolicy.limit($0, to: StoryCopyPolicy.identityRule) }
             .filter { !$0.isEmpty }
         self.beats = beats.sorted { $0.anchorYears < $1.anchorYears }
+        self.targetBeat = targetBeat
+    }
+
+    /// The beat to use for image generation. Uses `targetBeat` only when its
+    /// exact target identity matches the requested time (within 0.5 days).
+    /// This prevents a locked 100-day target beat from being used for a
+    /// 250-day generation, or a 25-year target for a 25.6-year request.
+    func generationBeat(for time: TimePosition) -> StoryBeat? {
+        if let targetBeat,
+           let exact = targetBeat.exactTarget,
+           abs(exact.offsetDays - time.offsetDays) < 0.5 {
+            return targetBeat
+        }
+        return beats.min {
+            abs($0.anchorYears - time.offsetYears) <
+                abs($1.anchorYears - time.offsetYears)
+        }
     }
 
     func beat(for time: TimePosition) -> StoryBeat? {
@@ -511,6 +732,27 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
         let identityRules = understanding.subjects.map(\.identityRule)
         let anchors = [-100.0, -30, -10, 0, 10, 30, 100]
 
+        let mainDriver = drivers.first ?? "时间自然变化"
+        let targetIdentity = ExactTarget(
+            offsetDays: targetTime.offsetDays,
+            targetDateISO: targetTime.targetDate().ISO8601Format(),
+            compactLabel: targetTime.compactLabel
+        )
+        let renderPlan = fallbackRenderPlan(
+            understanding: understanding,
+            target: targetIdentity,
+            targetTime: targetTime,
+            driver: mainDriver
+        )
+        let exactTarget = StoryBeat(
+            anchorYears: targetTime.offsetYears,
+            title: "\(location)的\(targetTime.compactLabel)",
+            narrative: "\(mainDriver)在\(targetTime.compactLabel)深刻改变\(location)的面貌，主体与构图保持连续。",
+            visualPrompt: "\(understanding.visualMood)，\(mainDriver)经过\(targetTime.compactLabel)的累积效应，保持原图主体、机位与构图",
+            exactTarget: targetIdentity,
+            renderPlan: renderPlan
+        )
+
         return TemporalStory(
             title: "\(location)的时间回声",
             logline: "\(understanding.summary) 目标抵达\(targetTime.compactLabel)。",
@@ -530,8 +772,88 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
                         : "\(driver)继续改变\(location)的景象，主体与构图保持连续。",
                     visualPrompt: "\(understanding.visualMood)，\(driver)，保持原图主体、机位与构图"
                 )
-            }
+            },
+            targetBeat: exactTarget
         )
+    }
+
+    private static func fallbackRenderPlan(
+        understanding: SceneUnderstanding,
+        target: ExactTarget,
+        targetTime: TimePosition,
+        driver: String
+    ) -> TemporalRenderPlan {
+        let regions = understanding.sceneGraph?.regions ?? []
+        let changes = regions.map { region in
+            RegionTemporalChange(
+                regionId: region.id,
+                action: fallbackAction(for: region),
+                magnitude: abs(targetTime.offsetYears) < 5 ? .subtle : .moderate,
+                targetAppearance: "\(region.description)体现\(targetTime.compactLabel)的\(driver)",
+                causalReason: "\(driver)与经过的时间共同作用"
+            )
+        }
+        let fallbackChanges = changes.isEmpty
+            ? [
+                RegionTemporalChange(
+                    regionId: "whole-scene",
+                    action: .age,
+                    magnitude: .moderate,
+                    targetAppearance: "\(understanding.summary)呈现\(targetTime.compactLabel)的变化",
+                    causalReason: driver
+                )
+            ]
+            : changes
+
+        return TemporalRenderPlan(
+            exactTarget: target,
+            horizonBand: horizonBand(for: targetTime.offsetDays),
+            subjectContinuityMode: .identityPersists,
+            globalEraState: "\(targetTime.compactLabel)的\(understanding.locationType)",
+            regionChanges: fallbackChanges,
+            crossRegionCouplings: ["所有材质、植被、设施与主体属于同一目标年代"],
+            mustPreserve: understanding.subjects.map(\.identityRule),
+            allowedEraAdditions: ["有时间因果依据的建筑、设施、植被、车辆与标牌"],
+            prohibitedDrift: ["不得只改变最显眼的单一主体"],
+            coverage: RenderPlanCoverage(
+                foreground: regions.contains { $0.depth == .foreground },
+                midground: regions.contains { $0.depth == .midground },
+                background: regions.contains { $0.depth == .background },
+                builtEnvironment: regions.contains {
+                    $0.category == .architecture || $0.category == .infrastructure
+                },
+                naturalEnvironment: regions.contains {
+                    $0.category == .vegetation || $0.category == .landscape
+                },
+                principalSubject: !understanding.subjects.isEmpty
+            )
+        )
+    }
+
+    private static func fallbackAction(for region: SceneRegion) -> RegionChangeAction {
+        switch region.temporalPolicy {
+        case .lockGeometry:
+            .preserve
+        case .ageInPlace:
+            .age
+        case .evolve:
+            region.category == .vegetation ? .grow : .age
+        case .replaceByEra:
+            .replace
+        case .mayDisappear, .transient:
+            .remove
+        }
+    }
+
+    private static func horizonBand(for offsetDays: Double) -> HorizonBand {
+        let days = abs(offsetDays)
+        if days <= 14 { return .hoursDays }
+        if days < 365 { return .months }
+        if days < 5 * 365.25 { return .years }
+        if days < 100 * 365.25 { return .decades }
+        if days < 1_000 * 365.25 { return .centuries }
+        if days < 100_000 * 365.25 { return .millennia }
+        return .deepTime
     }
 
     static let parkReference = fallback(

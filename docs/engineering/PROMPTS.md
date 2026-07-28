@@ -7,7 +7,7 @@
 > 原则：
 > - 出图 / 理解 / 故事 Prompt 均由 `server/` 生成；App 只传结构化参数（timePosition、Scene Bible、beat 等）。
 > - 应用内没有任何自由文本 prompt 输入框。
-> - 三类模型调用：① 出图（I2I） ② 图像理解（VLM / Scene Bible） ③ 7 拍故事（M3 Chat）。
+> - 四类模型调用：① 图像理解（SceneGraph）② 7 拍故事 ③ 精确目标规划 ④ 出图（I2I）。
 
 ---
 
@@ -30,10 +30,13 @@
 └──────┬───────────────────────────────────────────┘
        ▼
 ┌──────────────────────────────────────────────────┐
-│ ③ 出图 Prompt（server 权威）                       │
-│   temporalImagePrompt.make / compileStoryDriven    │
-│   + continuityFooter；整体 ≤ promptMaxChars(2400)  │
-│   App 客户端 prompt 字符串会被忽略（__FORCE_*__ 除外）│
+│ ③ 精确目标世界规划（server）                         │
+│   writeExactTargetPlan → TemporalRenderPlan         │
+└──────┬───────────────────────────────────────────┘
+       ▼
+┌──────────────────────────────────────────────────┐
+│ ④ PromptCompiler V3（server 权威）                  │
+│   必需段落先压缩保留，整体 ≤ promptMaxChars(1500)    │
 └──────┬───────────────────────────────────────────┘
        ▼
 ┌──────────────────────┐
@@ -51,8 +54,8 @@
 
 | # | 角色 | 语言 | 状态 | 文件 |
 |---|---|---|---|---|
-| 1 | 主出图 Prompt V2 | 中 | ✅ 权威 | `server/src/temporalImagePrompt.ts` |
-| 2 | 故事驱动出图编译 | 中 | ✅ 权威 | `compileStoryDrivenPrompt` 同文件 |
+| 1 | 主出图 Prompt V3 | 英 | ✅ 权威 | `server/src/promptCompiler.ts` |
+| 2 | Legacy 故事驱动编译 | 中 | 兼容 | `server/src/temporalImagePrompt.ts` |
 | 3 | continuityFooter | 英 | ✅ 必拼 | `server/src/prompt.ts` |
 | 4 | VLM Scene Bible | 英 | ✅ | `server/src/minimax/liveIntelligenceAdapter.ts` |
 | 5 | 故事 system / user | 英 | ✅ | 同上 |
@@ -64,13 +67,15 @@
 
 ---
 
-## 3. 主出图 Prompt V2（server）
+## 3. 主出图 Prompt V3（server）
 
-- **入口：** `createGenerationJob` → `compileStoryDrivenPrompt` / `makeTemporalImagePrompt` → `buildPrompt`
-- **核心逻辑：** 空间锚点锁定 → 全景分层 → 时间因果推演 → 年代一致性检查
+- **入口：** `createGenerationJob` → `compilePrompt`
+- **核心逻辑：** SceneGraph → TemporalRenderPlan → 相机锁定 / 锚点策略 /
+  全场景变化 / 跨层一致性 / 禁止漂移
 - **跨度分级：** &lt;1天 / &lt;1年 / 1–10 / 10–50 / 50+
 - **禁止项：** 不添加无关、抢镜或缺乏时间因果依据的人物/车辆/建筑/设施（非冻结世界）
-- **字符上限：** `config.promptMaxChars = 2400`
+- **字符上限：** `config.promptMaxChars = 1500`
+- **预算：** 必需段落先放紧凑版，再按优先级扩展；精确时间变化永不整段删除
 
 ---
 
@@ -82,9 +87,11 @@
 
 ## 5. Scene Bible / StoryBeat 扩展
 
-`SceneUnderstanding` 可选字段：`cameraLock`、`spatialAnchors`、`temporalLayers`、`storySeeds`、`hardConstraints`（旧字段兼容）。
+`SceneUnderstanding` 新增机器层 `sceneGraph`：分景深区域、材质、状态、
+时间策略、相机锁和不确定项；旧 Scene Bible 字段继续兼容。
 
-`StoryBeat` 可选字段：`transitionCause`、`unchangedAnchors`、`foregroundDelta` / `midgroundDelta` / `backgroundDelta` / `subjectDelta` / `environmentDelta`。
+`StoryBeat` 保留短 UI 文案，并为精确 `targetBeat` 增加
+`renderPlan`。RenderPlan 不套用 UI 字符预算。
 
 App DTO 与 server normalize 均向后兼容解析。
 
@@ -96,7 +103,8 @@ App DTO 与 server normalize 均向后兼容解析。
 
 - `timePosition` **必需**（server 据此生成 Prompt）
 - `prompt` / `story`：**可省略**；若传入普通字符串则**忽略**；仅 `__FORCE_*__` 测试标记透传
-- 新增可选：`understanding`、`temporalStory`、`storyBeat`（故事驱动编译）
+- 当前客户端发送 `generation.v3` + `generation-context.v3`
+- Legacy 可选：`understanding`、`temporalStory`、`storyBeat`
 
 `POST /v1/understand`：仍分析上传资源；语义改为**源照片 Scene Bible**（非目标结果图）。
 
@@ -116,8 +124,8 @@ App DTO 与 server normalize 均向后兼容解析。
 
 ## 8. 修改 Prompt 检查清单
 
-- [ ] 改出图 Prompt → 只改 `server/src/temporalImagePrompt.ts`，跑 `server/test/temporal-prompt.test.ts`
-- [ ] 改 Footer / 上限 → `prompt.ts` + `config.promptMaxChars`
+- [ ] 改主出图 Prompt → `server/src/promptCompiler.ts` + `promptCompiler.test.ts`
+- [ ] 改 Legacy / 上限 → `temporalImagePrompt.ts` / `config.promptMaxChars`
 - [ ] 改 VLM / 故事 → `liveIntelligenceAdapter.ts` + parser 测试
 - [ ] 改 copyConstraints → 同步 App `*CopyPolicy` 与 server bounds
 - [ ] **不要**在 App Feature / View 层新增长业务 Prompt 字符串

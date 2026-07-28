@@ -17,8 +17,9 @@ xcodebuild -project FUMIRA.xcodeproj -scheme FUMIRA -sdk iphonesimulator \
 talks to the local FUMIRA backend (`RemoteGenerationProvider`). **Release** /
 Archive leave the URL empty → local Mock generation (safe default).
 
-Understanding / story stay on Mock in MVP either way. Simulator uses the
-deterministic camera fallback; physical devices use the live rear camera.
+Understanding, story, and generation are all remote when `MINIMAX_API_KEY` is
+set in `server/.env`. Simulator uses the deterministic camera fallback;
+physical devices use the live rear camera.
 
 MiniMax is **not** packaged into the app. The key lives only in `server/.env`.
 Packaging the iOS target never embeds vendor credentials — you run the backend
@@ -67,8 +68,9 @@ FUMIRA_API_BASE_URL=http://<Mac-LAN-IP>:8787
 Scheme env wins over the Info.plist Debug default. Mac and phone must be on the
 same LAN; local HTTP is allowed via `NSAllowsLocalNetworking`.
 
-Flow: capture → (mock) understand/story → upload JPEG → queue MiniMax
-`image-01` I2I → poll → show generated JPEG on the result screen.
+Flow: capture → upload JPEG → remote understand → remote story (with
+`targetBeat`) → queue MiniMax `image-01` I2I (server-compiled prompt) → poll →
+show generated JPEG on the result screen.
 
 Admin (Bearer `ADMIN_TOKEN`):
 
@@ -87,15 +89,15 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ## 首屏 / 相机视觉
 
-- **Connection** is a full-screen flat poster: centered `PosterKeywordHero`
-  (ink / pine / leafGreen + hand underline) over `ParkPosterBackdrop` shapes.
-  Supporting copy explains hardware vs phone-only — it does not repeat the hero
-  headline. No settings gear on first screen.
+- **Connection** is a full-screen blue/white time portal with red and yellow
+  toy-camera accents. The only entry control is a circular aperture icon.
+  RootView owns an eight-blade close/swap/reopen transition so the iris remains
+  continuous across the permission/viewfinder phase change.
 - **Viewfinder** is immersive: full-bleed preview, top/bottom scrims only (no
   large white control card). Top = flash when supported + `NOW · year` chip;
   bottom = `WaveTimeRail` + centered shutter + flip (when live) + grid. Shutter
   uses paper fill with leafGreen accent ring.
-- Palette: paper · sky · grassLight · pine · leafGreen · ink.
+- Palette: canvas · actionBlue · paperWhite · toyRed · bellYellow · ink.
 - Generation / result lettering:「时间正在生长」/「未来的回信」.
 - Decorative 2.5D parallax (connection / result / share only) moves flat
   background planes at 1.5 / 3 / 5 pt; camera, waveform, text, and CTAs stay fixed.

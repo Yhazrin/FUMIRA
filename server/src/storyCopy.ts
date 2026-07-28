@@ -1,6 +1,7 @@
 import type {
   StoryCopyConstraints,
   TemporalStoryPayload,
+  TemporalStoryPayloadV2,
 } from "./types.js";
 
 type ConstraintKey = keyof StoryCopyConstraints;
@@ -38,7 +39,7 @@ export function normalizeTemporalStoryCopy(
   story: TemporalStoryPayload,
   constraints: StoryCopyConstraints
 ): TemporalStoryPayload {
-  return {
+  const normalized: TemporalStoryPayload = {
     title: limit(story.title, constraints.title),
     logline: limit(story.logline, constraints.logline),
     presentTruth: limit(story.presentTruth, constraints.presentTruth),
@@ -46,23 +47,14 @@ export function normalizeTemporalStoryCopy(
       .slice(0, 8)
       .map((rule) => limit(rule, constraints.identityRule))
       .filter(Boolean),
-    beats: story.beats.map((beat) => ({
-      anchorYears: beat.anchorYears,
-      title: limit(beat.title, constraints.beatTitle),
-      narrative: limit(beat.narrative, constraints.beatNarrative),
-      visualPrompt: limit(beat.visualPrompt, constraints.visualPrompt),
-      transitionCause: optionalLimit(beat.transitionCause, beatDeltaLimit),
-      unchangedAnchors: beat.unchangedAnchors
-        ?.slice(0, 6)
-        .map((item) => limit(item, 28))
-        .filter(Boolean),
-      foregroundDelta: optionalLimit(beat.foregroundDelta, beatDeltaLimit),
-      midgroundDelta: optionalLimit(beat.midgroundDelta, beatDeltaLimit),
-      backgroundDelta: optionalLimit(beat.backgroundDelta, beatDeltaLimit),
-      subjectDelta: optionalLimit(beat.subjectDelta, beatDeltaLimit),
-      environmentDelta: optionalLimit(beat.environmentDelta, beatDeltaLimit),
-    })),
+    beats: story.beats.map((beat) => normalizeBeat(beat, constraints)),
   };
+
+  if (story.targetBeat) {
+    normalized.targetBeat = normalizeBeat(story.targetBeat, constraints);
+  }
+
+  return normalized;
 }
 
 function resolve(key: ConstraintKey, requested: unknown): number {
@@ -85,4 +77,50 @@ function optionalLimit(value: string | undefined, maximum: number): string | und
   if (!value) return undefined;
   const limited = limit(value, maximum);
   return limited || undefined;
+}
+
+/**
+ * Build the strict V3 story contract from a separately generated target plan.
+ * There is deliberately no nearest-beat fallback: missing exact planning is an
+ * error at the intelligence boundary, not something copy normalization hides.
+ */
+export function promoteToV3(
+  story: TemporalStoryPayload,
+  targetBeat: TemporalStoryPayloadV2["targetBeat"],
+  constraints: StoryCopyConstraints
+): TemporalStoryPayloadV2 {
+  const normalized = normalizeTemporalStoryCopy(story, constraints);
+  return {
+    schemaVersion: "temporal-story.v3",
+    title: normalized.title,
+    logline: normalized.logline,
+    presentTruth: normalized.presentTruth,
+    identityRules: normalized.identityRules,
+    beats: normalized.beats,
+    targetBeat: normalizeBeat(targetBeat, constraints),
+  };
+}
+
+function normalizeBeat(
+  beat: TemporalStoryPayload["beats"][number],
+  constraints: StoryCopyConstraints
+): TemporalStoryPayload["beats"][number] {
+  return {
+    anchorYears: beat.anchorYears,
+    title: limit(beat.title, constraints.beatTitle),
+    narrative: limit(beat.narrative, constraints.beatNarrative),
+    visualPrompt: limit(beat.visualPrompt, constraints.visualPrompt),
+    transitionCause: optionalLimit(beat.transitionCause, beatDeltaLimit),
+    unchangedAnchors: beat.unchangedAnchors
+      ?.slice(0, 6)
+      .map((item) => limit(item, 28))
+      .filter(Boolean),
+    foregroundDelta: optionalLimit(beat.foregroundDelta, beatDeltaLimit),
+    midgroundDelta: optionalLimit(beat.midgroundDelta, beatDeltaLimit),
+    backgroundDelta: optionalLimit(beat.backgroundDelta, beatDeltaLimit),
+    subjectDelta: optionalLimit(beat.subjectDelta, beatDeltaLimit),
+    environmentDelta: optionalLimit(beat.environmentDelta, beatDeltaLimit),
+    exactTarget: beat.exactTarget,
+    renderPlan: beat.renderPlan,
+  };
 }

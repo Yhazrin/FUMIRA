@@ -5,9 +5,8 @@ Direction H — **公园时间海报版**：纯白画布、青蓝天空、草地
 荧光黄作为主视觉。**不以米色作 App 主背景**；米色纸感仅保留在海报合成 /
 公园装饰形局部。
 
-视觉基准屏：**Connection「时间开口」** — 青蓝天空 + 草绿丘陵 + 松绿 CTA +
-叶绿点睛 + 关键词排版。其余 chrome / 设置 / 结果留白对齐纯白画布，点睛色从
-Connection 气质延伸，而不是回到大面积 energyLime。
+视觉基准屏：**Connection「时间光圈」** — 哆啦蓝 + 纯白门户 + 玩具红细节 +
+铃铛黄点睛。其余 chrome / 设置 / 结果留白对齐纯白画布。
 
 ## Palette
 
@@ -25,6 +24,9 @@ Raw hex values live only in `PosterPalette`. Features must use semantic tokens.
 | `skyDeep` | `#3D8BB5` | 深青蓝 — 叠层、理解页大色块 |
 | `actionBlue` | `#1E9CE0` | 哆啦 A 梦蓝 — 主按钮、进度、时间选中态 |
 | `actionBlueDeep` | `#1269A8` | 按压暗面、描边与高对比蓝色文字 |
+| `actionBlueShadow` | `#075999` | 时间光圈暗面、光学阴影与外描边 |
+| `toyRed` | `#E82A34` | 首屏镜头与入口按钮的小面积红色点睛 |
+| `bellYellow` | `#FFD33A` | 首屏状态点与镜头标记的小面积黄色点睛 |
 | `grassLight` | `#8FCB7E` | 草地浅绿 — 分层地形近层 |
 | `pine` | `#2A5A3C` | 深松绿 — 仅地形深部与自然场景 |
 | `leafGreen` | `#5FA868` | 清新叶绿 — **仅**自然场景与海报下划线 |
@@ -109,18 +111,14 @@ from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
 
 ## 首屏 / 相机视觉
 
-### Connection（时间开口 · 视觉基准）
+### Connection（时间光圈 · 视觉基准）
 
-- Composition is a **full-screen flat poster** (`ParkPosterBackdrop`), not a
-  rounded inset card. This screen sets the product color temperature:
-  sky / grassLight / pine / leafGreen — not beige chrome.
-- Keyword hero (`PosterKeywordHero`) uses ink / pine / leafGreen segments plus a
-  hand-drawn leafGreen underline. One invite headline only — supporting copy must
-  not repeat「给时间，一张照片」.
-- Background: custom sky / hill / river / botanical shapes with optional device
-  tilt on decorative planes only. Local `paper` shapes are decorative only.
-  No settings gear.
-- Primary CTA uses `actionBlue`; green stays inside the landscape illustration.
+- Full-screen supplied blue-and-white line-art background with a static blue
+  wordmark; no portal rings, ornamental lens stack, particles, or parallax.
+- A single centered action-blue aperture button is the hero and entry control.
+  It keeps a 44pt+ target with no visible CTA sentence and no settings gear.
+- The wordmark and button are present immediately and remain geometrically stable.
+- Raw color values remain in `PosterPalette`; Connection uses semantic tokens.
 
 ### Viewfinder（沉浸相机）
 

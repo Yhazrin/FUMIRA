@@ -63,12 +63,15 @@ Selected bar / cursor / year emphasis uses `PosterPalette.actionBlue`.
 
 ## 首屏 / 相机动效
 
-### PosterKeywordHero
+### Connection aperture
 
-- Connection uses a one-shot, cancel-safe entrance (opacity + small transform) on
-  stable layout segments. No timed invite ↔ connecting layout swap.
-- Reduce Motion: static invite composition; phase change uses the 150ms opacity
-  crossfade from `PhaseTransition`.
+- Wordmark and aperture button are static on first appearance. There is no
+  entrance translation, stagger, scale reveal, parallax, or idle breathing.
+- RootView owns the camera-entry iris so it survives the phase swap: eight blades
+  begin beyond the screen diagonal, close in 340ms, swap the phase only while
+  fully sealed, then reopen from the aperture button's center.
+- Repeated taps are ignored while the iris is active. Cancellation resets the
+  overlay. Reduce Motion bypasses blade geometry and uses the phase crossfade.
 
 ### Viewfinder shutter
 

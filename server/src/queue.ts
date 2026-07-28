@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
-import { buildPrompt, normalizeAspectRatio, toJpegDataUrl } from "./prompt.js";
+import {
+  buildPrompt,
+  normalizeAspectRatio,
+  toJpegDataUrl,
+} from "./prompt.js";
+import { compilePrompt, buildLegacyPrompt } from "./promptCompiler.js";
 import {
   compileStoryDrivenPrompt,
   makeTemporalImagePrompt,
@@ -18,9 +23,13 @@ import {
 } from "./storage.js";
 import type {
   CreateGenerationBody,
+  GenerationContext,
   GenerationRecord,
   ImageGenerationAdapter,
   ImageGenerationProvider,
+  SceneUnderstandingPayload,
+  StoryBeatPayload,
+  StructuredGenerationBody,
 } from "./types.js";
 import {
   getPostGenerationValidationAdapter,
@@ -28,10 +37,6 @@ import {
   runPostGenerationValidation,
 } from "./validationService.js";
 import { shouldAttemptRepair, DEFAULT_REPAIR_INSTRUCTION } from "./validation.js";
-import type {
-  SceneUnderstandingPayload,
-  StoryBeatPayload,
-} from "./types.js";
 
 const adapters = new Map<ImageGenerationProvider, ImageGenerationAdapter>();
 const processing = new Set<string>();
@@ -114,87 +119,104 @@ export function createGenerationJob(
 
   const aspectRatio = normalizeAspectRatio(body.aspectRatio);
   if (!aspectRatio) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_aspect_ratio",
-      userMessage: "不支持的画幅比例。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_aspect_ratio", "不支持的画幅比例。");
   }
 
   if (!body.requestId?.trim()) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "missing_request_id",
-      userMessage: "缺少 requestId。",
-      retryable: false,
-    };
+    return contractError(400, "missing_request_id", "缺少 requestId。");
   }
 
   if (!body.sourceAssetId || !getAsset(body.sourceAssetId)) {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_source_asset",
-      userMessage: "源图片不存在或已过期。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_source_asset", "源图片不存在或已过期。");
   }
 
   if (!body.timePosition || typeof body.timePosition.normalized !== "number") {
-    return {
-      ok: false,
-      statusCode: 400,
-      errorCode: "invalid_time_position",
-      userMessage: "时间位置无效。",
-      retryable: false,
-    };
+    return contractError(400, "invalid_time_position", "时间位置无效。");
   }
 
-  // Server is the sole prompt author. Client `prompt` / `story` strings are
-  // ignored except for mock/test force markers (`__FORCE_*__`).
-  const clientPrompt =
-    typeof body.prompt === "string" && body.prompt.trim()
-      ? body.prompt.trim()
-      : typeof body.story === "string" && body.story.trim()
-        ? body.story.trim()
-        : "";
-  const forceMarker = /__FORCE_[A-Z0-9_]+__/.test(clientPrompt) ? clientPrompt : null;
-  if (clientPrompt && !forceMarker) {
-    console.info(
-      JSON.stringify({
-        event: "client_prompt_ignored",
-        requestId: body.requestId.trim(),
-        clientPromptChars: clientPrompt.length,
-      })
-    );
-  }
+  const contextVersion =
+    (body as { contextVersion?: string }).contextVersion ?? "legacy.v1";
+  let built: {
+    prompt: string;
+    truncated: boolean;
+    charCount: number;
+    version?: string;
+    hash?: string;
+    sectionCharCounts?: Record<string, number>;
+    truncatedSections?: string[];
+  };
+  let understanding: SceneUnderstandingPayload | null = null;
+  let beat: StoryBeatPayload | null = null;
 
-  const beat =
-    body.storyBeat
-    ?? pickNearestBeat(body.temporalStory, body.timePosition.offsetYears);
-  const corePrompt = forceMarker
-    ?? (compileStoryDrivenPrompt({
-      time: body.timePosition,
-      understanding: body.understanding,
-      story: body.temporalStory
+  if (contextVersion === "generation.v2" || contextVersion === "generation.v3") {
+    const structured = body as StructuredGenerationBody;
+    const validation = validateStructuredContext(structured.structuredContext);
+    if (validation) return validation;
+    const ctx = injectTargetTime(structured);
+    built = compilePrompt({
+      context: ctx,
+      timePosition: body.timePosition,
+      aspectRatio,
+    });
+    understanding = ctx.understanding;
+    beat = ctx.story.targetBeat;
+  } else if (contextVersion === "legacy.v1") {
+    const legacy = body as Extract<CreateGenerationBody, { contextVersion: "legacy.v1" }>;
+    const clientPrompt =
+      typeof legacy.prompt === "string" && legacy.prompt.trim()
+        ? legacy.prompt.trim()
+        : typeof legacy.story === "string" && legacy.story.trim()
+          ? legacy.story.trim()
+          : "";
+    const forceMarker = /__FORCE_[A-Z0-9_]+__/.test(clientPrompt)
+      ? clientPrompt
+      : null;
+    beat = legacy.storyBeat
+      ?? pickNearestBeat(legacy.temporalStory, body.timePosition.offsetYears)
+      ?? null;
+    understanding = legacy.understanding ?? null;
+
+    if (legacy.understanding || legacy.temporalStory || legacy.storyBeat) {
+      const corePrompt = forceMarker
+        ?? compileStoryDrivenPrompt({
+          time: body.timePosition,
+          understanding: legacy.understanding,
+          story: legacy.temporalStory
+            ? {
+                identityRules: legacy.temporalStory.identityRules,
+                logline: legacy.temporalStory.logline,
+                presentTruth: legacy.temporalStory.presentTruth,
+              }
+            : null,
+          beat,
+        })
+        ?? makeTemporalImagePrompt(body.timePosition);
+      built = buildPrompt({
+        template: settings.promptTemplate,
+        corePrompt,
+        timePosition: body.timePosition,
+        aspectRatio,
+      });
+    } else {
+      if (!clientPrompt) {
+        return contractError(400, "missing_story", "缺少故事内容。");
+      }
+      built = forceMarker
         ? {
-            identityRules: body.temporalStory.identityRules,
-            logline: body.temporalStory.logline,
-            presentTruth: body.temporalStory.presentTruth,
+            prompt: forceMarker,
+            truncated: false,
+            charCount: forceMarker.length,
           }
-        : null,
-      beat,
-    }) || makeTemporalImagePrompt(body.timePosition));
-
-  const built = buildPrompt({
-    template: settings.promptTemplate,
-    corePrompt,
-    timePosition: body.timePosition,
-    aspectRatio,
-  });
+        : buildLegacyPrompt({
+            template: settings.promptTemplate,
+            story: clientPrompt,
+            timePosition: body.timePosition,
+            aspectRatio,
+          });
+    }
+  } else {
+    return contractError(400, "unsupported_context_version", "不支持的上下文版本。");
+  }
 
   const now = new Date().toISOString();
   const record: GenerationRecord = {
@@ -209,13 +231,17 @@ export function createGenerationJob(
     aspectRatio,
     promptTruncated: built.truncated,
     promptCharCount: built.charCount,
+    promptVersion: built.version,
+    promptHash: built.hash,
+    sectionCharCounts: built.sectionCharCounts,
+    truncatedSections: built.truncatedSections,
   };
 
   promptByGeneration.set(record.generationId, {
     prompt: built.prompt,
     useSubjectReference: Boolean(body.useSubjectReference),
-    understanding: body.understanding ?? null,
-    storyBeat: beat ?? null,
+    understanding,
+    storyBeat: beat,
     targetTime: body.timePosition,
   });
 
@@ -229,10 +255,123 @@ export function createGenerationJob(
       generationId: record.generationId,
       status: record.status,
       promptTruncated: record.promptTruncated,
+      promptVersion: built.version,
     })
   );
 
   return { ok: true, record };
+}
+
+// ---------------------------------------------------------------------------
+// Contract validation (Task 7)
+// ---------------------------------------------------------------------------
+
+function contractError(
+  statusCode: number,
+  errorCode: string,
+  userMessage: string,
+  retryable = false
+) {
+  return { ok: false as const, statusCode, errorCode, userMessage, retryable };
+}
+
+const VALID_GENERATION_MODES = new Set([
+  "captured_target",
+  "story_preview_target",
+  "regenerate_same_target",
+]);
+
+const VALID_SCHEMA_VERSIONS = new Set([
+  "generation-context.v2",
+  "generation-context.v3",
+]);
+
+function validateStructuredContext(
+  ctx: GenerationContext | undefined
+): ReturnType<typeof contractError> | null {
+  if (!ctx) {
+    return contractError(400, "invalid_generation_contract", "缺少结构化上下文。");
+  }
+  if (!VALID_SCHEMA_VERSIONS.has(ctx.schemaVersion)) {
+    return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
+  }
+  if (!ctx.understanding) {
+    return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  }
+  if (!ctx.story) {
+    return contractError(400, "invalid_generation_contract", "缺少时间故事数据。");
+  }
+  if (
+    ctx.story.schemaVersion !== "temporal-story.v2"
+    && ctx.story.schemaVersion !== "temporal-story.v3"
+  ) {
+    return contractError(400, "unsupported_schema_version", `故事 schema 版本不匹配: ${ctx.story.schemaVersion ?? "undefined"}`);
+  }
+  if (!ctx.story.targetBeat) {
+    return contractError(400, "missing_target_beat", "V2 故事缺少精确目标节点 (targetBeat)。");
+  }
+  const tb = ctx.story.targetBeat;
+  if (!Number.isFinite(tb.anchorYears) || !tb.visualPrompt) {
+    return contractError(400, "invalid_target_beat", "targetBeat 缺少必要字段 (anchorYears, visualPrompt)。");
+  }
+  if (ctx.schemaVersion === "generation-context.v3") {
+    if (ctx.story.schemaVersion !== "temporal-story.v3") {
+      return contractError(400, "unsupported_schema_version", "V3 生成上下文需要 temporal-story.v3。");
+    }
+    if (!ctx.understanding.sceneGraph?.regions.length) {
+      return contractError(400, "missing_scene_graph", "V3 上下文缺少分层场景图。");
+    }
+    if (!tb.renderPlan?.regionChanges.length) {
+      return contractError(400, "missing_temporal_render_plan", "V3 目标节点缺少分区域渲染计划。");
+    }
+  }
+  if (ctx.story.beats.length !== 7) {
+    return contractError(400, "invalid_generation_contract", `需要恰好 7 个浏览节点，收到 ${ctx.story.beats.length} 个。`);
+  }
+  if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
+    return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
+  }
+  // Validate subject count bounds.
+  if (ctx.understanding.subjects.length > 10) {
+    return contractError(400, "invalid_generation_contract", "主体数量超过上限 (10)。");
+  }
+  if (ctx.story.identityRules.length > 10) {
+    return contractError(400, "invalid_generation_contract", "身份规则数量超过上限 (10)。");
+  }
+  return null;
+}
+
+/**
+ * Inject program-authoritative time values into the targetBeat.
+ * The LLM's anchorYears is a hint; offsetDays is the truth.
+ */
+function injectTargetTime(body: StructuredGenerationBody): GenerationContext {
+  const offsetDays = body.timePosition.offsetDays;
+  const now = new Date();
+  const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
+  const exactTarget: import("./types.js").ExactTarget = {
+    offsetDays,
+    targetDateISO: targetDate.toISOString().slice(0, 10),
+    compactLabel: body.timePosition.compactLabel,
+  };
+  return {
+    ...body.structuredContext,
+    story: {
+      ...body.structuredContext.story,
+      targetBeat: {
+        ...body.structuredContext.story.targetBeat,
+        // Overwrite the LLM's anchorYears with the program-authoritative value.
+        anchorYears: offsetDays / 365.25,
+        exactTarget,
+        renderPlan: body.structuredContext.story.targetBeat.renderPlan
+          ? {
+              ...body.structuredContext.story.targetBeat.renderPlan,
+              exactTarget,
+            }
+          : undefined,
+      },
+    },
+  };
 }
 
 async function processGeneration(generationId: string): Promise<void> {
@@ -323,6 +462,7 @@ async function processGeneration(generationId: string): Promise<void> {
     // enabled and we have enough metadata to compare source vs target.
     const finalRelativeUrl = await maybeRepair({
       generationId,
+      sourceAssetId: current.sourceAssetId,
       requestId: current.requestId,
       sourceBytes: asset.bytes,
       sourceContentType: asset.contentType,
@@ -337,6 +477,7 @@ async function processGeneration(generationId: string): Promise<void> {
       aspectRatio: current.aspectRatio,
       adapter,
       useSubjectReference: Boolean(stored?.useSubjectReference),
+      originalPrompt: prompt,
     });
     const finalUrl = finalRelativeUrl ?? primaryRelativeUrl;
     promptByGeneration.delete(generationId);
@@ -387,6 +528,7 @@ async function processGeneration(generationId: string): Promise<void> {
  */
 async function maybeRepair(input: {
   generationId: string;
+  sourceAssetId: string;
   requestId: string;
   sourceBytes: Buffer;
   sourceContentType: string;
@@ -400,12 +542,13 @@ async function maybeRepair(input: {
     : never;
   adapter: ImageGenerationAdapter;
   useSubjectReference: boolean;
+  originalPrompt: string;
 }): Promise<string | null> {
   const validator = getPostGenerationValidationAdapter();
   if (!validator) return null;
   const validationStart = Date.now();
   const validation = await runPostGenerationValidation({
-    sourceAssetId: input.generationId,
+    sourceAssetId: input.sourceAssetId,
     sourceContentType: input.sourceContentType,
     targetBytes: input.targetBytes,
     targetContentType: input.targetContentType,
@@ -437,6 +580,7 @@ async function maybeRepair(input: {
       anchorPreservation: value.anchorPreservation,
       identityConsistency: value.identityConsistency,
       temporalCoverage: value.temporalCoverage,
+      environmentEvolution: value.environmentEvolution,
       eraCoherence: value.eraCoherence,
       storyAlignment: value.storyAlignment,
       shouldRegenerate: value.shouldRegenerate,
@@ -447,7 +591,10 @@ async function maybeRepair(input: {
   const plan = planFromValidation(value);
   const repairInstructions =
     plan?.repairInstructions ?? [DEFAULT_REPAIR_INSTRUCTION];
-  const repairPrompt = buildRepairPrompt(repairInstructions);
+  const repairPrompt = buildRepairPrompt(
+    input.originalPrompt,
+    repairInstructions
+  );
   const repair = await input.adapter.generate({
     prompt: repairPrompt,
     imageDataUrl: toJpegDataUrl(input.sourceBytes, input.sourceContentType),
@@ -485,12 +632,40 @@ async function maybeRepair(input: {
   return repairedUrl;
 }
 
-function buildRepairPrompt(instructions: string[]): string {
-  return [
+function buildRepairPrompt(
+  originalPrompt: string,
+  instructions: string[]
+): string {
+  const repairBlock = [
+    "REPAIR PASS",
     "上一轮结果被判定为时间分布不均，按下列修复指令重画：",
     ...instructions.map((line, index) => `${index + 1}. ${line}`),
     "其它约束（构图、空间锚点、相机、连续性约束）保持不变。",
   ].join("\n");
+  const combined = `${originalPrompt}\n\n${repairBlock}`;
+  if (combined.length <= config.promptMaxChars) return combined;
+
+  const prohibitMarker = "\n\nDO NOT";
+  const prohibitIndex = originalPrompt.lastIndexOf(prohibitMarker);
+  const preserveTail = prohibitIndex >= 0
+    ? originalPrompt.slice(prohibitIndex + 2)
+    : "";
+  const head = prohibitIndex >= 0
+    ? originalPrompt.slice(0, prohibitIndex)
+    : originalPrompt;
+  const separators = preserveTail ? 4 : 2;
+  const headBudget = Math.max(
+    0,
+    config.promptMaxChars
+      - repairBlock.length
+      - preserveTail.length
+      - separators
+  );
+  return [
+    head.slice(0, headBudget).trimEnd(),
+    repairBlock,
+    preserveTail,
+  ].filter(Boolean).join("\n\n").slice(0, config.promptMaxChars);
 }
 
 export function toClientGeneration(record: GenerationRecord) {
@@ -530,6 +705,10 @@ export function toAdminGeneration(record: GenerationRecord) {
     aspectRatio: record.aspectRatio,
     promptTruncated: record.promptTruncated,
     promptCharCount: record.promptCharCount,
+    promptVersion: record.promptVersion,
+    promptHash: record.promptHash,
+    sectionCharCounts: record.sectionCharCounts,
+    truncatedSections: record.truncatedSections,
     durationMs: record.durationMs,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,

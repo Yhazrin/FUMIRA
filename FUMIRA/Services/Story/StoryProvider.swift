@@ -15,6 +15,12 @@ enum StoryEvent: Sendable {
 
 protocol StoryProvider: Sendable {
     func write(request: StoryRequest) async -> AsyncThrowingStream<StoryEvent, Error>
+    /// Generate a single exact target beat for browse-year generation.
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat
 }
 
 actor MockStoryProvider: StoryProvider {
@@ -22,6 +28,20 @@ actor MockStoryProvider: StoryProvider {
 
     init(stepDelay: Duration = .milliseconds(260)) {
         self.stepDelay = stepDelay
+    }
+
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        guard let beat = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: target
+        ).targetBeat else {
+            throw GenerationError.generationFailed(message: "无法建立精确目标场景计划。")
+        }
+        return beat
     }
 
     func write(request: StoryRequest) async -> AsyncThrowingStream<StoryEvent, Error> {
