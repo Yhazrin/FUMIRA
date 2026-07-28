@@ -1,11 +1,13 @@
 # FUMIRA Backend
 
-TypeScript + Fastify proxy between the iOS app and MiniMax `image-01` I2I.
+TypeScript + Fastify proxy between the iOS app and MiniMax understanding,
+story-planning and `image-01` I2I services.
 
 ## Security
 
-- `MINIMAX_API_KEY` lives only in server process env. Never send it to iOS.
-- Logs record `requestId`, `generationId`, status, duration, and error codes only.
+- `MINIMAX_API_KEY` and `MINIMAX_VLM_API_KEY` live only in the server process.
+- Logs record request IDs, generation IDs, status, duration, error codes and
+  prompt-section metadata only.
 - Admin routes require `Authorization: Bearer $ADMIN_TOKEN`.
 
 ## Quick start
@@ -13,43 +15,51 @@ TypeScript + Fastify proxy between the iOS app and MiniMax `image-01` I2I.
 ```sh
 cd server
 cp .env.example .env
-# For local flow without a real key:
+# For local flow without real keys:
 #   MINIMAX_MOCK=true
-# or a real:
-#   MINIMAX_API_KEY=...   # never commit
+# Or configure:
+#   MINIMAX_API_KEY=...
+#   MINIMAX_VLM_API_KEY=...
 #   MINIMAX_MOCK=false
 # Also set ADMIN_TOKEN=...
-#
-# Outbound MiniMax calls use the local proxy on port 7990 by default:
-#   HTTPS_PROXY=http://127.0.0.1:7990
-#   HTTP_PROXY=http://127.0.0.1:7990
 npm install
 npm test
 npm run dev
 ```
 
-### Proxy (port 7990)
+## Proxy configuration
 
-This project’s local HTTP/HTTPS proxy listens on **7990**.
+MiniMax outbound HTTPS may use the local proxy on port `7990`:
 
-| Use | How |
-|-----|-----|
-| MiniMax I2I outbound | Set `HTTPS_PROXY` / `HTTP_PROXY` (or `MINIMAX_HTTPS_PROXY`) in `.env` to `http://127.0.0.1:7990`. The live adapter routes vendor HTTPS through undici `ProxyAgent`. |
-| npm install | `server/.npmrc` points at `http://127.0.0.1:7990`. Ensure the proxy is running before `npm install`. |
+```dotenv
+HTTPS_PROXY=http://127.0.0.1:7990
+HTTP_PROXY=http://127.0.0.1:7990
+# or:
+MINIMAX_HTTPS_PROXY=http://127.0.0.1:7990
+```
 
-Mock mode (`MINIMAX_MOCK=true`) does not call MiniMax and does not need the proxy.
+The tracked `server/.npmrc` contains only the public npm registry so GitHub
+Actions and machines without the local proxy can run `npm ci`. Developers who
+also need npm itself to use the proxy should export the proxy variables in their
+shell or configure an untracked user-level `~/.npmrc`.
+
+Mock mode (`MINIMAX_MOCK=true`) does not call MiniMax and does not need a proxy.
+
 ## Endpoints
 
 | Method | Path | Notes |
 |--------|------|-------|
 | POST/GET | `/health` | Coarse generation readiness |
-| POST | `/v1/uploads` | multipart JPEG/HEIC ≤ 10MB |
-| POST | `/v1/generations` | 202 + `generationId` |
-| GET | `/v1/generations/:id` | poll status / resultUrl |
-| GET | `/v1/results/:filename` | download generated JPEG |
+| POST | `/v1/uploads` | Multipart JPEG/HEIC ≤ 10MB |
+| POST | `/v1/understand` | Scene-wide image understanding |
+| POST | `/v1/stories` | Canonical story + exact target beat |
+| POST | `/v1/target-beats` | Continue existing story at an exact browse time |
+| POST | `/v1/generations` | Queue generation; structured V2 preferred |
+| GET | `/v1/generations/:id` | Poll status / result URL |
+| GET | `/v1/results/:filename` | Download generated JPEG |
 | GET | `/v1/admin/generations` | Bearer admin list |
-| PATCH | `/v1/admin/settings` | enable/disable + prompt template |
+| PATCH | `/v1/admin/settings` | Enable/disable + legacy prompt template |
 
-Image understanding stays on the iOS Mock provider for MVP. See
-`docs/engineering/REMOTE_UNDERSTANDING_TODO.md` — do not invent MiniMax HTTP
-understanding endpoints; MCP is for development verification only.
+See `docs/engineering/AI_PIPELINE_API.md` and
+`docs/engineering/TEMPORAL_PROMPT_ARCHITECTURE.md` for the prompt contract and
+SceneGraph V3 migration plan.
