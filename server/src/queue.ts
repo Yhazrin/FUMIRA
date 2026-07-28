@@ -34,7 +34,9 @@ import type {
   SceneGraph,
   StructuredGenerationBodyV2,
   StructuredGenerationBodyV3,
+  SubjectContinuityMode,
   TemporalRenderPlan,
+  TimePositionPayload,
 } from "./types.js";
 
 let adapter: MiniMaxAdapter | null = null;
@@ -82,7 +84,11 @@ export function createGenerationJob(
   if (!body.sourceAssetId || !getAsset(body.sourceAssetId)) {
     return contractError(400, "invalid_source_asset", "源图片不存在或已过期。");
   }
-  if (!body.timePosition || !Number.isFinite(body.timePosition.normalized) || !Number.isFinite(body.timePosition.offsetDays)) {
+  if (
+    !body.timePosition
+    || !Number.isFinite(body.timePosition.normalized)
+    || !Number.isFinite(body.timePosition.offsetDays)
+  ) {
     return contractError(400, "invalid_time_position", "时间位置无效。");
   }
 
@@ -105,32 +111,38 @@ export function createGenerationJob(
   if (body.contextVersion === "generation.v2") {
     const validation = validateV2Context(body.structuredContext);
     if (validation) return validation;
-    const exactTarget = exactTargetFromTime(body.timePosition.offsetDays, body.timePosition.compactLabel);
+    const exactTarget = exactTargetFromTime(body.timePosition);
     const v2Context = injectV2TargetTime(body, exactTarget);
     const v3Context = buildV3ContextFromV2({
       context: v2Context,
       timePosition: body.timePosition,
       exactTarget,
     });
-    built = compilePromptV3({ context: v3Context, timePosition: body.timePosition, aspectRatio });
-    const policy = defaultQualityPolicy(v3Context.qualityPolicy);
+    built = compilePromptV3({
+      context: v3Context,
+      timePosition: body.timePosition,
+      aspectRatio,
+    });
     quality = {
       sceneGraph: v3Context.sceneGraph,
       targetPlan: v3Context.targetPlan,
-      policy,
+      policy: defaultQualityPolicy(v3Context.qualityPolicy),
     };
     renderPlanId = v3Context.targetPlan.planId;
   } else if (body.contextVersion === "generation.v3") {
-    const exactTarget = exactTargetFromTime(body.timePosition.offsetDays, body.timePosition.compactLabel);
+    const exactTarget = exactTargetFromTime(body.timePosition);
     const v3Context = injectV3TargetTime(body, exactTarget);
     const validation = validateV3Context(v3Context);
     if (validation) return validation;
-    built = compilePromptV3({ context: v3Context, timePosition: body.timePosition, aspectRatio });
-    const policy = defaultQualityPolicy(v3Context.qualityPolicy);
+    built = compilePromptV3({
+      context: v3Context,
+      timePosition: body.timePosition,
+      aspectRatio,
+    });
     quality = {
       sceneGraph: v3Context.sceneGraph,
       targetPlan: v3Context.targetPlan,
-      policy,
+      policy: defaultQualityPolicy(v3Context.qualityPolicy),
     };
     renderPlanId = v3Context.targetPlan.planId;
   } else if (body.contextVersion === "legacy.v1") {
@@ -167,9 +179,13 @@ export function createGenerationJob(
     regenerationCount: 0,
   };
 
+  const continuityMode = quality?.targetPlan.subjectContinuityMode;
   promptByGeneration.set(record.generationId, {
     prompt: built.prompt,
-    useSubjectReference: Boolean(body.useSubjectReference),
+    useSubjectReference: resolveSubjectReference(
+      Boolean(body.useSubjectReference),
+      continuityMode
+    ),
     quality,
   });
   putGeneration(record);
@@ -183,6 +199,7 @@ export function createGenerationJob(
     promptTruncated: record.promptTruncated,
     promptVersion: built.version,
     renderPlanId,
+    continuityMode,
     visualCriticEnabled: quality?.policy.visualCriticEnabled ?? false,
   }));
 
@@ -200,17 +217,31 @@ function validateV2Context(
 ): ReturnType<typeof contractError> | null {
   if (!ctx) return contractError(400, "invalid_generation_contract", "缺少结构化上下文。");
   if (ctx.schemaVersion !== "generation-context.v2") {
-    return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
+    return contractError(
+      400,
+      "unsupported_schema_version",
+      `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`
+    );
   }
-  if (!ctx.understanding) return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  if (!ctx.understanding) {
+    return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  }
   if (!ctx.story || ctx.story.schemaVersion !== "temporal-story.v2") {
     return contractError(400, "unsupported_schema_version", "故事 schema 版本不匹配。");
   }
-  if (!ctx.story.targetBeat || !Number.isFinite(ctx.story.targetBeat.anchorYears) || !ctx.story.targetBeat.visualPrompt) {
+  if (
+    !ctx.story.targetBeat
+    || !Number.isFinite(ctx.story.targetBeat.anchorYears)
+    || !ctx.story.targetBeat.visualPrompt
+  ) {
     return contractError(400, "invalid_target_beat", "V2 故事缺少有效的精确目标节点。");
   }
   if (ctx.story.beats.length !== 7) {
-    return contractError(400, "invalid_generation_contract", `需要恰好 7 个浏览节点，收到 ${ctx.story.beats.length} 个。`);
+    return contractError(
+      400,
+      "invalid_generation_contract",
+      `需要恰好 7 个浏览节点，收到 ${ctx.story.beats.length} 个。`
+    );
   }
   if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
     return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
@@ -225,30 +256,51 @@ function validateV3Context(
   ctx: GenerationContextV3
 ): ReturnType<typeof contractError> | null {
   if (ctx.schemaVersion !== "generation-context.v3") {
-    return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
+    return contractError(
+      400,
+      "unsupported_schema_version",
+      `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`
+    );
   }
   if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
     return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
   }
   const graphIssues = validateSceneGraph(ctx.sceneGraph);
   if (graphIssues.length) {
-    return contractError(400, "invalid_scene_graph", `场景图无效: ${graphIssues.slice(0, 5).join(", ")}`);
+    return contractError(
+      400,
+      "invalid_scene_graph",
+      `场景图无效: ${graphIssues.slice(0, 5).join(", ")}`
+    );
   }
   const planIssues = validateTemporalRenderPlan(ctx.sceneGraph, ctx.targetPlan);
   if (planIssues.length) {
-    return contractError(400, "invalid_render_plan", `时间渲染计划无效: ${planIssues.slice(0, 5).join(", ")}`);
+    return contractError(
+      400,
+      "invalid_render_plan",
+      `时间渲染计划无效: ${planIssues.slice(0, 5).join(", ")}`
+    );
   }
   return null;
 }
 
-function exactTargetFromTime(offsetDays: number, compactLabel: string): ExactTarget {
-  const now = new Date();
-  const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
+function exactTargetFromTime(timePosition: TimePositionPayload): ExactTarget {
+  const sourceDate = parseISODate(timePosition.sourceDateISO) ?? new Date();
+  const targetDate = new Date(
+    sourceDate.getTime() + timePosition.offsetDays * 86_400_000
+  );
   return {
-    offsetDays,
+    offsetDays: timePosition.offsetDays,
     targetDateISO: targetDate.toISOString().slice(0, 10),
-    compactLabel: compactLabel || `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
+    compactLabel: timePosition.compactLabel
+      || `${Math.abs(timePosition.offsetDays).toFixed(0)} 天${timePosition.offsetDays < 0 ? "前" : "后"}`,
   };
+}
+
+function parseISODate(value: string | undefined): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) ? date : undefined;
 }
 
 function injectV2TargetTime(
@@ -274,8 +326,22 @@ function injectV3TargetTime(
 ): GenerationContextV3 {
   return {
     ...body.structuredContext,
-    targetPlan: normalizeRenderPlanTarget(body.structuredContext.targetPlan, exactTarget),
+    targetPlan: normalizeRenderPlanTarget(
+      body.structuredContext.targetPlan,
+      exactTarget
+    ),
   };
+}
+
+function resolveSubjectReference(
+  requested: boolean,
+  mode: SubjectContinuityMode | undefined
+): boolean {
+  if (!requested || !mode) return false;
+  return mode === "identity_persists"
+    || mode === "age_progression"
+    || mode === "object_remains"
+    || mode === "time_traveler";
 }
 
 async function processGeneration(generationId: string): Promise<void> {
@@ -341,7 +407,11 @@ async function processGeneration(generationId: string): Promise<void> {
       : null;
     let regenerationCount = 0;
 
-    if (stored.quality && critic && criticNeedsRegeneration(critic, stored.quality.policy)) {
+    if (
+      stored.quality
+      && critic
+      && criticNeedsRegeneration(critic, stored.quality.policy)
+    ) {
       const correctionPrompt = buildCorrectionPromptV3({
         originalPrompt: stored.prompt,
         graph: stored.quality.sceneGraph,
@@ -413,7 +483,9 @@ async function processGeneration(generationId: string): Promise<void> {
   }
 }
 
-function criticScore(critic: NonNullable<GenerationRecord["visualCritic"]>): number {
+function criticScore(
+  critic: NonNullable<GenerationRecord["visualCritic"]>
+): number {
   return (
     critic.cameraConsistency * 1.25
     + critic.spatialTopologyConsistency
@@ -520,7 +592,12 @@ export async function waitForGeneration(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const record = getGeneration(generationId);
-    if (record && (record.status === "succeeded" || record.status === "failed")) return record;
+    if (
+      record
+      && (record.status === "succeeded" || record.status === "failed")
+    ) {
+      return record;
+    }
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   return getGeneration(generationId);
