@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import multipart from "@fastify/multipart";
 import { config, isGenerationReady } from "./config.js";
 import { LiveMiniMaxAdapter } from "./minimax/liveAdapter.js";
-import { LiveMiniMaxIntelligenceAdapter } from "./minimax/liveIntelligenceAdapter.js";
+import { LiveMiniMaxTemporalV3Adapter } from "./minimax/liveTemporalV3Adapter.js";
 import { setMiniMaxIntelligenceAdapter } from "./intelligence.js";
 import { MockMiniMaxAdapter } from "./minimax/mockAdapter.js";
 import { setMiniMaxAdapter } from "./queue.js";
@@ -17,7 +17,7 @@ import type { MiniMaxAdapter } from "./types.js";
 export interface BuildAppOptions {
   /** Force a specific adapter (tests). */
   adapter?: MiniMaxAdapter | null;
-  /** Force a specific image-understanding / story adapter (tests). */
+  /** Force a specific image-understanding / planning adapter (tests). */
   intelligenceAdapter?: import("./types.js").MiniMaxIntelligenceAdapter | null;
   /** Skip binding listen — for inject() tests. */
   skipListen?: boolean;
@@ -39,7 +39,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   if (options.intelligenceAdapter !== undefined) {
     setMiniMaxIntelligenceAdapter(options.intelligenceAdapter);
   } else if (config.minimaxApiKey) {
-    setMiniMaxIntelligenceAdapter(new LiveMiniMaxIntelligenceAdapter(
+    setMiniMaxIntelligenceAdapter(new LiveMiniMaxTemporalV3Adapter(
       config.minimaxApiKey,
       config.minimaxVlmApiKey
     ));
