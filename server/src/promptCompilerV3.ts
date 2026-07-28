@@ -29,19 +29,21 @@ export function compilePromptV3(input: {
   const { context, timePosition, aspectRatio } = input;
   const graph = context.sceneGraph;
   const plan = context.targetPlan;
-
-  const fixedSections = buildFixedSections(graph, plan, timePosition, aspectRatio);
-  const regionSection = buildRegionSection(graph, plan, fixedSections);
-  const optionalSections = buildOptionalSections(graph, plan);
+  const fixed = buildFixedSections(graph, plan, timePosition, aspectRatio);
+  const regions = buildRegionSection(graph, plan, fixed);
+  const optional = buildOptionalSections(graph, plan);
   let included: PromptSection[] = [
-    ...fixedSections.slice(0, 3),
-    regionSection,
-    ...fixedSections.slice(3),
+    fixed[0],
+    fixed[1],
+    fixed[2],
+    regions,
+    fixed[3],
+    fixed[4],
   ];
 
-  for (const optional of optionalSections) {
-    if (renderSections([...included, optional]).length <= TOTAL_BUDGET) {
-      included.push(optional);
+  for (const section of optional) {
+    if (renderSections([...included, section]).length <= TOTAL_BUDGET) {
+      included.push(section);
     }
   }
 
@@ -56,19 +58,17 @@ export function compilePromptV3(input: {
     throw new Error("prompt_v3_required_contract_exceeds_budget");
   }
 
-  const allSections = [...fixedSections, regionSection, ...optionalSections];
+  const all = [...fixed, regions, ...optional];
   const sectionCharCounts: Record<string, number> = {};
   const truncatedSections: string[] = [];
-  for (const section of allSections) {
+  for (const section of all) {
     const rendered = included.find((item) => item.id === section.id);
     sectionCharCounts[section.id] = emergency ? 0 : rendered?.text.length ?? 0;
     if (emergency || !rendered || rendered.text !== section.text) {
       truncatedSections.push(section.id);
     }
   }
-  if (emergency) {
-    sectionCharCounts.emergency = prompt.length;
-  }
+  if (emergency) sectionCharCounts.emergency = prompt.length;
 
   return {
     prompt,
@@ -90,33 +90,28 @@ export function buildCorrectionPromptV3(input: {
   const missing = input.critic.missedRegionChanges
     .map((id) => input.plan.regionChanges.find((change) => change.regionId === id))
     .filter((change): change is RegionTemporalChange => Boolean(change));
-
-  const correctionLines = [
+  const lines = [
     "CORRECTION PASS",
-    "Keep every successful camera, topology and principal-identity property from the first attempt.",
+    "Keep successful camera, topology, identity and already-correct regions.",
   ];
   if (input.critic.cameraDrift.length) {
-    correctionLines.push(
-      `Restore camera geometry: ${clip(input.critic.cameraDrift.join("; "), 180)}.`
-    );
+    lines.push(`RESTORE CAMERA: ${clip(input.critic.cameraDrift.join("; "), 150)}`);
   }
   for (const change of missing.slice(0, 16)) {
     const region = input.graph.regions.find((item) => item.id === change.regionId);
-    correctionLines.push(formatChange(region, change, 105));
+    lines.push(formatChange(region, change, 92));
   }
   if (!missing.length && input.critic.correctionInstruction) {
-    correctionLines.push(clip(input.critic.correctionInstruction, 360));
+    lines.push(clip(input.critic.correctionInstruction, 300));
   }
-  correctionLines.push(
+  lines.push(
     "Do not alter already-correct regions merely to create novelty.",
-    "Do not solve missing environmental evolution by changing only the main person, applying a filter, or moving the camera."
+    "Do not repair environment coverage by changing only the main subject, adding a filter, or moving the camera."
   );
-
-  const correction = correctionLines.join("\n");
-  const reserve = correction.length + 2;
-  const baseBudget = Math.max(0, TOTAL_BUDGET - reserve);
-  const base = input.originalPrompt.slice(0, baseBudget).trimEnd();
-  return `${base}\n\n${correction}`.slice(0, TOTAL_BUDGET);
+  const correction = lines.join("\n");
+  const baseBudget = Math.max(0, TOTAL_BUDGET - correction.length - 2);
+  return `${input.originalPrompt.slice(0, baseBudget).trimEnd()}\n\n${correction}`
+    .slice(0, TOTAL_BUDGET);
 }
 
 function buildFixedSections(
@@ -132,8 +127,7 @@ function buildFixedSections(
       required: true,
       text: [
         "TARGET",
-        `${safe(plan.exactTarget.compactLabel)}; exact date ${safe(plan.exactTarget.targetDateISO)}; offset ${(timePosition.offsetDays / 365.25).toFixed(2)} years; aspect ${aspectRatio}.`,
-        `Render plan ${safe(plan.planId)}. Same viewpoint, one coherent target world.`,
+        `${safe(plan.exactTarget.compactLabel)} | ${safe(plan.exactTarget.targetDateISO)} | ${(timePosition.offsetDays / 365.25).toFixed(2)}y | ${aspectRatio} | plan ${safe(plan.planId)}. Same viewpoint, one target world.`,
       ].join("\n"),
     },
     {
@@ -141,31 +135,22 @@ function buildFixedSections(
       required: true,
       text: [
         "CAMERA LOCK",
-        clip(
-          `${camera.viewpoint}; ${camera.framing}; ${camera.horizon}; ${camera.perspective}; ${camera.depthLayout}`,
-          260
-        ),
-        "Preserve screen coordinates, vanishing points, scale, occlusion order and edge crop of persistent anchors.",
+        clip(`${camera.viewpoint}; ${camera.framing}; ${camera.horizon}; ${camera.perspective}; ${camera.depthLayout}`, 155),
+        "Keep screen coordinates, vanishing points, scale, crop and occlusion order.",
       ].join("\n"),
     },
     {
       id: "continuity",
       required: true,
-      text: [
-        "CONTINUITY",
-        `Mode: ${plan.subjectContinuityMode}. Preserve identity only where this mode and the region policy require it; do not freeze transient entities.`,
-      ].join("\n"),
+      text: `CONTINUITY\n${plan.subjectContinuityMode}: preserve identity only where region policy requires; release transient entities.`,
     },
     {
       id: "coherence",
       required: true,
       text: [
         "WORLD COHERENCE",
-        clip(
-          `${plan.globalWorldState.eraSummary}; ${plan.globalWorldState.environmentalState}; ${plan.globalWorldState.technologyState}; ${plan.globalWorldState.humanActivityState}`,
-          300
-        ),
-        "Every changed region must share one era, light direction, weather, material logic, perspective and causal history.",
+        clip(`${plan.globalWorldState.eraSummary}; ${plan.globalWorldState.environmentalState}; ${plan.globalWorldState.technologyState}; ${plan.globalWorldState.humanActivityState}`, 175),
+        "One era, light, weather, material logic and causal history across all edits.",
       ].join("\n"),
     },
     {
@@ -173,8 +158,8 @@ function buildFixedSections(
       required: true,
       text: [
         "PROHIBITED",
-        "No camera drift, reframing, identity replacement, arbitrary objects, invented readable text, uniform material aging, generic vintage filter, neon cyberpunk, or subject-only transformation.",
-        clip(plan.prohibitedDrift.join("; "), 260),
+        "No camera drift, arbitrary objects, invented text, uniform aging, mixed eras, vintage filter, neon cyberpunk, identity replacement or subject-only transformation.",
+        clip(plan.prohibitedDrift.join("; "), 115),
       ].join("\n"),
     },
   ];
@@ -197,34 +182,24 @@ function buildRegionSection(
     return bSalience - aSalience;
   });
 
-  // Phase 1: every planned region receives a non-droppable compact action.
-  const compactLines = ordered.map((change) => {
+  // Every changed region first receives a compact instruction. Detail is added
+  // only after complete region coverage is secured.
+  const lines = ordered.map((change) => {
     const region = graph.regions.find((item) => item.id === change.regionId);
     return formatCompactChange(region, change);
   });
-  const compactCost = compactLines.join("\n").length;
-  if (compactCost > remaining) {
-    // Force the compiler into the emergency representation, which is designed
-    // to carry all region IDs under the hard provider budget.
-    return {
-      id: "regionEdits",
-      required: true,
-      text: `${header}${compactLines.join("\n")}\n${unchanged}`.trimEnd(),
-    };
-  }
-
-  // Phase 2: spend remaining detail budget on high-salience regions without
-  // ever deleting the compact instruction for a lower-salience region.
-  const lines = [...compactLines];
-  let detailRemaining = remaining - compactCost;
-  for (let index = 0; index < ordered.length; index++) {
-    const change = ordered[index];
-    const region = graph.regions.find((item) => item.id === change.regionId);
-    const expanded = formatChange(region, change, 165);
-    const delta = expanded.length - lines[index].length;
-    if (delta <= detailRemaining) {
-      lines[index] = expanded;
-      detailRemaining -= delta;
+  const compactCost = lines.join("\n").length;
+  if (compactCost <= remaining) {
+    let detailBudget = remaining - compactCost;
+    for (let index = 0; index < ordered.length; index++) {
+      const change = ordered[index];
+      const region = graph.regions.find((item) => item.id === change.regionId);
+      const expanded = formatChange(region, change, 135);
+      const delta = expanded.length - lines[index].length;
+      if (delta <= detailBudget) {
+        lines[index] = expanded;
+        detailBudget -= delta;
+      }
     }
   }
 
@@ -249,8 +224,8 @@ function buildOptionalSections(
       required: false,
       text: [
         "CROSS-REGION RULES",
-        ...plan.crossRegionCouplings.slice(0, 5).map((item) =>
-          `${item.regionIds.map(safe).join("+")}: ${clip(item.rule, 150)}`
+        ...plan.crossRegionCouplings.slice(0, 4).map((item) =>
+          `${item.regionIds.map(safe).join("+")}: ${clip(item.rule, 120)}`
         ),
       ].join("\n"),
     });
@@ -260,12 +235,12 @@ function buildOptionalSections(
       id: "addRemove",
       required: false,
       text: [
-        "JUSTIFIED ADDITIONS / REMOVALS",
-        ...plan.additions.slice(0, 4).map((item) =>
-          `ADD ${safe(item.id)} ${item.screenZone}/${item.depth}: ${clip(item.description, 120)}; because ${clip(item.causalReason, 80)}`
+        "JUSTIFIED ADD / REMOVE",
+        ...plan.additions.slice(0, 3).map((item) =>
+          `ADD ${safe(item.id)} ${item.screenZone}/${item.depth}: ${clip(item.description, 90)}; ${clip(item.causalReason, 55)}`
         ),
-        ...plan.removals.slice(0, 4).map((item) =>
-          `REMOVE ${safe(item.regionId)}: ${clip(item.causalReason, 120)}`
+        ...plan.removals.slice(0, 3).map((item) =>
+          `REMOVE ${safe(item.regionId)}: ${clip(item.causalReason, 90)}`
         ),
       ].join("\n"),
     });
@@ -273,17 +248,13 @@ function buildOptionalSections(
   sections.push({
     id: "coverage",
     required: false,
-    text: [
-      "COVERAGE CHECK",
-      `Evaluated ${plan.coverage.evaluatedRegionIds.map(safe).join(",")}; changed domains ${plan.coverage.changedDomains.join(",") || "none"}.`,
-      "Do not finish until every listed region has either its edit or explicit unchanged treatment visible in the output.",
-    ].join("\n"),
+    text: `COVERAGE\nEvaluated ${plan.coverage.evaluatedRegionIds.map(safe).join(",")}; domains ${plan.coverage.changedDomains.join(",") || "none"}. Every region needs its edit or explicit unchanged treatment.`,
   });
   if (graph.uncertainties.some(Boolean)) {
     sections.push({
       id: "uncertainty",
       required: false,
-      text: `UNCERTAINTY\n${clip(graph.uncertainties.join("; "), 220)}. Prefer conservative visible edits over invented hidden facts.`,
+      text: `UNCERTAINTY\n${clip(graph.uncertainties.join("; "), 165)}. Prefer conservative visible edits over invented hidden facts.`,
     });
   }
   return sections;
@@ -299,9 +270,9 @@ function emergencyPrompt(
     const region = graph.regions.find((item) => item.id === change.regionId);
     return formatEmergencyChange(region, change);
   });
-  const prompt = [
+  return [
     "TARGET",
-    `${safe(plan.exactTarget.compactLabel)} ${safe(plan.exactTarget.targetDateISO)}; ${(timePosition.offsetDays / 365.25).toFixed(1)}y; ${aspectRatio}.`,
+    `${safe(plan.exactTarget.compactLabel)} ${safe(plan.exactTarget.targetDateISO)} ${(timePosition.offsetDays / 365.25).toFixed(1)}y ${aspectRatio}.`,
     "CAMERA LOCK",
     "Keep viewpoint, crop, horizon, perspective, vanishing points, scale and occlusion topology.",
     `CONTINUITY ${plan.subjectContinuityMode}.`,
@@ -310,12 +281,11 @@ function emergencyPrompt(
     plan.unchangedRegionIds.length
       ? `UNCHANGED ${plan.unchangedRegionIds.map(safe).join(",")}.`
       : "",
-    "COHERENCE",
-    "One era and one light/weather/material system. Apply environment changes, not only the salient subject.",
+    "WORLD COHERENCE",
+    "One era/light/weather/material system. Apply environment changes, not only the salient subject.",
     "PROHIBITED",
-    "No camera drift, arbitrary additions, filters, mixed eras, invented text or subject-only edit.",
-  ].filter(Boolean).join("\n");
-  return prompt.slice(0, TOTAL_BUDGET);
+    "No camera drift, arbitrary additions, filters, mixed eras, invented text or subject-only transformation.",
+  ].filter(Boolean).join("\n").slice(0, TOTAL_BUDGET);
 }
 
 function formatChange(
@@ -326,11 +296,7 @@ function formatChange(
   const locator = region
     ? `${safe(region.id)} ${region.screenZone}/${region.depth}/${region.category}`
     : safe(change.regionId);
-  const detail = clip(
-    `${change.targetState}; cause: ${change.causalReason}`,
-    detailBudget
-  );
-  return `${locator} -> ${change.action.toUpperCase()} ${change.magnitude}: ${detail}`;
+  return `${locator} -> ${change.action.toUpperCase()} ${change.magnitude}: ${clip(`${change.targetState}; cause: ${change.causalReason}`, detailBudget)}`;
 }
 
 function formatCompactChange(
@@ -340,7 +306,7 @@ function formatCompactChange(
   const locator = region
     ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
     : safe(change.regionId);
-  return `${locator} ${change.action.toUpperCase()} ${change.magnitude}: ${clip(change.targetState, 54)}`;
+  return `${locator} ${change.action.toUpperCase()} ${change.magnitude}: ${clip(change.targetState, 45)}`;
 }
 
 function formatEmergencyChange(
@@ -350,7 +316,7 @@ function formatEmergencyChange(
   const locator = region
     ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
     : safe(change.regionId);
-  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 38)}`;
+  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 32)}`;
 }
 
 function renderSections(sections: PromptSection[]): string {
