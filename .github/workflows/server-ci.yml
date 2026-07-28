@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - "server/**"
+      - ".github/workflows/server-ci.yml"
 
 jobs:
   test:
@@ -25,8 +26,47 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - run: npm ci
+      - name: Install, typecheck and test
+        id: validation
+        shell: bash
+        run: |
+          set +e
+          : > ci-diagnostics.log
 
-      - run: npx tsc -p tsconfig.json --noEmit
+          echo "== npm ci ==" | tee -a ci-diagnostics.log
+          npm ci 2>&1 | tee -a ci-diagnostics.log
+          npm_status=${PIPESTATUS[0]}
 
-      - run: npm test
+          tsc_status=99
+          test_status=99
+          if [ "$npm_status" -eq 0 ]; then
+            echo "" | tee -a ci-diagnostics.log
+            echo "== TypeScript ==" | tee -a ci-diagnostics.log
+            npx tsc -p tsconfig.json --noEmit 2>&1 | tee -a ci-diagnostics.log
+            tsc_status=${PIPESTATUS[0]}
+          fi
+
+          if [ "$npm_status" -eq 0 ] && [ "$tsc_status" -eq 0 ]; then
+            echo "" | tee -a ci-diagnostics.log
+            echo "== Tests ==" | tee -a ci-diagnostics.log
+            npm test 2>&1 | tee -a ci-diagnostics.log
+            test_status=${PIPESTATUS[0]}
+          fi
+
+          echo "" | tee -a ci-diagnostics.log
+          echo "npm_status=$npm_status" | tee -a ci-diagnostics.log
+          echo "tsc_status=$tsc_status" | tee -a ci-diagnostics.log
+          echo "test_status=$test_status" | tee -a ci-diagnostics.log
+
+          if [ "$npm_status" -ne 0 ] || [ "$tsc_status" -ne 0 ] || [ "$test_status" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-ci-diagnostics
+          path: server/ci-diagnostics.log
+          if-no-files-found: warn
+          retention-days: 7
