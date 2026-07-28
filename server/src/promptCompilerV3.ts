@@ -33,31 +33,42 @@ export function compilePromptV3(input: {
   const fixedSections = buildFixedSections(graph, plan, timePosition, aspectRatio);
   const regionSection = buildRegionSection(graph, plan, fixedSections);
   const optionalSections = buildOptionalSections(graph, plan);
-
-  const included: PromptSection[] = [...fixedSections.slice(0, 3), regionSection];
-  for (const section of fixedSections.slice(3)) included.push(section);
+  let included: PromptSection[] = [
+    ...fixedSections.slice(0, 3),
+    regionSection,
+    ...fixedSections.slice(3),
+  ];
 
   for (const optional of optionalSections) {
-    const candidate = renderSections([...included, optional]);
-    if (candidate.length <= TOTAL_BUDGET) included.push(optional);
+    if (renderSections([...included, optional]).length <= TOTAL_BUDGET) {
+      included.push(optional);
+    }
   }
 
   let prompt = renderSections(included);
+  let emergency = false;
   if (prompt.length > TOTAL_BUDGET) {
+    emergency = true;
     prompt = emergencyPrompt(graph, plan, timePosition, aspectRatio);
+    included = [];
   }
   if (prompt.length > TOTAL_BUDGET) {
     throw new Error("prompt_v3_required_contract_exceeds_budget");
   }
 
+  const allSections = [...fixedSections, regionSection, ...optionalSections];
   const sectionCharCounts: Record<string, number> = {};
-  for (const section of [...fixedSections, regionSection, ...optionalSections]) {
+  const truncatedSections: string[] = [];
+  for (const section of allSections) {
     const rendered = included.find((item) => item.id === section.id);
-    sectionCharCounts[section.id] = rendered?.text.length ?? 0;
+    sectionCharCounts[section.id] = emergency ? 0 : rendered?.text.length ?? 0;
+    if (emergency || !rendered || rendered.text !== section.text) {
+      truncatedSections.push(section.id);
+    }
   }
-  const truncatedSections = [...fixedSections, regionSection, ...optionalSections]
-    .filter((section) => !included.some((item) => item.id === section.id) || included.find((item) => item.id === section.id)?.text !== section.text)
-    .map((section) => section.id);
+  if (emergency) {
+    sectionCharCounts.emergency = prompt.length;
+  }
 
   return {
     prompt,
@@ -85,11 +96,13 @@ export function buildCorrectionPromptV3(input: {
     "Keep every successful camera, topology and principal-identity property from the first attempt.",
   ];
   if (input.critic.cameraDrift.length) {
-    correctionLines.push(`Restore camera geometry: ${clip(input.critic.cameraDrift.join("; "), 180)}.`);
+    correctionLines.push(
+      `Restore camera geometry: ${clip(input.critic.cameraDrift.join("; "), 180)}.`
+    );
   }
-  for (const change of missing.slice(0, 8)) {
+  for (const change of missing.slice(0, 16)) {
     const region = input.graph.regions.find((item) => item.id === change.regionId);
-    correctionLines.push(formatChange(region, change, 130));
+    correctionLines.push(formatChange(region, change, 105));
   }
   if (!missing.length && input.critic.correctionInstruction) {
     correctionLines.push(clip(input.critic.correctionInstruction, 360));
@@ -119,8 +132,8 @@ function buildFixedSections(
       required: true,
       text: [
         "TARGET",
-        `${plan.exactTarget.compactLabel}; exact date ${plan.exactTarget.targetDateISO}; offset ${(timePosition.offsetDays / 365.25).toFixed(2)} years; aspect ${aspectRatio}.`,
-        `Render plan ${plan.planId}. Same viewpoint, one coherent target world.`,
+        `${safe(plan.exactTarget.compactLabel)}; exact date ${safe(plan.exactTarget.targetDateISO)}; offset ${(timePosition.offsetDays / 365.25).toFixed(2)} years; aspect ${aspectRatio}.`,
+        `Render plan ${safe(plan.planId)}. Same viewpoint, one coherent target world.`,
       ].join("\n"),
     },
     {
@@ -128,7 +141,10 @@ function buildFixedSections(
       required: true,
       text: [
         "CAMERA LOCK",
-        clip(`${camera.viewpoint}; ${camera.framing}; ${camera.horizon}; ${camera.perspective}; ${camera.depthLayout}`, 260),
+        clip(
+          `${camera.viewpoint}; ${camera.framing}; ${camera.horizon}; ${camera.perspective}; ${camera.depthLayout}`,
+          260
+        ),
         "Preserve screen coordinates, vanishing points, scale, occlusion order and edge crop of persistent anchors.",
       ].join("\n"),
     },
@@ -145,7 +161,10 @@ function buildFixedSections(
       required: true,
       text: [
         "WORLD COHERENCE",
-        clip(`${plan.globalWorldState.eraSummary}; ${plan.globalWorldState.environmentalState}; ${plan.globalWorldState.technologyState}; ${plan.globalWorldState.humanActivityState}`, 300),
+        clip(
+          `${plan.globalWorldState.eraSummary}; ${plan.globalWorldState.environmentalState}; ${plan.globalWorldState.technologyState}; ${plan.globalWorldState.humanActivityState}`,
+          300
+        ),
         "Every changed region must share one era, light direction, weather, material logic, perspective and causal history.",
       ].join("\n"),
     },
@@ -167,37 +186,51 @@ function buildRegionSection(
   fixed: PromptSection[]
 ): PromptSection {
   const header = "REGION EDITS\n";
-  const fixedLength = renderSections(fixed).length + 2;
   const unchanged = plan.unchangedRegionIds.length
-    ? `UNCHANGED ${plan.unchangedRegionIds.join(",")}: explicitly preserve source state and spatial role.\n`
+    ? `UNCHANGED ${plan.unchangedRegionIds.map(safe).join(",")}: preserve source state and spatial role.\n`
     : "";
-  const reserved = fixedLength + header.length + unchanged.length;
-  let remaining = Math.max(120, TOTAL_BUDGET - reserved);
+  const reserved = renderSections(fixed).length + 2 + header.length + unchanged.length;
+  const remaining = Math.max(0, TOTAL_BUDGET - reserved);
   const ordered = [...plan.regionChanges].sort((a, b) => {
-    const ar = graph.regions.find((region) => region.id === a.regionId)?.salience ?? 0;
-    const br = graph.regions.find((region) => region.id === b.regionId)?.salience ?? 0;
-    return br - ar;
+    const aSalience = graph.regions.find((region) => region.id === a.regionId)?.salience ?? 0;
+    const bSalience = graph.regions.find((region) => region.id === b.regionId)?.salience ?? 0;
+    return bSalience - aSalience;
   });
 
-  const lines: string[] = [];
-  for (const change of ordered) {
+  // Phase 1: every planned region receives a non-droppable compact action.
+  const compactLines = ordered.map((change) => {
     const region = graph.regions.find((item) => item.id === change.regionId);
-    const full = formatChange(region, change, 190);
-    const compact = formatChange(region, change, 78);
-    const line = full.length + 1 <= remaining ? full : compact;
-    if (line.length + 1 > remaining) {
-      const fallback = `${change.regionId} ${change.action.toUpperCase()}: apply planned target state.`;
-      if (fallback.length + 1 <= remaining) {
-        lines.push(fallback);
-        remaining -= fallback.length + 1;
-      }
-      continue;
-    }
-    lines.push(line);
-    remaining -= line.length + 1;
+    return formatCompactChange(region, change);
+  });
+  const compactCost = compactLines.join("\n").length;
+  if (compactCost > remaining) {
+    // Force the compiler into the emergency representation, which is designed
+    // to carry all region IDs under the hard provider budget.
+    return {
+      id: "regionEdits",
+      required: true,
+      text: `${header}${compactLines.join("\n")}\n${unchanged}`.trimEnd(),
+    };
   }
 
-  if (!lines.length) lines.push("No local edit may replace the required world-state transformation.");
+  // Phase 2: spend remaining detail budget on high-salience regions without
+  // ever deleting the compact instruction for a lower-salience region.
+  const lines = [...compactLines];
+  let detailRemaining = remaining - compactCost;
+  for (let index = 0; index < ordered.length; index++) {
+    const change = ordered[index];
+    const region = graph.regions.find((item) => item.id === change.regionId);
+    const expanded = formatChange(region, change, 165);
+    const delta = expanded.length - lines[index].length;
+    if (delta <= detailRemaining) {
+      lines[index] = expanded;
+      detailRemaining -= delta;
+    }
+  }
+
+  if (!lines.length) {
+    lines.push("No local edit may replace the required world-state transformation.");
+  }
   return {
     id: "regionEdits",
     required: true,
@@ -205,7 +238,10 @@ function buildRegionSection(
   };
 }
 
-function buildOptionalSections(graph: SceneGraph, plan: TemporalRenderPlan): PromptSection[] {
+function buildOptionalSections(
+  graph: SceneGraph,
+  plan: TemporalRenderPlan
+): PromptSection[] {
   const sections: PromptSection[] = [];
   if (plan.crossRegionCouplings.length) {
     sections.push({
@@ -213,7 +249,9 @@ function buildOptionalSections(graph: SceneGraph, plan: TemporalRenderPlan): Pro
       required: false,
       text: [
         "CROSS-REGION RULES",
-        ...plan.crossRegionCouplings.slice(0, 5).map((item) => `${item.regionIds.join("+")}: ${clip(item.rule, 150)}`),
+        ...plan.crossRegionCouplings.slice(0, 5).map((item) =>
+          `${item.regionIds.map(safe).join("+")}: ${clip(item.rule, 150)}`
+        ),
       ].join("\n"),
     });
   }
@@ -223,8 +261,12 @@ function buildOptionalSections(graph: SceneGraph, plan: TemporalRenderPlan): Pro
       required: false,
       text: [
         "JUSTIFIED ADDITIONS / REMOVALS",
-        ...plan.additions.slice(0, 4).map((item) => `ADD ${item.id} ${item.screenZone}/${item.depth}: ${clip(item.description, 120)}; because ${clip(item.causalReason, 80)}`),
-        ...plan.removals.slice(0, 4).map((item) => `REMOVE ${item.regionId}: ${clip(item.causalReason, 120)}`),
+        ...plan.additions.slice(0, 4).map((item) =>
+          `ADD ${safe(item.id)} ${item.screenZone}/${item.depth}: ${clip(item.description, 120)}; because ${clip(item.causalReason, 80)}`
+        ),
+        ...plan.removals.slice(0, 4).map((item) =>
+          `REMOVE ${safe(item.regionId)}: ${clip(item.causalReason, 120)}`
+        ),
       ].join("\n"),
     });
   }
@@ -233,16 +275,15 @@ function buildOptionalSections(graph: SceneGraph, plan: TemporalRenderPlan): Pro
     required: false,
     text: [
       "COVERAGE CHECK",
-      `Evaluated ${plan.coverage.evaluatedRegionIds.join(",")}; changed domains ${plan.coverage.changedDomains.join(",") || "none"}.`,
+      `Evaluated ${plan.coverage.evaluatedRegionIds.map(safe).join(",")}; changed domains ${plan.coverage.changedDomains.join(",") || "none"}.`,
       "Do not finish until every listed region has either its edit or explicit unchanged treatment visible in the output.",
     ].join("\n"),
   });
-  const uncertainties = graph.uncertainties.filter(Boolean);
-  if (uncertainties.length) {
+  if (graph.uncertainties.some(Boolean)) {
     sections.push({
       id: "uncertainty",
       required: false,
-      text: `UNCERTAINTY\n${clip(uncertainties.join("; "), 220)}. Prefer conservative visible edits over invented hidden facts.`,
+      text: `UNCERTAINTY\n${clip(graph.uncertainties.join("; "), 220)}. Prefer conservative visible edits over invented hidden facts.`,
     });
   }
   return sections;
@@ -254,24 +295,27 @@ function emergencyPrompt(
   timePosition: TimePositionPayload,
   aspectRatio: AspectRatio
 ): string {
-  const changes = plan.regionChanges.slice(0, 12).map((change) => {
+  const changes = plan.regionChanges.slice(0, 16).map((change) => {
     const region = graph.regions.find((item) => item.id === change.regionId);
-    return formatChange(region, change, 64);
+    return formatEmergencyChange(region, change);
   });
-  return [
+  const prompt = [
     "TARGET",
-    `${plan.exactTarget.compactLabel} ${plan.exactTarget.targetDateISO}; ${(timePosition.offsetDays / 365.25).toFixed(1)}y; ${aspectRatio}.`,
+    `${safe(plan.exactTarget.compactLabel)} ${safe(plan.exactTarget.targetDateISO)}; ${(timePosition.offsetDays / 365.25).toFixed(1)}y; ${aspectRatio}.`,
     "CAMERA LOCK",
     "Keep viewpoint, crop, horizon, perspective, vanishing points, scale and occlusion topology.",
     `CONTINUITY ${plan.subjectContinuityMode}.`,
     "REGION EDITS",
     ...changes,
-    plan.unchangedRegionIds.length ? `UNCHANGED ${plan.unchangedRegionIds.join(",")}.` : "",
+    plan.unchangedRegionIds.length
+      ? `UNCHANGED ${plan.unchangedRegionIds.map(safe).join(",")}.`
+      : "",
     "COHERENCE",
-    "One era, one light/weather/material system. Apply environment changes, not only the salient subject.",
+    "One era and one light/weather/material system. Apply environment changes, not only the salient subject.",
     "PROHIBITED",
     "No camera drift, arbitrary additions, filters, mixed eras, invented text or subject-only edit.",
-  ].filter(Boolean).join("\n").slice(0, TOTAL_BUDGET);
+  ].filter(Boolean).join("\n");
+  return prompt.slice(0, TOTAL_BUDGET);
 }
 
 function formatChange(
@@ -280,10 +324,33 @@ function formatChange(
   detailBudget: number
 ): string {
   const locator = region
-    ? `${region.id} ${region.screenZone}/${region.depth}/${region.category}`
-    : change.regionId;
-  const detail = clip(`${change.targetState}; cause: ${change.causalReason}`, detailBudget);
+    ? `${safe(region.id)} ${region.screenZone}/${region.depth}/${region.category}`
+    : safe(change.regionId);
+  const detail = clip(
+    `${change.targetState}; cause: ${change.causalReason}`,
+    detailBudget
+  );
   return `${locator} -> ${change.action.toUpperCase()} ${change.magnitude}: ${detail}`;
+}
+
+function formatCompactChange(
+  region: SceneRegion | undefined,
+  change: RegionTemporalChange
+): string {
+  const locator = region
+    ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
+    : safe(change.regionId);
+  return `${locator} ${change.action.toUpperCase()} ${change.magnitude}: ${clip(change.targetState, 54)}`;
+}
+
+function formatEmergencyChange(
+  region: SceneRegion | undefined,
+  change: RegionTemporalChange
+): string {
+  const locator = region
+    ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
+    : safe(change.regionId);
+  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 38)}`;
 }
 
 function renderSections(sections: PromptSection[]): string {
@@ -291,7 +358,15 @@ function renderSections(sections: PromptSection[]): string {
 }
 
 function clip(value: string, max: number): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
+  const normalized = safe(value).replace(/\s+/g, " ").trim();
   if (normalized.length <= max) return normalized;
   return `${normalized.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function safe(value: string): string {
+  return String(value ?? "")
+    .replaceAll("<", "\\u003c")
+    .replaceAll(">", "\\u003e")
+    .replaceAll("\u0000", "")
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ");
 }
