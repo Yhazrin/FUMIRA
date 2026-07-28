@@ -19,18 +19,8 @@ export interface CompiledPrompt {
   truncatedSections: string[];
 }
 
-/**
- * Section-based prompt compiler (v2, scene-wide evolution hardening).
- *
- * `retentionPriority` controls which full sections receive budget first.
- * `renderOrder` controls where a retained section appears in the provider prompt.
- * Every required section has a compact fallback so camera consistency never
- * removes the actual temporal transformation plan, and vice versa.
- */
-
 const VERSION = "v2";
 const TOTAL_BUDGET = config.promptMaxChars;
-
 interface Section {
   id: string;
   retentionPriority: number;
@@ -39,7 +29,6 @@ interface Section {
   emergencyTemplate: string;
   build(ctx: CompileContext): string;
 }
-
 interface CompileContext {
   understanding: SceneUnderstandingPayload;
   story: TemporalStoryPayloadV2;
@@ -48,388 +37,122 @@ interface CompileContext {
   aspectRatio: AspectRatio;
 }
 
-// ---------------------------------------------------------------------------
-// Untrusted prompt data
-// ---------------------------------------------------------------------------
-
 export function sanitizeUntrustedPromptData(value: string): string {
-  return value
-    .replaceAll("<", "\\u003c")
-    .replaceAll(">", "\\u003e")
-    .replaceAll("\u0000", "")
-    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+  return value.replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")
+    .replaceAll("\u0000", "").replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 }
-
-function sanitizeAll(strings: string[]): string[] {
-  return strings.map(sanitizeUntrustedPromptData);
-}
-
-// ---------------------------------------------------------------------------
-// Required compact fallbacks
-// ---------------------------------------------------------------------------
-
-const EMERGENCY_OBJECTIVE =
-  "EDIT OBJECTIVE\nRender the exact same camera view at the requested target time.";
-
-const EMERGENCY_PRESERVE =
-  "PRESERVE\nKeep camera position, framing, horizon, perspective, major spatial topology and principal identity. Do not freeze transient details or all environmental content.";
-
-const EMERGENCY_TEMPORAL_CHANGES =
-  "TEMPORAL CHANGES\nApply the requested time change to both the principal subject and the surrounding environment. Do not transform only one salient object.";
-
-const EMERGENCY_SCENE_COVERAGE =
-  "SCENE-WIDE COVERAGE\nKeep the same viewpoint, but propagate era-consistent change across visible foreground, midground and background, including built and natural elements when present.";
-
-const EMERGENCY_TEMPORAL_REALISM =
-  "TEMPORAL REALISM\nMatch the magnitude and type of change to the requested time span. Keep all changed elements in one coherent era.";
-
-const EMERGENCY_PROHIBIT =
-  "DO NOT\n- Do not change camera angle, crop, horizon or principal identity.\n- Do not add arbitrary elements unrelated to the place or target era.\n- Do not use generic vintage, sepia, cyberpunk or futuristic filters.";
-
-// ---------------------------------------------------------------------------
-// Sections
-// ---------------------------------------------------------------------------
+function sanitizeAll(strings: string[]): string[] { return strings.map(sanitizeUntrustedPromptData); }
 
 const sections: Section[] = [
   {
-    id: "objective",
-    retentionPriority: 100,
-    renderOrder: 10,
-    required: true,
-    emergencyTemplate: EMERGENCY_OBJECTIVE,
+    id: "objective", retentionPriority: 100, renderOrder: 10, required: true,
+    emergencyTemplate: "EDIT OBJECTIVE\nRender the exact same camera view at the requested target time.",
     build(ctx) {
-      const label = ctx.timePosition.compactLabel || "NOW";
-      const date = targetDateISO(ctx.timePosition);
-      return [
-        "EDIT OBJECTIVE",
-        `Transform the source photograph into the exact same place at ${label} (${date}).`,
-        "Treat this as a coherent world-state change, not a local edit to only the most salient subject.",
-      ].join("\n");
+      return `EDIT OBJECTIVE\nTransform the source photograph into the exact same place at ${ctx.timePosition.compactLabel || "NOW"}. Treat this as a coherent world-state change, not a local edit.`;
     },
   },
   {
-    id: "preserve",
-    retentionPriority: 95,
-    renderOrder: 20,
-    required: true,
-    emergencyTemplate: EMERGENCY_PRESERVE,
+    id: "preserve", retentionPriority: 95, renderOrder: 20, required: true,
+    emergencyTemplate: "PRESERVE\nKeep camera, framing, perspective, topology and plausible principal identity without freezing transient content.",
     build(ctx) {
-      const lines: string[] = [
-        "PRESERVE",
-        "- Keep the original camera position, lens perspective, framing, horizon and vanishing points.",
-        "- Keep the major spatial topology and recognizable persistent anchors.",
-        "- Preserve principal subject identity and screen position when that subject can plausibly persist.",
-        "- Do not lock transient people, vehicles, signage, vegetation size, surface condition or subject count unless an identity rule explicitly requires it.",
-      ];
-      const spatial = sanitizeAll(
-        ctx.understanding.subjects.map((subject) => subject.identityRule).filter(Boolean)
-      );
-      if (spatial.length) {
-        lines.push("- Preserve these identity or spatial anchors:");
-        for (const rule of spatial) lines.push(`  ${rule}`);
-      }
-      const identity = sanitizeAll(ctx.story.identityRules.filter(Boolean));
-      if (identity.length) {
-        lines.push("- Preserve these story identity rules:");
-        for (const rule of identity) lines.push(`  ${rule}`);
-      }
-      return lines.join("\n");
-    },
-  },
-  {
-    id: "temporalChanges",
-    retentionPriority: 99,
-    renderOrder: 30,
-    required: true,
-    emergencyTemplate: EMERGENCY_TEMPORAL_CHANGES,
-    build(ctx) {
-      const changes: string[] = [];
-      if (ctx.targetBeat.visualPrompt) {
-        changes.push(sanitizeUntrustedPromptData(ctx.targetBeat.visualPrompt));
-      }
-      if (
-        ctx.targetBeat.narrative &&
-        ctx.targetBeat.narrative !== ctx.targetBeat.visualPrompt
-      ) {
-        changes.push(sanitizeUntrustedPromptData(ctx.targetBeat.narrative));
-      }
-      return [
-        "TEMPORAL CHANGES",
-        changes.join(" ") || "Apply plausible scene-wide changes for the exact target time.",
-        "Map every requested change to visible evidence. Change the environment as well as the principal subject whenever the time span makes environmental change plausible.",
-      ].join("\n");
-    },
-  },
-  {
-    id: "sceneCoverage",
-    retentionPriority: 98,
-    renderOrder: 40,
-    required: true,
-    emergencyTemplate: EMERGENCY_SCENE_COVERAGE,
-    build(ctx) {
-      const drivers = sanitizeAll(ctx.understanding.changeDrivers.filter(Boolean));
       const lines = [
-        "SCENE-WIDE COVERAGE",
-        "- Evaluate and render the whole frame: foreground, midground, background and sky when visible.",
-        "- Propagate time consistently through architecture, infrastructure, ground surfaces, vegetation, vehicles, signage, clothing, lighting and atmosphere when those domains are present.",
-        "- Era-consistent buildings, infrastructure, vegetation, vehicles and signage may be added, removed, renovated or replaced when causally justified.",
-        "- Explicitly keep a region unchanged when change would be implausible; never leave the entire environment frozen merely because composition is locked.",
-        "- Do not transform only one salient person or object while ignoring the planned world change.",
+        "PRESERVE",
+        "- Keep camera position, lens perspective, framing, horizon, vanishing points and major topology.",
+        "- Preserve principal identity only when physically plausible; do not lock transient people, vehicles, signage, vegetation size or subject count.",
       ];
-      if (drivers.length) {
-        lines.push(`- Scene change drivers: ${drivers.join(", ")}.`);
-      }
+      const rules = sanitizeAll([...ctx.understanding.subjects.map((s) => s.identityRule), ...ctx.story.identityRules].filter(Boolean));
+      if (rules.length) lines.push(...rules.map((r) => `- ${r}`));
       return lines.join("\n");
     },
   },
   {
-    id: "temporalRealism",
-    retentionPriority: 92,
-    renderOrder: 50,
-    required: true,
-    emergencyTemplate: EMERGENCY_TEMPORAL_REALISM,
+    id: "temporalChanges", retentionPriority: 99, renderOrder: 30, required: true,
+    emergencyTemplate: "TEMPORAL CHANGES\nApply the exact time change to both principal subject and surrounding environment.",
     build(ctx) {
-      const years = ctx.timePosition.offsetYears;
+      return `TEMPORAL CHANGES\n${sanitizeUntrustedPromptData(ctx.targetBeat.visualPrompt)} ${sanitizeUntrustedPromptData(ctx.targetBeat.narrative)}\nChange the environment as well as the salient subject whenever plausible.`;
+    },
+  },
+  {
+    id: "sceneCoverage", retentionPriority: 98, renderOrder: 40, required: true,
+    emergencyTemplate: "SCENE-WIDE COVERAGE\nPropagate era-consistent change through visible foreground, midground and background.",
+    build(ctx) {
       return [
-        "TEMPORAL REALISM",
-        `The requested offset is ${years.toFixed(1)} years. ${horizonGuidance(years)}`,
-        "Use material-specific aging, plausible maintenance cycles, biological growth, construction history, technology turnover and local environmental processes.",
-        "All changed elements must belong to the same target world and era; avoid mixed-period visual cues.",
-      ].join("\n");
+        "SCENE-WIDE COVERAGE",
+        "Evaluate foreground, midground, background and sky.",
+        "Propagate time through present architecture, infrastructure, surfaces, vegetation, vehicles, signage, clothing, lighting and atmosphere.",
+        "Permit era-justified additions, removals, renovation and replacement; explicitly preserve implausible-to-change regions.",
+        ctx.understanding.changeDrivers.length ? `Drivers: ${sanitizeAll(ctx.understanding.changeDrivers).join(", ")}` : "",
+      ].filter(Boolean).join("\n");
     },
   },
   {
-    id: "sceneDetails",
-    retentionPriority: 55,
-    renderOrder: 60,
-    required: false,
-    emergencyTemplate: "",
+    id: "temporalRealism", retentionPriority: 92, renderOrder: 50, required: true,
+    emergencyTemplate: "TEMPORAL REALISM\nMatch change magnitude to the requested span and keep one coherent era.",
     build(ctx) {
-      const details: string[] = [];
-      if (ctx.understanding.locationType) {
-        details.push(`Location: ${sanitizeUntrustedPromptData(ctx.understanding.locationType)}`);
-      }
-      if (ctx.understanding.visualMood) {
-        details.push(`Visible mood: ${sanitizeUntrustedPromptData(ctx.understanding.visualMood)}`);
-      }
-      if (ctx.understanding.timeClues.length) {
-        details.push(`Current-time clues: ${sanitizeAll(ctx.understanding.timeClues).join(", ")}`);
-      }
-      if (!details.length) return "";
-      return ["SCENE-SPECIFIC VISUAL DETAILS", details.join(". ")].join("\n");
+      return `TEMPORAL REALISM\nOffset ${ctx.timePosition.offsetYears.toFixed(1)} years. Use material aging, maintenance, biological growth, construction history, technology turnover and local environmental processes.`;
     },
   },
   {
-    id: "narrative",
-    retentionPriority: 20,
-    renderOrder: 70,
-    required: false,
-    emergencyTemplate: "",
+    id: "sceneDetails", retentionPriority: 55, renderOrder: 60, required: false, emergencyTemplate: "",
     build(ctx) {
-      const parts: string[] = [];
-      if (ctx.story.presentTruth) {
-        parts.push(sanitizeUntrustedPromptData(ctx.story.presentTruth));
-      }
-      if (
-        ctx.understanding.summary &&
-        ctx.understanding.summary !== ctx.story.presentTruth
-      ) {
-        parts.push(sanitizeUntrustedPromptData(ctx.understanding.summary));
-      }
-      if (!parts.length) return "";
-      return ["NARRATIVE CONTEXT", parts.join(" ")].join("\n");
+      return `SCENE DETAILS\nLocation: ${sanitizeUntrustedPromptData(ctx.understanding.locationType)}. Mood: ${sanitizeUntrustedPromptData(ctx.understanding.visualMood)}.`;
     },
   },
   {
-    id: "prohibit",
-    retentionPriority: 90,
-    renderOrder: 80,
-    required: true,
-    emergencyTemplate: EMERGENCY_PROHIBIT,
-    build(_ctx) {
-      return [
-        "DO NOT",
-        "- Do not change the camera angle, crop, horizon, lens perspective or principal subject identity.",
-        "- Do not add arbitrary people, vehicles, animals, buildings or props without a causal relationship to the target era and location.",
-        "- Do not forbid justified environmental evolution: related structures, infrastructure, vegetation, vehicles and signage may change when required by the temporal plan.",
-        "- Do not add captions, interface elements, logos, watermarks or invented readable text.",
-        "- Do not use a generic vintage, sepia or damaged-film filter to represent the past.",
-        "- Do not use generic cyberpunk, neon or science-fiction styling to represent the future.",
-        "- Do not make every material age identically, and do not transform only one salient subject while leaving the rest of the planned scene unchanged.",
-      ].join("\n");
+    id: "prohibit", retentionPriority: 90, renderOrder: 80, required: true,
+    emergencyTemplate: "DO NOT\nNo camera drift, arbitrary elements, invented text, generic filters or subject-only transformation.",
+    build() {
+      return "DO NOT\n- No camera drift, arbitrary unrelated elements, invented readable text, generic vintage filter, neon cyberpunk, mixed eras, uniform aging or subject-only transformation.";
     },
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Compiler
-// ---------------------------------------------------------------------------
-
-export function compilePrompt(input: {
-  context: GenerationContext;
-  timePosition: TimePositionPayload;
-  aspectRatio: AspectRatio;
-}): CompiledPrompt {
-  const { context, timePosition, aspectRatio } = input;
-  const targetBeat = context.story.targetBeat;
+export function compilePrompt(input: { context: GenerationContext; timePosition: TimePositionPayload; aspectRatio: AspectRatio }): CompiledPrompt {
   const ctx: CompileContext = {
-    understanding: context.understanding,
-    story: context.story,
-    targetBeat,
-    timePosition,
-    aspectRatio,
+    understanding: input.context.understanding,
+    story: input.context.story,
+    targetBeat: input.context.story.targetBeat,
+    timePosition: input.timePosition,
+    aspectRatio: input.aspectRatio,
   };
-
-  const built = sections.map((section) => ({
-    id: section.id,
-    retentionPriority: section.retentionPriority,
-    renderOrder: section.renderOrder,
-    required: section.required,
-    emergencyTemplate: section.emergencyTemplate,
-    text: section.build(ctx),
-  }));
-
+  const built = sections.map((s) => ({ ...s, text: s.build(ctx) }));
   const included = new Map<string, { text: string; fullText: string }>();
-
-  // Required sections begin in compact form. This guarantees that the camera
-  // lock, exact change plan, whole-scene coverage, realism and prohibitions all
-  // survive even when provider prompt limits are tight.
-  for (const section of built.filter((item) => item.required)) {
-    included.set(section.id, {
-      text: section.emergencyTemplate,
-      fullText: section.text,
-    });
+  for (const s of built.filter((x) => x.required)) included.set(s.id, { text: s.emergencyTemplate, fullText: s.text });
+  for (const s of built.filter((x) => x.required).sort((a, b) => b.retentionPriority - a.retentionPriority)) {
+    const old = included.get(s.id)!;
+    included.set(s.id, { text: s.text, fullText: s.text });
+    if (render(included).length > TOTAL_BUDGET) included.set(s.id, old);
   }
-
-  if (renderLength(included) > TOTAL_BUDGET) {
-    throw new Error("prompt_required_sections_exceed_budget");
+  for (const s of built.filter((x) => !x.required).sort((a, b) => b.retentionPriority - a.retentionPriority)) {
+    included.set(s.id, { text: s.text, fullText: s.text });
+    if (render(included).length > TOTAL_BUDGET) included.delete(s.id);
   }
-
-  // Promote required sections from compact to full form in semantic priority.
-  for (const section of built
-    .filter((item) => item.required)
-    .sort((a, b) => b.retentionPriority - a.retentionPriority)) {
-    const previous = included.get(section.id)!;
-    included.set(section.id, { text: section.text, fullText: section.text });
-    if (renderLength(included) > TOTAL_BUDGET) {
-      included.set(section.id, previous);
-    }
-  }
-
-  // Optional copy is admitted only after every required semantic contract has
-  // secured space. Narrative prose is therefore the first thing to disappear.
-  for (const section of built
-    .filter((item) => !item.required && item.text.length > 0)
-    .sort((a, b) => b.retentionPriority - a.retentionPriority)) {
-    included.set(section.id, { text: section.text, fullText: section.text });
-    if (renderLength(included) > TOTAL_BUDGET) {
-      included.delete(section.id);
-    }
-  }
-
-  const prompt = renderIncluded(included);
+  const prompt = render(included);
   const sectionCharCounts: Record<string, number> = {};
   const truncatedSections: string[] = [];
-
-  for (const section of built) {
-    const entry = included.get(section.id);
-    if (!entry) {
-      sectionCharCounts[section.id] = 0;
-      truncatedSections.push(section.id);
-      continue;
-    }
-    sectionCharCounts[section.id] = entry.text.length;
-    if (entry.text !== entry.fullText) truncatedSections.push(section.id);
+  for (const s of built) {
+    const entry = included.get(s.id);
+    sectionCharCounts[s.id] = entry?.text.length ?? 0;
+    if (!entry || entry.text !== entry.fullText) truncatedSections.push(s.id);
   }
-
-  const hash = createHash("sha256").update(prompt).digest("hex").slice(0, 16);
   return {
-    prompt,
-    version: VERSION,
-    hash,
-    charCount: prompt.length,
-    truncated: truncatedSections.length > 0,
-    sectionCharCounts,
-    truncatedSections,
+    prompt, version: VERSION,
+    hash: createHash("sha256").update(prompt).digest("hex").slice(0, 16),
+    charCount: prompt.length, truncated: truncatedSections.length > 0,
+    sectionCharCounts, truncatedSections,
   };
 }
 
-/** Legacy flat-prompt path retained for backward compatibility. */
-export function buildLegacyPrompt(params: {
-  template: string;
-  story: string;
-  timePosition: TimePositionPayload;
-  aspectRatio: AspectRatio;
-}): {
-  prompt: string;
-  truncated: boolean;
-  charCount: number;
-} {
-  const filled = params.template
-    .replaceAll("{{story}}", params.story.trim())
+export function buildLegacyPrompt(params: { template: string; story: string; timePosition: TimePositionPayload; aspectRatio: AspectRatio }) {
+  const filled = params.template.replaceAll("{{story}}", params.story.trim())
     .replaceAll("{{timeLabel}}", params.timePosition.compactLabel || "NOW")
-    .replaceAll("{{aspectRatio}}", params.aspectRatio)
-    .trim();
-
-  if (filled.length <= TOTAL_BUDGET) {
-    return { prompt: filled, truncated: false, charCount: filled.length };
-  }
-
-  const footer =
-    " Keep original composition and principal identity, while applying coherent scene-wide temporal change.";
-  const budget = Math.max(0, TOTAL_BUDGET - footer.length);
-  const head = filled.slice(0, budget).trimEnd();
-  const prompt = `${head}${footer}`.slice(0, TOTAL_BUDGET);
+    .replaceAll("{{aspectRatio}}", params.aspectRatio).trim();
+  if (filled.length <= TOTAL_BUDGET) return { prompt: filled, truncated: false, charCount: filled.length };
+  const footer = " Keep original composition, camera angle, and main subject identity.";
+  const prompt = `${filled.slice(0, Math.max(0, TOTAL_BUDGET - footer.length)).trimEnd()}${footer}`.slice(0, TOTAL_BUDGET);
   return { prompt, truncated: true, charCount: prompt.length };
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function renderIncluded(
-  included: Map<string, { text: string; fullText: string }>
-): string {
-  return sections
-    .filter((section) => included.has(section.id))
-    .sort((a, b) => a.renderOrder - b.renderOrder)
-    .map((section) => included.get(section.id)!.text)
-    .join("\n\n");
-}
-
-function renderLength(
-  included: Map<string, { text: string; fullText: string }>
-): number {
-  return renderIncluded(included).length;
-}
-
-function horizonGuidance(offsetYears: number): string {
-  const magnitude = Math.abs(offsetYears);
-  if (magnitude < 0.03) {
-    return "Prioritize light, weather, temporary objects and human activity; avoid implausible structural change.";
-  }
-  if (magnitude < 1) {
-    return "Prioritize seasonality, vegetation state, temporary construction, maintenance and short-lived signage.";
-  }
-  if (magnitude < 5) {
-    return "Use subtle wear, maintenance, clothing, vehicles, storefronts and incremental vegetation change.";
-  }
-  if (magnitude < 30) {
-    return "Show human aging, vegetation growth, material renewal, technology turnover and selective renovation.";
-  }
-  if (magnitude < 100) {
-    return "Allow major renovation, infrastructure replacement, urban-density change, mature ecology and generational turnover.";
-  }
-  if (magnitude < 1_000) {
-    return "Prioritize rebuilding, ruins, ecological succession and cultural replacement; preserve the site and camera geometry rather than every short-lived object.";
-  }
-  return "Use deep-time geological, climatic, ecological and civilizational change. Short-lived people and objects should persist only when the story explicitly treats them as anomalous time anchors.";
-}
-
-function targetDateISO(timePosition: TimePositionPayload): string {
-  const now = new Date();
-  const target = new Date(
-    now.getTime() + timePosition.offsetDays * 86_400_000
-  );
-  return target.toISOString().slice(0, 10);
+function render(included: Map<string, { text: string }>): string {
+  return sections.filter((s) => included.has(s.id)).sort((a, b) => a.renderOrder - b.renderOrder).map((s) => included.get(s.id)!.text).join("\n\n");
 }
