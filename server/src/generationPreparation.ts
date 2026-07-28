@@ -13,6 +13,7 @@ import type {
   StoryContinuityContext,
   StructuredGenerationBodyV2,
   StructuredGenerationBodyV3,
+  SubjectContinuityMode,
 } from "./types.js";
 
 /**
@@ -77,7 +78,10 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     timePosition: v2.timePosition,
     aspectRatio: v2.aspectRatio,
     requestId: v2.requestId,
-    useSubjectReference: v2.useSubjectReference,
+    useSubjectReference: allowSubjectReference(
+      Boolean(v2.useSubjectReference),
+      planned.value.subjectContinuityMode
+    ),
     structuredContext: {
       schemaVersion: "generation-context.v3",
       sceneGraph,
@@ -88,6 +92,17 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     },
   };
   return createGenerationJob(upgraded);
+}
+
+function allowSubjectReference(
+  requested: boolean,
+  mode: SubjectContinuityMode
+): boolean {
+  if (!requested) return false;
+  return mode === "identity_persists"
+    || mode === "age_progression"
+    || mode === "object_remains"
+    || mode === "time_traveler";
 }
 
 function exactTargetFromTime(offsetDays: number, compactLabel: string): ExactTarget {
