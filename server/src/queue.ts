@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
+import { critiqueGeneratedImage } from "./intelligence.js";
 import { normalizeAspectRatio, toJpegDataUrl } from "./prompt.js";
-import { compilePrompt, buildLegacyPrompt } from "./promptCompiler.js";
+import { buildLegacyPrompt } from "./promptCompiler.js";
+import { buildCorrectionPromptV3, compilePromptV3 } from "./promptCompilerV3.js";
 import {
   getAsset,
   getGeneration,
@@ -12,21 +14,43 @@ import {
   saveGeneratedImage,
   updateGeneration,
 } from "./storage.js";
+import {
+  buildV3ContextFromV2,
+  criticNeedsRegeneration,
+  defaultQualityPolicy,
+  normalizeRenderPlanTarget,
+  validateSceneGraph,
+  validateTemporalRenderPlan,
+} from "./temporalV3.js";
 import type {
   CreateGenerationBody,
+  ExactTarget,
   GenerationContext,
+  GenerationContextV3,
   GenerationRecord,
   MiniMaxAdapter,
-  StructuredGenerationBody,
-  TemporalStoryPayloadV2,
+  MiniMaxGenerateSuccess,
+  QualityPolicy,
+  SceneGraph,
+  StructuredGenerationBodyV2,
+  StructuredGenerationBodyV3,
+  TemporalRenderPlan,
 } from "./types.js";
 
 let adapter: MiniMaxAdapter | null = null;
 const processing = new Set<string>();
-const promptByGeneration = new Map<
-  string,
-  { prompt: string; useSubjectReference: boolean }
->();
+
+interface StoredGenerationContract {
+  prompt: string;
+  useSubjectReference: boolean;
+  quality?: {
+    sceneGraph: SceneGraph;
+    targetPlan: TemporalRenderPlan;
+    policy: QualityPolicy;
+  };
+}
+
+const promptByGeneration = new Map<string, StoredGenerationContract>();
 
 export function setMiniMaxAdapter(next: MiniMaxAdapter | null): void {
   adapter = next;
@@ -53,30 +77,19 @@ export function createGenerationJob(
   }
 
   const aspectRatio = normalizeAspectRatio(body.aspectRatio);
-  if (!aspectRatio) {
-    return contractError(400, "invalid_aspect_ratio", "不支持的画幅比例。");
-  }
-
-  if (!body.requestId?.trim()) {
-    return contractError(400, "missing_request_id", "缺少 requestId。");
-  }
-
+  if (!aspectRatio) return contractError(400, "invalid_aspect_ratio", "不支持的画幅比例。");
+  if (!body.requestId?.trim()) return contractError(400, "missing_request_id", "缺少 requestId。");
   if (!body.sourceAssetId || !getAsset(body.sourceAssetId)) {
     return contractError(400, "invalid_source_asset", "源图片不存在或已过期。");
   }
-
-  if (!body.timePosition || typeof body.timePosition.normalized !== "number") {
+  if (!body.timePosition || !Number.isFinite(body.timePosition.normalized) || !Number.isFinite(body.timePosition.offsetDays)) {
     return contractError(400, "invalid_time_position", "时间位置无效。");
   }
 
-  // Discriminated union: reject mixed input (Task 4 & 6).
-  if ((body as any).contextVersion === undefined) {
-    // Legacy body without contextVersion — treat as legacy.v1
-    (body as any).contextVersion = "legacy.v1";
+  if ((body as { contextVersion?: string }).contextVersion === undefined) {
+    (body as unknown as { contextVersion: string }).contextVersion = "legacy.v1";
   }
 
-  // V2 structured path: server-side prompt compilation.
-  // Legacy path: client sends a flat story string, server wraps in template.
   let built: {
     prompt: string;
     truncated: boolean;
@@ -86,20 +99,40 @@ export function createGenerationJob(
     sectionCharCounts?: Record<string, number>;
     truncatedSections?: string[];
   };
+  let quality: StoredGenerationContract["quality"];
+  let renderPlanId: string | undefined;
 
   if (body.contextVersion === "generation.v2") {
-    // V2: validate structured context contract.
-    const v2Validation = validateStructuredContext(body.structuredContext);
-    if (v2Validation) return v2Validation;
-
-    // Inject program-authoritative time values into targetBeat (Task 5).
-    // The LLM's anchorYears is a hint; offsetDays is the truth.
-    const ctx = injectTargetTime(body as StructuredGenerationBody);
-    built = compilePrompt({
-      context: ctx,
+    const validation = validateV2Context(body.structuredContext);
+    if (validation) return validation;
+    const exactTarget = exactTargetFromTime(body.timePosition.offsetDays, body.timePosition.compactLabel);
+    const v2Context = injectV2TargetTime(body, exactTarget);
+    const v3Context = buildV3ContextFromV2({
+      context: v2Context,
       timePosition: body.timePosition,
-      aspectRatio,
+      exactTarget,
     });
+    built = compilePromptV3({ context: v3Context, timePosition: body.timePosition, aspectRatio });
+    const policy = defaultQualityPolicy(v3Context.qualityPolicy);
+    quality = {
+      sceneGraph: v3Context.sceneGraph,
+      targetPlan: v3Context.targetPlan,
+      policy,
+    };
+    renderPlanId = v3Context.targetPlan.planId;
+  } else if (body.contextVersion === "generation.v3") {
+    const exactTarget = exactTargetFromTime(body.timePosition.offsetDays, body.timePosition.compactLabel);
+    const v3Context = injectV3TargetTime(body, exactTarget);
+    const validation = validateV3Context(v3Context);
+    if (validation) return validation;
+    built = compilePromptV3({ context: v3Context, timePosition: body.timePosition, aspectRatio });
+    const policy = defaultQualityPolicy(v3Context.qualityPolicy);
+    quality = {
+      sceneGraph: v3Context.sceneGraph,
+      targetPlan: v3Context.targetPlan,
+      policy,
+    };
+    renderPlanId = v3Context.targetPlan.planId;
   } else if (body.contextVersion === "legacy.v1") {
     if (typeof body.story !== "string" || !body.story.trim()) {
       return contractError(400, "missing_story", "缺少故事内容。");
@@ -130,41 +163,30 @@ export function createGenerationJob(
     promptHash: built.hash,
     sectionCharCounts: built.sectionCharCounts,
     truncatedSections: built.truncatedSections,
+    renderPlanId,
+    regenerationCount: 0,
   };
 
   promptByGeneration.set(record.generationId, {
     prompt: built.prompt,
     useSubjectReference: Boolean(body.useSubjectReference),
+    quality,
   });
-
   putGeneration(record);
   void processGeneration(record.generationId);
 
-  console.info(
-    JSON.stringify({
-      event: "generation_queued",
-      requestId: record.requestId,
-      generationId: record.generationId,
-      status: record.status,
-      promptTruncated: record.promptTruncated,
-      promptVersion: built.version,
-    })
-  );
+  console.info(JSON.stringify({
+    event: "generation_queued",
+    requestId: record.requestId,
+    generationId: record.generationId,
+    status: record.status,
+    promptTruncated: record.promptTruncated,
+    promptVersion: built.version,
+    renderPlanId,
+    visualCriticEnabled: quality?.policy.visualCriticEnabled ?? false,
+  }));
 
   return { ok: true, record };
-}
-
-// ---------------------------------------------------------------------------
-// Contract validation (Task 7)
-// ---------------------------------------------------------------------------
-
-function contractError(
-  statusCode: number,
-  errorCode: string,
-  userMessage: string,
-  retryable = false
-) {
-  return { ok: false as const, statusCode, errorCode, userMessage, retryable };
 }
 
 const VALID_GENERATION_MODES = new Set([
@@ -173,35 +195,19 @@ const VALID_GENERATION_MODES = new Set([
   "regenerate_same_target",
 ]);
 
-const VALID_SCHEMA_VERSIONS = new Set([
-  "generation-context.v2",
-  "temporal-story.v2",
-]);
-
-function validateStructuredContext(
+function validateV2Context(
   ctx: GenerationContext | undefined
 ): ReturnType<typeof contractError> | null {
-  if (!ctx) {
-    return contractError(400, "invalid_generation_contract", "缺少结构化上下文。");
-  }
-  if (!VALID_SCHEMA_VERSIONS.has(ctx.schemaVersion)) {
+  if (!ctx) return contractError(400, "invalid_generation_contract", "缺少结构化上下文。");
+  if (ctx.schemaVersion !== "generation-context.v2") {
     return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
   }
-  if (!ctx.understanding) {
-    return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  if (!ctx.understanding) return contractError(400, "invalid_generation_contract", "缺少图片理解数据。");
+  if (!ctx.story || ctx.story.schemaVersion !== "temporal-story.v2") {
+    return contractError(400, "unsupported_schema_version", "故事 schema 版本不匹配。");
   }
-  if (!ctx.story) {
-    return contractError(400, "invalid_generation_contract", "缺少时间故事数据。");
-  }
-  if (ctx.story.schemaVersion !== "temporal-story.v2") {
-    return contractError(400, "unsupported_schema_version", `故事 schema 版本不匹配: ${ctx.story.schemaVersion ?? "undefined"}`);
-  }
-  if (!ctx.story.targetBeat) {
-    return contractError(400, "missing_target_beat", "V2 故事缺少精确目标节点 (targetBeat)。");
-  }
-  const tb = ctx.story.targetBeat;
-  if (!Number.isFinite(tb.anchorYears) || !tb.visualPrompt) {
-    return contractError(400, "invalid_target_beat", "targetBeat 缺少必要字段 (anchorYears, visualPrompt)。");
+  if (!ctx.story.targetBeat || !Number.isFinite(ctx.story.targetBeat.anchorYears) || !ctx.story.targetBeat.visualPrompt) {
+    return contractError(400, "invalid_target_beat", "V2 故事缺少有效的精确目标节点。");
   }
   if (ctx.story.beats.length !== 7) {
     return contractError(400, "invalid_generation_contract", `需要恰好 7 个浏览节点，收到 ${ctx.story.beats.length} 个。`);
@@ -209,50 +215,74 @@ function validateStructuredContext(
   if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
     return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
   }
-  // Validate subject count bounds.
-  if (ctx.understanding.subjects.length > 10) {
-    return contractError(400, "invalid_generation_contract", "主体数量超过上限 (10)。");
-  }
-  if (ctx.story.identityRules.length > 10) {
-    return contractError(400, "invalid_generation_contract", "身份规则数量超过上限 (10)。");
+  if (ctx.understanding.subjects.length > 16 || ctx.story.identityRules.length > 16) {
+    return contractError(400, "invalid_generation_contract", "V2 场景主体或身份规则超过上限。");
   }
   return null;
 }
 
-/**
- * Inject program-authoritative time values into the targetBeat.
- * The LLM's anchorYears is a hint; offsetDays is the truth.
- */
-function injectTargetTime(body: StructuredGenerationBody): GenerationContext {
-  const offsetDays = body.timePosition.offsetDays;
+function validateV3Context(
+  ctx: GenerationContextV3
+): ReturnType<typeof contractError> | null {
+  if (ctx.schemaVersion !== "generation-context.v3") {
+    return contractError(400, "unsupported_schema_version", `不支持的 schema 版本: ${ctx.schemaVersion ?? "undefined"}`);
+  }
+  if (!VALID_GENERATION_MODES.has(ctx.generationMode)) {
+    return contractError(400, "invalid_generation_mode", `不支持的生成模式: ${ctx.generationMode}`);
+  }
+  const graphIssues = validateSceneGraph(ctx.sceneGraph);
+  if (graphIssues.length) {
+    return contractError(400, "invalid_scene_graph", `场景图无效: ${graphIssues.slice(0, 5).join(", ")}`);
+  }
+  const planIssues = validateTemporalRenderPlan(ctx.sceneGraph, ctx.targetPlan);
+  if (planIssues.length) {
+    return contractError(400, "invalid_render_plan", `时间渲染计划无效: ${planIssues.slice(0, 5).join(", ")}`);
+  }
+  return null;
+}
+
+function exactTargetFromTime(offsetDays: number, compactLabel: string): ExactTarget {
   const now = new Date();
   const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
-  const exactTarget: import("./types.js").ExactTarget = {
+  return {
     offsetDays,
     targetDateISO: targetDate.toISOString().slice(0, 10),
-    compactLabel: body.timePosition.compactLabel,
+    compactLabel: compactLabel || `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
   };
+}
+
+function injectV2TargetTime(
+  body: StructuredGenerationBodyV2,
+  exactTarget: ExactTarget
+): GenerationContext {
   return {
     ...body.structuredContext,
     story: {
       ...body.structuredContext.story,
       targetBeat: {
         ...body.structuredContext.story.targetBeat,
-        // Overwrite the LLM's anchorYears with the program-authoritative value.
-        anchorYears: offsetDays / 365.25,
+        anchorYears: exactTarget.offsetDays / 365.25,
         exactTarget,
       },
     },
   };
 }
 
+function injectV3TargetTime(
+  body: StructuredGenerationBodyV3,
+  exactTarget: ExactTarget
+): GenerationContextV3 {
+  return {
+    ...body.structuredContext,
+    targetPlan: normalizeRenderPlanTarget(body.structuredContext.targetPlan, exactTarget),
+  };
+}
+
 async function processGeneration(generationId: string): Promise<void> {
   if (processing.has(generationId)) return;
   processing.add(generationId);
-
   const startedAt = Date.now();
   const current = getGeneration(generationId);
-
   if (!current || !adapter) {
     processing.delete(generationId);
     return;
@@ -266,87 +296,166 @@ async function processGeneration(generationId: string): Promise<void> {
   try {
     const asset = await readAssetBytes(current.sourceAssetId);
     if (!asset) {
-      updateGeneration(generationId, {
-        status: "failed",
-        finishedAt: new Date().toISOString(),
-        durationMs: Date.now() - startedAt,
-        errorCode: "invalid_image",
-        userMessage: "源图片无法读取。",
-        retryable: false,
-      });
+      failGeneration(generationId, startedAt, "invalid_image", "源图片无法读取。", false);
       return;
     }
 
     const stored = promptByGeneration.get(generationId);
-    const prompt = stored?.prompt ?? "";
-    const result = await adapter.generate({
-      prompt,
-      imageDataUrl: toJpegDataUrl(asset.bytes, asset.contentType),
+    if (!stored?.prompt) {
+      failGeneration(generationId, startedAt, "missing_prompt", "生成提示上下文已丢失。", true);
+      return;
+    }
+
+    const imageDataUrl = toJpegDataUrl(asset.bytes, asset.contentType);
+    const first = await adapter.generate({
+      prompt: stored.prompt,
+      imageDataUrl,
       aspectRatio: current.aspectRatio,
-      useSubjectReference: Boolean(stored?.useSubjectReference),
+      useSubjectReference: stored.useSubjectReference,
       requestId: current.requestId,
       generationId,
     });
 
-    promptByGeneration.delete(generationId);
-
-    if (!result.ok) {
-      updateGeneration(generationId, {
-        status: "failed",
-        finishedAt: new Date().toISOString(),
-        durationMs: Date.now() - startedAt,
-        errorCode: result.errorCode,
-        userMessage: result.userMessage,
-        retryable: result.retryable,
-        statusMsg: result.statusMsg,
-      });
-      console.info(
-        JSON.stringify({
-          event: "generation_failed",
-          requestId: current.requestId,
-          generationId,
-          errorCode: result.errorCode,
-          durationMs: Date.now() - startedAt,
-        })
+    if (!first.ok) {
+      failGeneration(
+        generationId,
+        startedAt,
+        first.errorCode,
+        first.userMessage,
+        first.retryable,
+        first.statusMsg
       );
       return;
     }
 
+    let selected: MiniMaxGenerateSuccess = first;
+    let critic = stored.quality
+      ? await critiqueGeneratedImage({
+          sourceSceneGraph: stored.quality.sceneGraph,
+          targetPlan: stored.quality.targetPlan,
+          generatedBytes: first.imageBytes,
+          generatedContentType: first.contentType,
+          qualityPolicy: stored.quality.policy,
+          requestId: current.requestId,
+        })
+      : null;
+    let regenerationCount = 0;
+
+    if (stored.quality && critic && criticNeedsRegeneration(critic, stored.quality.policy)) {
+      const correctionPrompt = buildCorrectionPromptV3({
+        originalPrompt: stored.prompt,
+        graph: stored.quality.sceneGraph,
+        plan: stored.quality.targetPlan,
+        critic,
+      });
+      const retry = await adapter.generate({
+        prompt: correctionPrompt,
+        imageDataUrl,
+        aspectRatio: current.aspectRatio,
+        useSubjectReference: stored.useSubjectReference,
+        requestId: `${current.requestId}-repair`,
+        generationId,
+      });
+      if (retry.ok) {
+        regenerationCount = 1;
+        const retryCritic = await critiqueGeneratedImage({
+          sourceSceneGraph: stored.quality.sceneGraph,
+          targetPlan: stored.quality.targetPlan,
+          generatedBytes: retry.imageBytes,
+          generatedContentType: retry.contentType,
+          qualityPolicy: stored.quality.policy,
+          requestId: `${current.requestId}-repair`,
+        });
+        if (!retryCritic || criticScore(retryCritic) >= criticScore(critic)) {
+          selected = retry;
+          critic = retryCritic ?? critic;
+        }
+      }
+    }
+
     const resultRelativeUrl = await saveGeneratedImage({
       generationId,
-      bytes: result.imageBytes,
+      bytes: selected.imageBytes,
     });
-
     updateGeneration(generationId, {
       status: "succeeded",
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       resultRelativeUrl,
+      visualCritic: critic ?? undefined,
+      regenerationCount,
     });
 
-    console.info(
-      JSON.stringify({
-        event: "generation_succeeded",
-        requestId: current.requestId,
-        generationId,
-        durationMs: Date.now() - startedAt,
-        model: config.modelName,
-      })
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown";
-    updateGeneration(generationId, {
-      status: "failed",
-      finishedAt: new Date().toISOString(),
+    console.info(JSON.stringify({
+      event: "generation_succeeded",
+      requestId: current.requestId,
+      generationId,
       durationMs: Date.now() - startedAt,
-      errorCode: "internal_error",
-      userMessage: "生成过程出现内部错误。",
-      retryable: true,
-      statusMsg: message.slice(0, 200),
-    });
+      model: config.modelName,
+      renderPlanId: current.renderPlanId,
+      regenerationCount,
+      criticPassed: critic?.passed,
+      environmentEvolution: critic?.environmentEvolution,
+      requiredChangeCompletion: critic?.requiredChangeCompletion,
+    }));
+  } catch (error) {
+    failGeneration(
+      generationId,
+      startedAt,
+      "internal_error",
+      "生成过程出现内部错误。",
+      true,
+      error instanceof Error ? error.message.slice(0, 200) : "unknown"
+    );
   } finally {
+    promptByGeneration.delete(generationId);
     processing.delete(generationId);
   }
+}
+
+function criticScore(critic: NonNullable<GenerationRecord["visualCritic"]>): number {
+  return (
+    critic.cameraConsistency * 1.25
+    + critic.spatialTopologyConsistency
+    + critic.principalIdentityConsistency
+    + critic.requiredChangeCompletion * 1.4
+    + critic.environmentEvolution * 1.4
+    + critic.eraCoherence
+  ) / 7.05;
+}
+
+function failGeneration(
+  generationId: string,
+  startedAt: number,
+  errorCode: string,
+  userMessage: string,
+  retryable: boolean,
+  statusMsg?: string
+): void {
+  updateGeneration(generationId, {
+    status: "failed",
+    finishedAt: new Date().toISOString(),
+    durationMs: Date.now() - startedAt,
+    errorCode,
+    userMessage,
+    retryable,
+    statusMsg,
+  });
+  console.info(JSON.stringify({
+    event: "generation_failed",
+    generationId,
+    errorCode,
+    durationMs: Date.now() - startedAt,
+  }));
+}
+
+function contractError(
+  statusCode: number,
+  errorCode: string,
+  userMessage: string,
+  retryable = false
+) {
+  return { ok: false as const, statusCode, errorCode, userMessage, retryable };
 }
 
 export function toClientGeneration(record: GenerationRecord) {
@@ -360,18 +469,19 @@ export function toClientGeneration(record: GenerationRecord) {
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     durationMs: record.durationMs,
+    qualityStatus: record.visualCritic
+      ? record.visualCritic.passed ? "passed" : "best_effort"
+      : record.renderPlanId ? "not_scored" : undefined,
+    regenerationCount: record.regenerationCount ?? 0,
   };
-
   if (record.status === "succeeded" && record.resultRelativeUrl) {
     base.resultUrl = `${config.publicBaseUrl}${record.resultRelativeUrl}`;
   }
-
   if (record.status === "failed") {
     base.errorCode = record.errorCode;
     base.userMessage = record.userMessage;
     base.retryable = record.retryable ?? false;
   }
-
   return base;
 }
 
@@ -388,6 +498,9 @@ export function toAdminGeneration(record: GenerationRecord) {
     promptHash: record.promptHash,
     sectionCharCounts: record.sectionCharCounts,
     truncatedSections: record.truncatedSections,
+    renderPlanId: record.renderPlanId,
+    visualCritic: record.visualCritic,
+    regenerationCount: record.regenerationCount,
     durationMs: record.durationMs,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -400,7 +513,6 @@ export function adminList() {
   return listGenerations().map(toAdminGeneration);
 }
 
-/** Wait helper for tests. */
 export async function waitForGeneration(
   generationId: string,
   timeoutMs = 5000
@@ -408,10 +520,8 @@ export async function waitForGeneration(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const record = getGeneration(generationId);
-    if (record && (record.status === "succeeded" || record.status === "failed")) {
-      return record;
-    }
-    await new Promise((r) => setTimeout(r, 20));
+    if (record && (record.status === "succeeded" || record.status === "failed")) return record;
+    await new Promise((resolve) => setTimeout(resolve, 20));
   }
   return getGeneration(generationId);
 }
