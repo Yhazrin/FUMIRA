@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   analyzeUploadedSceneGraph,
   planTemporalRender,
@@ -10,16 +11,26 @@ import {
 import type {
   CreateGenerationBody,
   ExactTarget,
+  SceneGraph,
   StoryContinuityContext,
   StructuredGenerationBodyV2,
   StructuredGenerationBodyV3,
   SubjectContinuityMode,
+  TemporalRenderPlan,
 } from "./types.js";
+
+const MAX_PREPARED_CONTEXTS = 128;
+const sceneGraphCache = new Map<string, SceneGraph>();
+const renderPlanCache = new Map<string, TemporalRenderPlan>();
 
 /**
  * Upgrade current iOS generation.v2 requests before queueing. Existing clients
  * keep their stable contract, while the server performs full source-image scene
  * decomposition and exact temporal planning before image generation.
+ *
+ * Scene graphs and exact plans are cached by immutable inputs so repeated
+ * generation of the same target preserves one world contract instead of asking
+ * the planner to invent a new interpretation every time.
  */
 export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) {
   if (body.contextVersion !== "generation.v2") {
@@ -36,13 +47,17 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     return createGenerationJob(body);
   }
 
-  const graphResult = await analyzeUploadedSceneGraph({
-    sourceAssetId: v2.sourceAssetId,
-    requestId: `${v2.requestId}-source-scene`,
-  });
-  const sceneGraph = graphResult.ok
-    ? graphResult.value
-    : deriveSceneGraphFromV2(v2.structuredContext.understanding);
+  let sceneGraph = sceneGraphCache.get(v2.sourceAssetId);
+  if (!sceneGraph) {
+    const graphResult = await analyzeUploadedSceneGraph({
+      sourceAssetId: v2.sourceAssetId,
+      requestId: `${v2.requestId}-source-scene`,
+    });
+    sceneGraph = graphResult.ok
+      ? graphResult.value
+      : deriveSceneGraphFromV2(v2.structuredContext.understanding);
+    putBounded(sceneGraphCache, v2.sourceAssetId, sceneGraph);
+  }
 
   const exactTarget = exactTargetFromTime(
     v2.timePosition.offsetDays,
@@ -59,17 +74,28 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
       visualPrompt: beat.visualPrompt,
     })),
   };
-
-  const planned = await planTemporalRender({
-    sceneGraph,
+  const cacheKey = planCacheKey(
+    v2.sourceAssetId,
     exactTarget,
     storyContext,
-    requestId: `${v2.requestId}-render-plan`,
-  });
-  if (!planned.ok) {
-    // Direct V2 queueing still performs a deterministic V3 conversion, so a
-    // planner outage never restores the old flat visualPrompt behavior.
-    return createGenerationJob(body);
+    sceneGraph
+  );
+
+  let targetPlan = renderPlanCache.get(cacheKey);
+  if (!targetPlan) {
+    const planned = await planTemporalRender({
+      sceneGraph,
+      exactTarget,
+      storyContext,
+      requestId: `${v2.requestId}-render-plan`,
+    });
+    if (!planned.ok) {
+      // Direct V2 queueing still performs a deterministic V3 conversion, so a
+      // planner outage never restores the old flat visualPrompt behavior.
+      return createGenerationJob(body);
+    }
+    targetPlan = planned.value;
+    putBounded(renderPlanCache, cacheKey, targetPlan);
   }
 
   const upgraded: StructuredGenerationBodyV3 = {
@@ -80,18 +106,23 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     requestId: v2.requestId,
     useSubjectReference: allowSubjectReference(
       Boolean(v2.useSubjectReference),
-      planned.value.subjectContinuityMode
+      targetPlan.subjectContinuityMode
     ),
     structuredContext: {
       schemaVersion: "generation-context.v3",
       sceneGraph,
-      targetPlan: planned.value,
+      targetPlan,
       temporalStory: v2.structuredContext.story,
       generationMode: v2.structuredContext.generationMode,
       qualityPolicy: defaultQualityPolicy(),
     },
   };
   return createGenerationJob(upgraded);
+}
+
+export function clearPreparedGenerationCache(): void {
+  sceneGraphCache.clear();
+  renderPlanCache.clear();
 }
 
 function allowSubjectReference(
@@ -103,6 +134,34 @@ function allowSubjectReference(
     || mode === "age_progression"
     || mode === "object_remains"
     || mode === "time_traveler";
+}
+
+function planCacheKey(
+  sourceAssetId: string,
+  target: ExactTarget,
+  story: StoryContinuityContext,
+  graph: SceneGraph
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify({
+      sourceAssetId,
+      offsetDays: target.offsetDays,
+      compactLabel: target.compactLabel,
+      story,
+      graph,
+    }))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function putBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  while (map.size > MAX_PREPARED_CONTEXTS) {
+    const oldest = map.keys().next().value as K | undefined;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
 }
 
 function exactTargetFromTime(offsetDays: number, compactLabel: string): ExactTarget {
