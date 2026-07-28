@@ -166,32 +166,47 @@ function buildRegionSection(
   plan: TemporalRenderPlan,
   fixed: PromptSection[]
 ): PromptSection {
-  const header = "REGION EDITS\n";
-  const unchanged = plan.unchangedRegionIds.length
-    ? `UNCHANGED ${plan.unchangedRegionIds.map(safe).join(",")}: preserve source state and spatial role.\n`
-    : "";
-  const reserved = renderSections(fixed).length + 2 + header.length + unchanged.length;
-  const remaining = Math.max(0, TOTAL_BUDGET - reserved);
-  const ordered = [...plan.regionChanges].sort((a, b) => {
+  const header = "REGION CONTRACT\n";
+  const changed = [...plan.regionChanges].sort((a, b) => {
     const aSalience = graph.regions.find((region) => region.id === a.regionId)?.salience ?? 0;
     const bSalience = graph.regions.find((region) => region.id === b.regionId)?.salience ?? 0;
     return bSalience - aSalience;
   });
-
-  const lines = ordered.map((change) => {
+  const changedLines = changed.map((change) => {
     const region = graph.regions.find((item) => item.id === change.regionId);
     return formatCompactChange(region, change);
   });
+  const unchangedLines = plan.unchangedRegionIds.map((id) => {
+    const region = graph.regions.find((item) => item.id === id);
+    return formatUnchanged(region, id, false);
+  });
+  const lines = [...changedLines, ...unchangedLines];
+  const remaining = Math.max(
+    0,
+    TOTAL_BUDGET - renderSections(fixed).length - header.length - 2
+  );
   const compactCost = lines.join("\n").length;
+
   if (compactCost <= remaining) {
     let detailBudget = remaining - compactCost;
-    for (let index = 0; index < ordered.length; index++) {
-      const change = ordered[index];
+    for (let index = 0; index < changed.length; index++) {
+      const change = changed[index];
       const region = graph.regions.find((item) => item.id === change.regionId);
-      const expanded = formatChange(region, change, 135);
+      const expanded = formatChange(region, change, 130);
       const delta = expanded.length - lines[index].length;
       if (delta <= detailBudget) {
         lines[index] = expanded;
+        detailBudget -= delta;
+      }
+    }
+    for (let index = 0; index < plan.unchangedRegionIds.length; index++) {
+      const lineIndex = changed.length + index;
+      const id = plan.unchangedRegionIds[index];
+      const region = graph.regions.find((item) => item.id === id);
+      const expanded = formatUnchanged(region, id, true);
+      const delta = expanded.length - lines[lineIndex].length;
+      if (delta <= detailBudget) {
+        lines[lineIndex] = expanded;
         detailBudget -= delta;
       }
     }
@@ -203,7 +218,7 @@ function buildRegionSection(
   return {
     id: "regionEdits",
     required: true,
-    text: `${header}${lines.join("\n")}\n${unchanged}`.trimEnd(),
+    text: `${header}${lines.join("\n")}`,
   };
 }
 
@@ -242,7 +257,7 @@ function buildOptionalSections(
   sections.push({
     id: "coverage",
     required: false,
-    text: `COVERAGE\nEvaluated ${plan.coverage.evaluatedRegionIds.map(safe).join(",")}; domains ${plan.coverage.changedDomains.join(",") || "none"}. Every region needs its edit or explicit unchanged treatment.`,
+    text: `COVERAGE\nEvaluated ${plan.coverage.evaluatedRegionIds.map(safe).join(",")}; domains ${plan.coverage.changedDomains.join(",") || "none"}. Every region needs its edit or explicit preserve treatment.`,
   });
   if (graph.uncertainties.some(Boolean)) {
     sections.push({
@@ -260,21 +275,24 @@ function emergencyPrompt(
   timePosition: TimePositionPayload,
   aspectRatio: AspectRatio
 ): string {
-  const changes = plan.regionChanges.slice(0, 16).map((change) => {
-    const region = graph.regions.find((item) => item.id === change.regionId);
-    return formatEmergencyChange(region, change);
-  });
+  const regionLines = [
+    ...plan.regionChanges.slice(0, 16).map((change) => {
+      const region = graph.regions.find((item) => item.id === change.regionId);
+      return formatEmergencyChange(region, change);
+    }),
+    ...plan.unchangedRegionIds.slice(0, 16).map((id) => {
+      const region = graph.regions.find((item) => item.id === id);
+      return formatUnchanged(region, id, false, true);
+    }),
+  ];
   return [
     "TARGET",
     `${safe(plan.exactTarget.compactLabel)}${trustedTargetDate(timePosition, plan)} ${(timePosition.offsetDays / 365.25).toFixed(1)}y-relative ${aspectRatio}.`,
     "CAMERA LOCK",
     "Keep viewpoint, crop, horizon, perspective, vanishing points, scale and occlusion topology.",
     `CONTINUITY ${plan.subjectContinuityMode}.`,
-    "REGION EDITS",
-    ...changes,
-    plan.unchangedRegionIds.length
-      ? `UNCHANGED ${plan.unchangedRegionIds.map(safe).join(",")}.`
-      : "",
+    "REGION CONTRACT",
+    ...regionLines,
     "WORLD COHERENCE",
     "One era/light/weather/material system. Apply environment changes, not only the salient subject.",
     "PROHIBITED",
@@ -296,30 +314,49 @@ function formatChange(
   change: RegionTemporalChange,
   detailBudget: number
 ): string {
-  const locator = region
-    ? `${safe(region.id)} ${region.screenZone}/${region.depth}/${region.category}`
-    : safe(change.regionId);
-  return `${locator} -> ${change.action.toUpperCase()} ${change.magnitude}: ${clip(`${change.targetState}; cause: ${change.causalReason}`, detailBudget)}`;
+  return `${regionLocator(region, change.regionId, true, true)} -> ${change.action.toUpperCase()} ${change.magnitude}: ${clip(`${change.targetState}; cause: ${change.causalReason}`, detailBudget)}`;
 }
 
 function formatCompactChange(
   region: SceneRegion | undefined,
   change: RegionTemporalChange
 ): string {
-  const locator = region
-    ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
-    : safe(change.regionId);
-  return `${locator} ${change.action.toUpperCase()} ${change.magnitude}: ${clip(change.targetState, 45)}`;
+  return `${regionLocator(region, change.regionId, false, true)} ${change.action.toUpperCase()} ${change.magnitude}: ${clip(change.targetState, 38)}`;
 }
 
 function formatEmergencyChange(
   region: SceneRegion | undefined,
   change: RegionTemporalChange
 ): string {
-  const locator = region
-    ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
-    : safe(change.regionId);
-  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 20)}`;
+  return `${regionLocator(region, change.regionId, false, false)} ${change.action.toUpperCase()}: ${clip(change.targetState, 18)}`;
+}
+
+function formatUnchanged(
+  region: SceneRegion | undefined,
+  id: string,
+  detailed: boolean,
+  emergency = false
+): string {
+  const descriptionBudget = emergency ? 12 : detailed ? 52 : 24;
+  return `${regionLocator(region, id, detailed, !emergency)} PRESERVE: ${clip(region?.sourceState.description || "source state", descriptionBudget)}`;
+}
+
+function regionLocator(
+  region: SceneRegion | undefined,
+  fallbackId: string,
+  includeCategory: boolean,
+  includeBox: boolean
+): string {
+  if (!region) return safe(fallbackId);
+  const category = includeCategory ? `/${region.category}` : "";
+  const box = includeBox && region.boundingBox
+    ? `@${round(region.boundingBox.x)},${round(region.boundingBox.y)},${round(region.boundingBox.width)},${round(region.boundingBox.height)}`
+    : "";
+  return `${safe(region.id)} ${region.screenZone}/${region.depth}${category}${box}`;
+}
+
+function round(value: number): string {
+  return Math.max(0, Math.min(1, value)).toFixed(2);
 }
 
 function renderSections(sections: PromptSection[]): string {
