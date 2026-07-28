@@ -137,21 +137,40 @@ describe("SceneGraph V3 compatibility conversion", () => {
 });
 
 describe("PromptCompiler V3", () => {
-  it("compiles exact region-addressable actions under the provider budget", () => {
+  it("compiles region-addressable actions and bounding boxes", () => {
     const context = buildV3ContextFromV2({
       context: v2Context(),
       timePosition: time(),
       exactTarget: target(),
     });
+    context.sceneGraph.regions[0].boundingBox = {
+      x: 0.35,
+      y: 0.2,
+      width: 0.3,
+      height: 0.65,
+    };
     const result = compilePromptV3({ context, timePosition: time(), aspectRatio: "3:4" });
     assert.equal(result.version, "v3");
     assert.ok(result.charCount <= 1500);
-    assert.ok(result.prompt.includes("REGION EDITS"));
+    assert.ok(result.prompt.includes("REGION CONTRACT"));
     assert.ok(result.prompt.includes("R1"));
-    assert.ok(result.prompt.includes("R2"));
     assert.ok(result.prompt.includes("CAMERA LOCK"));
     assert.ok(result.prompt.includes("WORLD COHERENCE"));
     assert.ok(result.prompt.includes("subject-only transformation"));
+    assert.ok(result.prompt.includes("@0.35,0.20,0.30,0.65"));
+  });
+
+  it("emits preserve contracts for unchanged regions", () => {
+    const context = buildV3ContextFromV2({
+      context: v2Context(),
+      timePosition: time(0.01),
+      exactTarget: target(0.01),
+    });
+    const result = compilePromptV3({ context, timePosition: time(0.01), aspectRatio: "3:4" });
+    for (const id of context.targetPlan.unchangedRegionIds) {
+      assert.ok(result.prompt.includes(id));
+    }
+    assert.ok(result.prompt.includes("PRESERVE"));
   });
 
   it("retains all sixteen region IDs under extreme scene complexity", () => {
@@ -171,6 +190,7 @@ describe("PromptCompiler V3", () => {
     for (const region of context.sceneGraph.regions) {
       assert.ok(result.prompt.includes(region.id), `missing ${region.id}`);
     }
+    assert.ok(result.prompt.includes("PROHIBITED"));
   });
 
   it("sanitizes control characters and boundary-like model output", () => {
