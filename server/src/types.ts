@@ -27,6 +27,8 @@ export interface TimePositionPayload {
   offsetDays: number;
   offsetYears: number;
   compactLabel: string;
+  /** Optional capture/source date. When absent, offsetDays remains authoritative. */
+  sourceDateISO?: string;
 }
 
 /** Program-authoritative target time. */
@@ -169,7 +171,11 @@ export type RegionTemporalAction =
   | "remove"
   | "add_related";
 
-export type ChangeMagnitude = "subtle" | "moderate" | "major" | "transformative";
+export type ChangeMagnitude =
+  | "subtle"
+  | "moderate"
+  | "major"
+  | "transformative";
 
 export interface RegionTemporalChange {
   regionId: string;
@@ -259,6 +265,12 @@ export interface QualityPolicy {
   };
 }
 
+export interface QualityPolicyOverride {
+  visualCriticEnabled?: boolean;
+  maxRegenerations?: 0 | 1;
+  thresholds?: Partial<QualityPolicy["thresholds"]>;
+}
+
 // ---------------------------------------------------------------------------
 // Request contracts
 // ---------------------------------------------------------------------------
@@ -317,9 +329,7 @@ export interface GenerationContextV3 {
   targetPlan: TemporalRenderPlan;
   temporalStory?: TemporalStoryPayloadV2;
   generationMode: GenerationMode;
-  qualityPolicy?: Partial<QualityPolicy> & {
-    thresholds?: Partial<QualityPolicy["thresholds"]>;
-  };
+  qualityPolicy?: QualityPolicyOverride;
 }
 
 export interface TemporalStoryPayloadV2 {
@@ -390,7 +400,9 @@ export interface MiniMaxGenerateFailure {
   httpStatus?: number;
 }
 
-export type MiniMaxGenerateResult = MiniMaxGenerateSuccess | MiniMaxGenerateFailure;
+export type MiniMaxGenerateResult =
+  | MiniMaxGenerateSuccess
+  | MiniMaxGenerateFailure;
 
 export interface MiniMaxAdapter {
   generate(input: MiniMaxGenerateInput): Promise<MiniMaxGenerateResult>;
