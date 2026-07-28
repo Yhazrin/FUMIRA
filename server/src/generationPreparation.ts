@@ -17,6 +17,7 @@ import type {
   StructuredGenerationBodyV3,
   SubjectContinuityMode,
   TemporalRenderPlan,
+  TimePositionPayload,
 } from "./types.js";
 
 const MAX_PREPARED_CONTEXTS = 128;
@@ -59,10 +60,7 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     putBounded(sceneGraphCache, v2.sourceAssetId, sceneGraph);
   }
 
-  const exactTarget = exactTargetFromTime(
-    v2.timePosition.offsetDays,
-    v2.timePosition.compactLabel
-  );
+  const exactTarget = exactTargetFromTime(v2.timePosition);
   const storyContext: StoryContinuityContext = {
     title: v2.structuredContext.story.title,
     presentTruth: v2.structuredContext.story.presentTruth,
@@ -90,8 +88,6 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
       requestId: `${v2.requestId}-render-plan`,
     });
     if (!planned.ok) {
-      // Direct V2 queueing still performs a deterministic V3 conversion, so a
-      // planner outage never restores the old flat visualPrompt behavior.
       return createGenerationJob(body);
     }
     targetPlan = planned.value;
@@ -145,8 +141,7 @@ function planCacheKey(
   return createHash("sha256")
     .update(JSON.stringify({
       sourceAssetId,
-      offsetDays: target.offsetDays,
-      compactLabel: target.compactLabel,
+      target,
       story,
       graph,
     }))
@@ -164,12 +159,21 @@ function putBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
   }
 }
 
-function exactTargetFromTime(offsetDays: number, compactLabel: string): ExactTarget {
-  const now = new Date();
-  const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
+function exactTargetFromTime(timePosition: TimePositionPayload): ExactTarget {
+  const sourceDate = parseISODate(timePosition.sourceDateISO) ?? new Date();
+  const targetDate = new Date(
+    sourceDate.getTime() + timePosition.offsetDays * 86_400_000
+  );
   return {
-    offsetDays,
+    offsetDays: timePosition.offsetDays,
     targetDateISO: targetDate.toISOString().slice(0, 10),
-    compactLabel: compactLabel || `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
+    compactLabel: timePosition.compactLabel
+      || `${Math.abs(timePosition.offsetDays).toFixed(0)} 天${timePosition.offsetDays < 0 ? "前" : "后"}`,
   };
+}
+
+function parseISODate(value: string | undefined): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) ? date : undefined;
 }
