@@ -26,7 +26,9 @@ import {
 
 let adapter: MiniMaxIntelligenceAdapter | null = null;
 
-export function setMiniMaxIntelligenceAdapter(next: MiniMaxIntelligenceAdapter | null): void {
+export function setMiniMaxIntelligenceAdapter(
+  next: MiniMaxIntelligenceAdapter | null
+): void {
   adapter = next;
 }
 
@@ -39,10 +41,13 @@ export async function analyzeUploadedAsset(input: {
   copyConstraints: UnderstandingCopyConstraints;
   requestId: string;
 }) {
-  if (!adapter) return unavailable("understanding_unavailable", "图片理解暂未就绪。");
+  const currentAdapter = adapter;
+  if (!currentAdapter) {
+    return unavailable("understanding_unavailable", "图片理解暂未就绪。");
+  }
   const asset = await sourceAsset(input.sourceAssetId);
   if (!asset.ok) return asset;
-  const result = await adapter.analyzeImage({
+  const result = await currentAdapter.analyzeImage({
     imageDataUrl: toJpegDataUrl(asset.bytes, asset.contentType),
     copyConstraints: input.copyConstraints,
     requestId: input.requestId,
@@ -59,21 +64,33 @@ export async function analyzeUploadedSceneGraph(input: {
   requestId: string;
 }): Promise<
   | { ok: true; value: SceneGraph; derivedFromV2: boolean }
-  | { ok: false; errorCode: string; userMessage: string; retryable: boolean; statusMsg?: string }
+  | {
+      ok: false;
+      errorCode: string;
+      userMessage: string;
+      retryable: boolean;
+      statusMsg?: string;
+    }
 > {
-  if (!adapter) return unavailable("scene_graph_unavailable", "场景图分析暂未就绪。");
+  const currentAdapter = adapter;
+  if (!currentAdapter) {
+    return unavailable("scene_graph_unavailable", "场景图分析暂未就绪。");
+  }
   const asset = await sourceAsset(input.sourceAssetId);
   if (!asset.ok) return asset;
   const imageDataUrl = toJpegDataUrl(asset.bytes, asset.contentType);
+  const graphAnalyzer = currentAdapter.analyzeSceneGraph?.bind(currentAdapter);
 
-  if (adapter.analyzeSceneGraph) {
-    const result = await adapter.analyzeSceneGraph({
+  if (graphAnalyzer) {
+    const result = await graphAnalyzer({
       imageDataUrl,
       requestId: input.requestId,
     });
     if (result.ok) {
       const issues = validateSceneGraph(result.value);
-      if (!issues.length) return { ok: true, value: result.value, derivedFromV2: false };
+      if (!issues.length) {
+        return { ok: true, value: result.value, derivedFromV2: false };
+      }
       console.info(JSON.stringify({
         event: "scene_graph_invalid",
         requestId: input.requestId,
@@ -82,9 +99,7 @@ export async function analyzeUploadedSceneGraph(input: {
     }
   }
 
-  // Compatibility fallback: use the mature V2 analyzer and deterministically
-  // expand its concise output into a conservative SceneGraph.
-  const v2 = await adapter.analyzeImage({
+  const v2 = await currentAdapter.analyzeImage({
     imageDataUrl,
     copyConstraints: {
       summary: 160,
@@ -113,18 +128,34 @@ export async function planTemporalRender(input: {
   requestId: string;
 }): Promise<
   | { ok: true; value: TemporalRenderPlan; deterministicFallback: boolean }
-  | { ok: false; errorCode: string; userMessage: string; retryable: boolean; statusMsg?: string }
+  | {
+      ok: false;
+      errorCode: string;
+      userMessage: string;
+      retryable: boolean;
+      statusMsg?: string;
+    }
 > {
   const graphIssues = validateSceneGraph(input.sceneGraph);
   if (graphIssues.length) {
-    return invalidAIResponse(`场景图不完整：${graphIssues.slice(0, 4).join(", ")}`);
+    return invalidAIResponse(
+      `场景图不完整：${graphIssues.slice(0, 4).join(", ")}`
+    );
   }
 
-  if (adapter?.planTemporalRender) {
-    const result = await adapter.planTemporalRender(input);
+  const currentAdapter = adapter;
+  const planner = currentAdapter?.planTemporalRender?.bind(currentAdapter);
+  if (planner) {
+    const result = await planner(input);
     if (result.ok) {
       const issues = validateTemporalRenderPlan(input.sceneGraph, result.value);
-      if (!issues.length) return { ok: true, value: result.value, deterministicFallback: false };
+      if (!issues.length) {
+        return {
+          ok: true,
+          value: result.value,
+          deterministicFallback: false,
+        };
+      }
       console.info(JSON.stringify({
         event: "render_plan_invalid",
         requestId: input.requestId,
@@ -133,12 +164,11 @@ export async function planTemporalRender(input: {
     }
   }
 
-  // Deterministic fallback keeps the endpoint executable during provider
-  // degradation and gives V2 clients a complete region-by-region contract.
   const visualPrompt = input.storyContext?.canonicalBeats
     .map((beat) => beat.visualPrompt)
     .filter(Boolean)
-    .join("；") || "让时间变化传播到主体、材料、环境、基础设施和背景，同时保持相机几何";
+    .join("；")
+    || "让时间变化传播到主体、材料、环境、基础设施和背景，同时保持相机几何";
   const fallback = deriveRenderPlanFromV2({
     sceneGraph: input.sceneGraph,
     exactTarget: input.exactTarget,
@@ -163,7 +193,9 @@ export async function planTemporalRender(input: {
       },
     },
   });
-  if (input.continuityMode) fallback.subjectContinuityMode = input.continuityMode;
+  if (input.continuityMode) {
+    fallback.subjectContinuityMode = input.continuityMode;
+  }
   return { ok: true, value: fallback, deterministicFallback: true };
 }
 
@@ -175,9 +207,16 @@ export async function critiqueGeneratedImage(input: {
   qualityPolicy: QualityPolicy;
   requestId: string;
 }): Promise<VisualCriticResult | null> {
-  if (!adapter?.analyzeSceneGraph || !adapter.critiqueGeneration) return null;
-  const generatedGraph = await adapter.analyzeSceneGraph({
-    imageDataUrl: toJpegDataUrl(input.generatedBytes, input.generatedContentType),
+  const currentAdapter = adapter;
+  const graphAnalyzer = currentAdapter?.analyzeSceneGraph?.bind(currentAdapter);
+  const critic = currentAdapter?.critiqueGeneration?.bind(currentAdapter);
+  if (!graphAnalyzer || !critic) return null;
+
+  const generatedGraph = await graphAnalyzer({
+    imageDataUrl: toJpegDataUrl(
+      input.generatedBytes,
+      input.generatedContentType
+    ),
     requestId: `${input.requestId}-generated-graph`,
   });
   if (!generatedGraph.ok) {
@@ -188,7 +227,8 @@ export async function critiqueGeneratedImage(input: {
     }));
     return null;
   }
-  const result = await adapter.critiqueGeneration({
+
+  const result = await critic({
     sourceSceneGraph: input.sourceSceneGraph,
     generatedSceneGraph: generatedGraph.value,
     targetPlan: input.targetPlan,
@@ -213,18 +253,30 @@ export async function writeTemporalStory(input: {
   requestId: string;
 }): Promise<
   | { ok: true; value: TemporalStoryPayloadV2 }
-  | { ok: false; errorCode: string; userMessage: string; retryable: boolean; statusMsg?: string }
+  | {
+      ok: false;
+      errorCode: string;
+      userMessage: string;
+      retryable: boolean;
+      statusMsg?: string;
+    }
 > {
-  if (!adapter) return unavailable("story_unavailable", "时间故事暂未就绪。");
-  const result = await adapter.writeStory(input);
+  const currentAdapter = adapter;
+  if (!currentAdapter) {
+    return unavailable("story_unavailable", "时间故事暂未就绪。");
+  }
+  const result = await currentAdapter.writeStory(input);
   if (!result.ok) return result;
   if (!result.value.targetBeat) {
     return invalidAIResponse("时间故事缺少精确目标节点，请重试。");
   }
-  const targetOffsetYears = input.targetTime.offsetDays / 365.25;
   return {
     ok: true,
-    value: promoteToV2(result.value, targetOffsetYears, input.copyConstraints),
+    value: promoteToV2(
+      result.value,
+      input.targetTime.offsetDays / 365.25,
+      input.copyConstraints
+    ),
   };
 }
 
@@ -235,9 +287,18 @@ export async function writeTargetBeat(input: {
   requestId: string;
 }): Promise<
   | { ok: true; targetBeat: StoryBeatPayload }
-  | { ok: false; errorCode: string; userMessage: string; retryable: boolean; statusMsg?: string }
+  | {
+      ok: false;
+      errorCode: string;
+      userMessage: string;
+      retryable: boolean;
+      statusMsg?: string;
+    }
 > {
-  if (!adapter) return unavailable("story_unavailable", "时间故事暂未就绪。");
+  const currentAdapter = adapter;
+  if (!currentAdapter) {
+    return unavailable("story_unavailable", "时间故事暂未就绪。");
+  }
   const targetOffsetYears = input.target.offsetDays / 365.25;
   const constraints: StoryCopyConstraints = {
     title: 16,
@@ -248,7 +309,7 @@ export async function writeTargetBeat(input: {
     beatNarrative: 72,
     visualPrompt: 110,
   };
-  const result = await adapter.writeStory({
+  const result = await currentAdapter.writeStory({
     understanding: input.understanding,
     targetTime: input.target,
     copyConstraints: constraints,
@@ -257,11 +318,15 @@ export async function writeTargetBeat(input: {
     exactTargetOnly: true,
   });
   if (!result.ok) return result;
-  if (!result.value.targetBeat) return invalidAIResponse("精确年份节点生成失败，请重试。");
+  if (!result.value.targetBeat) {
+    return invalidAIResponse("精确年份节点生成失败，请重试。");
+  }
 
   const normalized = normalizeTemporalStoryCopy(result.value, constraints);
   const modelBeat = normalized.targetBeat;
-  if (!modelBeat) return invalidAIResponse("精确年份节点生成失败，请重试。");
+  if (!modelBeat) {
+    return invalidAIResponse("精确年份节点生成失败，请重试。");
+  }
   return {
     ok: true,
     targetBeat: {
@@ -276,13 +341,20 @@ export async function writeTargetBeat(input: {
 
 async function sourceAsset(sourceAssetId: string): Promise<
   | { ok: true; bytes: Buffer; contentType: string }
-  | { ok: false; errorCode: string; userMessage: string; retryable: boolean }
+  | {
+      ok: false;
+      errorCode: string;
+      userMessage: string;
+      retryable: boolean;
+    }
 > {
   if (!sourceAssetId || !getAsset(sourceAssetId)) {
     return unavailable("invalid_source_asset", "源图片不存在或已过期。", false);
   }
   const asset = await readAssetBytes(sourceAssetId);
-  if (!asset) return unavailable("invalid_image", "源图片无法读取。", false);
+  if (!asset) {
+    return unavailable("invalid_image", "源图片无法读取。", false);
+  }
   return { ok: true, ...asset };
 }
 
@@ -295,6 +367,10 @@ function invalidAIResponse(userMessage: string) {
   };
 }
 
-function unavailable(errorCode: string, userMessage: string, retryable = true) {
+function unavailable(
+  errorCode: string,
+  userMessage: string,
+  retryable = true
+) {
   return { ok: false as const, errorCode, userMessage, retryable };
 }
