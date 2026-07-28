@@ -83,7 +83,12 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
 
   app.post<{ Body: {
     sceneGraph?: SceneGraph;
-    target?: { offsetDays?: number; targetDateISO?: string; compactLabel?: string };
+    target?: {
+      offsetDays?: number;
+      targetDateISO?: string;
+      compactLabel?: string;
+      sourceDateISO?: string;
+    };
     storyContext?: Partial<StoryContinuityContext>;
     continuityMode?: SubjectContinuityMode;
     requestId?: string;
@@ -120,21 +125,33 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
 
   app.post<{ Body: {
     understanding?: SceneUnderstandingPayload;
-    targetTime?: { offsetYears?: number; offsetDays?: number; compactLabel?: string };
+    targetTime?: {
+      offsetYears?: number;
+      offsetDays?: number;
+      compactLabel?: string;
+      sourceDateISO?: string;
+    };
     copyConstraints?: Partial<StoryCopyConstraints>;
     requestId?: string;
   } }>(
     "/v1/stories",
     async (request, reply) => {
       const body = request.body;
-      if (!body?.understanding || !body.requestId?.trim() || !Number.isFinite(body.targetTime?.offsetYears) || !body.targetTime?.compactLabel?.trim()) {
+      if (
+        !body?.understanding
+        || !body.requestId?.trim()
+        || !Number.isFinite(body.targetTime?.offsetYears)
+        || !body.targetTime?.compactLabel?.trim()
+      ) {
         return reply.code(400).send(error("invalid_body", "缺少图片理解、目标年份或 requestId。", false));
       }
       const copyConstraints = resolveStoryCopyConstraints(body.copyConstraints);
-      const offsetDays = body.targetTime.offsetDays ?? (body.targetTime.offsetYears as number) * 365.25;
+      const offsetDays = body.targetTime.offsetDays
+        ?? (body.targetTime.offsetYears as number) * 365.25;
       const exactTarget = resolveExactTarget({
         offsetDays,
         compactLabel: body.targetTime.compactLabel,
+        sourceDateISO: body.targetTime.sourceDateISO,
       });
       const result = await writeTemporalStory({
         understanding: body.understanding,
@@ -157,7 +174,12 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
   app.post<{ Body: {
     understanding?: SceneUnderstandingPayload;
     storyContext?: Partial<StoryContinuityContext>;
-    target?: { offsetDays?: number; targetDateISO?: string; compactLabel?: string };
+    target?: {
+      offsetDays?: number;
+      targetDateISO?: string;
+      compactLabel?: string;
+      sourceDateISO?: string;
+    };
     requestId?: string;
   } }>(
     "/v1/target-beats",
@@ -190,15 +212,26 @@ function resolveExactTarget(target: {
   offsetDays?: number;
   targetDateISO?: string;
   compactLabel?: string;
+  sourceDateISO?: string;
 }): ExactTarget {
   const offsetDays = target.offsetDays as number;
-  const now = new Date();
-  const date = new Date(now.getTime() + offsetDays * 86_400_000);
+  const explicitTarget = parseISODate(target.targetDateISO);
+  const sourceDate = parseISODate(target.sourceDateISO) ?? new Date();
+  const calculated = new Date(sourceDate.getTime() + offsetDays * 86_400_000);
   return {
     offsetDays,
-    targetDateISO: target.targetDateISO?.trim() || date.toISOString().slice(0, 10),
-    compactLabel: target.compactLabel?.trim() || `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
+    targetDateISO: explicitTarget
+      ? explicitTarget.toISOString().slice(0, 10)
+      : calculated.toISOString().slice(0, 10),
+    compactLabel: target.compactLabel?.trim()
+      || `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
   };
+}
+
+function parseISODate(value: string | undefined): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) ? date : undefined;
 }
 
 function normalizeStoryContext(
@@ -208,7 +241,9 @@ function normalizeStoryContext(
   return {
     title: input.title ?? "",
     presentTruth: input.presentTruth ?? "",
-    identityRules: Array.isArray(input.identityRules) ? input.identityRules.filter((item): item is string => typeof item === "string") : [],
+    identityRules: Array.isArray(input.identityRules)
+      ? input.identityRules.filter((item): item is string => typeof item === "string")
+      : [],
     canonicalBeats: Array.isArray(input.canonicalBeats)
       ? input.canonicalBeats.map((beat) => ({
           anchorYears: Number.isFinite(beat?.anchorYears) ? beat.anchorYears as number : 0,
@@ -229,13 +264,17 @@ function error(errorCode: string, userMessage: string, retryable: boolean) {
 }
 
 function statusFor(errorCode: string): number {
-  if (errorCode === "invalid_source_asset" || errorCode === "invalid_image" || errorCode === "invalid_ai_response") return 400;
   if (
-    errorCode === "understanding_unavailable" ||
-    errorCode === "scene_graph_unavailable" ||
-    errorCode === "temporal_planner_unavailable" ||
-    errorCode === "story_unavailable" ||
-    errorCode === "vision_credentials_required"
+    errorCode === "invalid_source_asset"
+    || errorCode === "invalid_image"
+    || errorCode === "invalid_ai_response"
+  ) return 400;
+  if (
+    errorCode === "understanding_unavailable"
+    || errorCode === "scene_graph_unavailable"
+    || errorCode === "temporal_planner_unavailable"
+    || errorCode === "story_unavailable"
+    || errorCode === "vision_credentials_required"
   ) return 503;
   return 502;
 }
