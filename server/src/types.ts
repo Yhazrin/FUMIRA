@@ -29,22 +29,244 @@ export interface TimePositionPayload {
   compactLabel: string;
 }
 
-/**
- * Precise target time — authoritative values set by the program, not the LLM.
- * `offsetYears` is for narrative/display only; `offsetDays` + `targetDateISO`
- * are the canonical identifiers for equality and dedup.
- */
+/** Program-authoritative target time. */
 export interface ExactTarget {
   offsetDays: number;
   targetDateISO: string;
   compactLabel: string;
 }
 
+export type GenerationMode =
+  | "captured_target"
+  | "story_preview_target"
+  | "regenerate_same_target";
+
 // ---------------------------------------------------------------------------
-// CreateGenerationBody — discriminated union (Task 4 & 6)
+// V3 machine-facing world representation
 // ---------------------------------------------------------------------------
 
-export type CreateGenerationBody = LegacyGenerationBody | StructuredGenerationBody;
+export type ScreenZone =
+  | "top_left"
+  | "top_center"
+  | "top_right"
+  | "middle_left"
+  | "center"
+  | "middle_right"
+  | "bottom_left"
+  | "bottom_center"
+  | "bottom_right";
+
+export type SceneDepth = "foreground" | "midground" | "background" | "sky";
+
+export type SceneCategory =
+  | "person"
+  | "animal"
+  | "vehicle"
+  | "vegetation"
+  | "architecture"
+  | "infrastructure"
+  | "surface"
+  | "signage"
+  | "furniture"
+  | "landscape"
+  | "atmosphere"
+  | "other";
+
+export type RegionPersistence =
+  | "persistent_identity"
+  | "persistent_geometry"
+  | "replaceable"
+  | "transient"
+  | "unknown";
+
+export type TemporalPolicy =
+  | "lock"
+  | "age_in_place"
+  | "grow"
+  | "renovate"
+  | "replace_by_era"
+  | "may_disappear"
+  | "free_evolution";
+
+export interface NormalizedBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SceneRegion {
+  id: string;
+  screenZone: ScreenZone;
+  boundingBox?: NormalizedBox;
+  depth: SceneDepth;
+  category: SceneCategory;
+  sourceState: {
+    description: string;
+    materials: string[];
+    condition: string;
+    identityFeatures: string[];
+  };
+  persistence: RegionPersistence;
+  temporalPolicy: TemporalPolicy;
+  confidence: number;
+  salience: number;
+}
+
+export interface TemporalDriver {
+  id: string;
+  process: string;
+  affectedRegionIds: string[];
+  confidence: number;
+}
+
+export interface SceneGraph {
+  schemaVersion: "scene-graph.v1";
+  baseline: {
+    locationType: string;
+    probableEra?: string;
+    season?: string;
+    timeOfDay?: string;
+    weather?: string;
+    culturalContext?: string;
+  };
+  camera: {
+    viewpoint: string;
+    framing: string;
+    horizon: string;
+    perspective: string;
+    vanishingPoints: string[];
+    depthLayout: string;
+  };
+  regions: SceneRegion[];
+  globalDrivers: TemporalDriver[];
+  uncertainties: string[];
+}
+
+export type TimeHorizonBand =
+  | "hours_days"
+  | "months"
+  | "years"
+  | "decades"
+  | "centuries"
+  | "millennia"
+  | "deep_time";
+
+export type SubjectContinuityMode =
+  | "identity_persists"
+  | "age_progression"
+  | "lineage_or_successor"
+  | "object_remains"
+  | "site_only"
+  | "time_traveler";
+
+export type RegionTemporalAction =
+  | "preserve"
+  | "age"
+  | "grow"
+  | "renovate"
+  | "replace"
+  | "remove"
+  | "add_related";
+
+export type ChangeMagnitude = "subtle" | "moderate" | "major" | "transformative";
+
+export interface RegionTemporalChange {
+  regionId: string;
+  action: RegionTemporalAction;
+  magnitude: ChangeMagnitude;
+  targetState: string;
+  causalReason: string;
+  visibleEvidence: string[];
+}
+
+export interface EraAddition {
+  id: string;
+  screenZone: ScreenZone;
+  depth: SceneDepth;
+  category: SceneCategory;
+  description: string;
+  causalReason: string;
+}
+
+export interface RegionRemoval {
+  regionId: string;
+  causalReason: string;
+  replacementState?: string;
+}
+
+export interface CrossRegionCoupling {
+  regionIds: string[];
+  rule: string;
+}
+
+export interface TemporalRenderPlan {
+  schemaVersion: "temporal-render-plan.v1";
+  planId: string;
+  exactTarget: ExactTarget;
+  horizonBand: TimeHorizonBand;
+  globalWorldState: {
+    eraSummary: string;
+    environmentalState: string;
+    technologyState: string;
+    humanActivityState: string;
+  };
+  regionChanges: RegionTemporalChange[];
+  additions: EraAddition[];
+  removals: RegionRemoval[];
+  crossRegionCouplings: CrossRegionCoupling[];
+  unchangedRegionIds: string[];
+  subjectContinuityMode: SubjectContinuityMode;
+  prohibitedDrift: string[];
+  coverage: {
+    evaluatedRegionIds: string[];
+    changedRegionIds: string[];
+    unchangedRegionIds: string[];
+    changedDomains: SceneCategory[];
+    foreground: boolean;
+    midground: boolean;
+    background: boolean;
+    principalSubject: boolean;
+    builtEnvironment: boolean;
+    naturalEnvironment: boolean;
+    technologyInfrastructure: boolean;
+  };
+}
+
+export interface VisualCriticResult {
+  schemaVersion: "visual-critic.v1";
+  passed: boolean;
+  cameraConsistency: number;
+  spatialTopologyConsistency: number;
+  principalIdentityConsistency: number;
+  requiredChangeCompletion: number;
+  environmentEvolution: number;
+  eraCoherence: number;
+  missedRegionChanges: string[];
+  unexplainedChanges: string[];
+  cameraDrift: string[];
+  correctionInstruction: string;
+}
+
+export interface QualityPolicy {
+  visualCriticEnabled: boolean;
+  maxRegenerations: 0 | 1;
+  thresholds: {
+    cameraConsistency: number;
+    requiredChangeCompletion: number;
+    environmentEvolution: number;
+    eraCoherence: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Request contracts
+// ---------------------------------------------------------------------------
+
+export type CreateGenerationBody =
+  | LegacyGenerationBody
+  | StructuredGenerationBodyV2
+  | StructuredGenerationBodyV3;
 
 export interface LegacyGenerationBody {
   contextVersion: "legacy.v1";
@@ -57,7 +279,7 @@ export interface LegacyGenerationBody {
   useSubjectReference?: boolean;
 }
 
-export interface StructuredGenerationBody {
+export interface StructuredGenerationBodyV2 {
   contextVersion: "generation.v2";
   sourceAssetId: string;
   timePosition: TimePositionPayload;
@@ -68,10 +290,20 @@ export interface StructuredGenerationBody {
   useSubjectReference?: boolean;
 }
 
-/**
- * Structured pipeline data the iOS client sends instead of a pre-built prompt.
- * The server's PromptCompiler owns the final provider prompt.
- */
+/** Backward-compatible alias used by older server modules. */
+export type StructuredGenerationBody = StructuredGenerationBodyV2;
+
+export interface StructuredGenerationBodyV3 {
+  contextVersion: "generation.v3";
+  sourceAssetId: string;
+  timePosition: TimePositionPayload;
+  story?: never;
+  structuredContext: GenerationContextV3;
+  aspectRatio?: AspectRatio;
+  requestId: string;
+  useSubjectReference?: boolean;
+}
+
 export interface GenerationContext {
   schemaVersion: "generation-context.v2";
   understanding: SceneUnderstandingPayload;
@@ -79,16 +311,17 @@ export interface GenerationContext {
   generationMode: GenerationMode;
 }
 
-export type GenerationMode =
-  | "captured_target"
-  | "story_preview_target"
-  | "regenerate_same_target";
+export interface GenerationContextV3 {
+  schemaVersion: "generation-context.v3";
+  sceneGraph: SceneGraph;
+  targetPlan: TemporalRenderPlan;
+  temporalStory?: TemporalStoryPayloadV2;
+  generationMode: GenerationMode;
+  qualityPolicy?: Partial<QualityPolicy> & {
+    thresholds?: Partial<QualityPolicy["thresholds"]>;
+  };
+}
 
-/**
- * V2 story payload — `targetBeat` is REQUIRED.
- * If the model omits it, the server must reject the payload rather than
- * silently falling back to the nearest canonical beat.
- */
 export interface TemporalStoryPayloadV2 {
   schemaVersion: "temporal-story.v2";
   title: string;
@@ -113,19 +346,17 @@ export interface GenerationRecord {
   aspectRatio: AspectRatio;
   promptTruncated: boolean;
   promptCharCount: number;
-  /** Prompt compiler version (e.g. "v2"). Absent for legacy flat prompts. */
   promptVersion?: string;
-  /** SHA-256 hex of the compiled prompt for dedup / debugging. */
   promptHash?: string;
-  /** Per-section character counts from the compiler. */
   sectionCharCounts?: Record<string, number>;
-  /** Which sections were compressed or deleted. */
   truncatedSections?: string[];
+  renderPlanId?: string;
+  visualCritic?: VisualCriticResult;
+  regenerationCount?: number;
   resultRelativeUrl?: string;
   errorCode?: string;
   userMessage?: string;
   retryable?: boolean;
-  /** Admin-only diagnostic; never returned to the app client. */
   statusMsg?: string;
 }
 
@@ -159,13 +390,15 @@ export interface MiniMaxGenerateFailure {
   httpStatus?: number;
 }
 
-export type MiniMaxGenerateResult =
-  | MiniMaxGenerateSuccess
-  | MiniMaxGenerateFailure;
+export type MiniMaxGenerateResult = MiniMaxGenerateSuccess | MiniMaxGenerateFailure;
 
 export interface MiniMaxAdapter {
   generate(input: MiniMaxGenerateInput): Promise<MiniMaxGenerateResult>;
 }
+
+// ---------------------------------------------------------------------------
+// V2 client-facing intelligence payloads
+// ---------------------------------------------------------------------------
 
 export interface SceneUnderstandingPayload {
   summary: string;
@@ -180,7 +413,6 @@ export interface SceneUnderstandingPayload {
   }>;
 }
 
-/** Character budgets for image-analysis copy rendered by the client. */
 export interface UnderstandingCopyConstraints {
   summary: number;
   locationType: number;
@@ -196,32 +428,24 @@ export interface StoryBeatPayload {
   title: string;
   narrative: string;
   visualPrompt: string;
-  /** Program-generated exact target identity — present only on precise target beats. */
   exactTarget?: ExactTarget;
 }
 
-/** Response from POST /v1/target-beats */
 export interface TargetBeatResponse {
   schemaVersion: "target-beat.v1";
   target: ExactTarget;
   targetBeat: StoryBeatPayload;
 }
 
-/**
- * V1 story payload — `targetBeat` is optional (for legacy/mock adapters).
- * The intelligence adapter should produce TemporalStoryPayloadV2 when possible.
- */
 export interface TemporalStoryPayload {
   title: string;
   logline: string;
   presentTruth: string;
   identityRules: string[];
   beats: StoryBeatPayload[];
-  /** Exact beat matching the user's chosen year — never the nearest canonical node. */
   targetBeat?: StoryBeatPayload;
 }
 
-/** Character budgets requested by the current client layout. */
 export interface StoryCopyConstraints {
   title: number;
   logline: number;
@@ -230,6 +454,18 @@ export interface StoryCopyConstraints {
   beatTitle: number;
   beatNarrative: number;
   visualPrompt: number;
+}
+
+export interface StoryContinuityContext {
+  title: string;
+  presentTruth: string;
+  identityRules: string[];
+  canonicalBeats: Array<{
+    anchorYears: number;
+    title: string;
+    narrative: string;
+    visualPrompt: string;
+  }>;
 }
 
 export interface MiniMaxIntelligenceFailure {
@@ -250,10 +486,34 @@ export interface MiniMaxIntelligenceAdapter {
     copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>>;
+
   writeStory(input: {
     understanding: SceneUnderstandingPayload;
     targetTime: ExactTarget;
     copyConstraints: StoryCopyConstraints;
     requestId: string;
+    storyContext?: StoryContinuityContext;
+    exactTargetOnly?: boolean;
   }): Promise<MiniMaxIntelligenceResult<TemporalStoryPayload>>;
+
+  analyzeSceneGraph?(input: {
+    imageDataUrl: string;
+    requestId: string;
+  }): Promise<MiniMaxIntelligenceResult<SceneGraph>>;
+
+  planTemporalRender?(input: {
+    sceneGraph: SceneGraph;
+    exactTarget: ExactTarget;
+    storyContext?: StoryContinuityContext;
+    continuityMode?: SubjectContinuityMode;
+    requestId: string;
+  }): Promise<MiniMaxIntelligenceResult<TemporalRenderPlan>>;
+
+  critiqueGeneration?(input: {
+    sourceSceneGraph: SceneGraph;
+    generatedSceneGraph: SceneGraph;
+    targetPlan: TemporalRenderPlan;
+    qualityPolicy: QualityPolicy;
+    requestId: string;
+  }): Promise<MiniMaxIntelligenceResult<VisualCriticResult>>;
 }
