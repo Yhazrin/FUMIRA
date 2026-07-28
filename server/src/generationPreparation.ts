@@ -1,6 +1,12 @@
-import { planTemporalRender } from "./intelligence.js";
+import {
+  analyzeUploadedSceneGraph,
+  planTemporalRender,
+} from "./intelligence.js";
 import { createGenerationJob } from "./queue.js";
-import { defaultQualityPolicy, deriveSceneGraphFromV2 } from "./temporalV3.js";
+import {
+  defaultQualityPolicy,
+  deriveSceneGraphFromV2,
+} from "./temporalV3.js";
 import type {
   CreateGenerationBody,
   ExactTarget,
@@ -10,10 +16,9 @@ import type {
 } from "./types.js";
 
 /**
- * Upgrade current iOS generation.v2 requests before queueing. The client keeps
- * its stable contract, while the server obtains a full SceneGraph and an exact
- * machine-facing TemporalRenderPlan from the V3 planner. Direct queue callers
- * still retain the deterministic compatibility fallback.
+ * Upgrade current iOS generation.v2 requests before queueing. Existing clients
+ * keep their stable contract, while the server performs full source-image scene
+ * decomposition and exact temporal planning before image generation.
  */
 export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) {
   if (body.contextVersion !== "generation.v2") {
@@ -30,7 +35,14 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     return createGenerationJob(body);
   }
 
-  const sceneGraph = deriveSceneGraphFromV2(v2.structuredContext.understanding);
+  const graphResult = await analyzeUploadedSceneGraph({
+    sourceAssetId: v2.sourceAssetId,
+    requestId: `${v2.requestId}-source-scene`,
+  });
+  const sceneGraph = graphResult.ok
+    ? graphResult.value
+    : deriveSceneGraphFromV2(v2.structuredContext.understanding);
+
   const exactTarget = exactTargetFromTime(
     v2.timePosition.offsetDays,
     v2.timePosition.compactLabel
@@ -54,7 +66,8 @@ export async function prepareAndCreateGenerationJob(body: CreateGenerationBody) 
     requestId: `${v2.requestId}-render-plan`,
   });
   if (!planned.ok) {
-    // The queue's deterministic V2 converter remains a safe degradation path.
+    // Direct V2 queueing still performs a deterministic V3 conversion, so a
+    // planner outage never restores the old flat visualPrompt behavior.
     return createGenerationJob(body);
   }
 
