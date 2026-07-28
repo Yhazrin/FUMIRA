@@ -50,6 +50,7 @@ export function normalizeTemporalStoryCopy(
       title: limit(beat.title, constraints.beatTitle),
       narrative: limit(beat.narrative, constraints.beatNarrative),
       visualPrompt: limit(beat.visualPrompt, constraints.visualPrompt),
+      ...(beat.exactTarget ? { exactTarget: beat.exactTarget } : {}),
     })),
   };
 
@@ -59,6 +60,9 @@ export function normalizeTemporalStoryCopy(
       title: limit(story.targetBeat.title, constraints.beatTitle),
       narrative: limit(story.targetBeat.narrative, constraints.beatNarrative),
       visualPrompt: limit(story.targetBeat.visualPrompt, constraints.visualPrompt),
+      ...(story.targetBeat.exactTarget
+        ? { exactTarget: story.targetBeat.exactTarget }
+        : {}),
     };
   }
 
@@ -82,18 +86,26 @@ function limit(value: string, maximum: number): string {
 }
 
 /**
- * Promote a V1 TemporalStoryPayload (optional targetBeat) to V2 (required).
- * If targetBeat is missing, uses the nearest canonical beat — but only for
- * the adapter layer. The validation layer should reject this and require
- * the model to produce a real targetBeat.
+ * Promote a validated temporal story into generation.v2.
+ *
+ * V2 requires a model-produced exact target beat. Using a nearby canonical
+ * browsing beat would silently render the wrong year, so this function is
+ * deliberately strict and never fabricates a fallback.
  */
 export function promoteToV2(
   story: TemporalStoryPayload,
   targetOffsetYears: number,
   constraints: StoryCopyConstraints
 ): TemporalStoryPayloadV2 {
-  const targetBeat = story.targetBeat ?? nearestBeat(story.beats, targetOffsetYears);
+  if (!story.targetBeat) {
+    throw new Error("missing_exact_target_beat");
+  }
+
   const normalized = normalizeTemporalStoryCopy(story, constraints);
+  if (!normalized.targetBeat) {
+    throw new Error("missing_exact_target_beat");
+  }
+
   return {
     schemaVersion: "temporal-story.v2",
     title: normalized.title,
@@ -102,24 +114,9 @@ export function promoteToV2(
     identityRules: normalized.identityRules,
     beats: normalized.beats,
     targetBeat: {
-      anchorYears: targetBeat.anchorYears,
-      title: limit(targetBeat.title, constraints.beatTitle),
-      narrative: limit(targetBeat.narrative, constraints.beatNarrative),
-      visualPrompt: limit(targetBeat.visualPrompt, constraints.visualPrompt),
+      ...normalized.targetBeat,
+      // Time identity is program-authoritative even when the model rounds it.
+      anchorYears: targetOffsetYears,
     },
   };
-}
-
-function nearestBeat(
-  beats: TemporalStoryPayload["beats"],
-  offsetYears: number
-) {
-  if (!beats.length) {
-    return { anchorYears: offsetYears, title: "", narrative: "", visualPrompt: "" };
-  }
-  return beats.reduce((best, beat) =>
-    Math.abs(beat.anchorYears - offsetYears) < Math.abs(best.anchorYears - offsetYears)
-      ? beat
-      : best
-  );
 }
