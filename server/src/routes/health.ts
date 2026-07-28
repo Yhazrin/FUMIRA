@@ -7,24 +7,37 @@ import { getSettings } from "../storage.js";
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
   const handler = async () => {
     const settings = getSettings();
-    const hasAdapter = getMiniMaxAdapter() !== null;
-    const generationReady = settings.remoteGenerationEnabled && hasAdapter;
+    const hasGenerationAdapter = getMiniMaxAdapter() !== null;
+    const intelligence = getMiniMaxIntelligenceAdapter();
+    const generationReady = settings.remoteGenerationEnabled && hasGenerationAdapter;
 
     return {
       ok: true,
       service: "fumira-server",
       generation: {
         ready: generationReady,
-        // Coarse mode only — never reveal whether MINIMAX_API_KEY is set.
         mode: !generationReady
           ? "unavailable"
           : config.minimaxMock
             ? "mock"
             : "live",
+        promptCompiler: "v3",
       },
       intelligence: {
-        ready: getMiniMaxIntelligenceAdapter() !== null,
-        provider: getMiniMaxIntelligenceAdapter() !== null ? "minimax" : "unavailable",
+        ready: intelligence !== null,
+        provider: intelligence !== null ? "minimax" : "unavailable",
+        capabilities: {
+          v2Understanding: Boolean(intelligence?.analyzeImage),
+          story: Boolean(intelligence?.writeStory),
+          sceneGraph: Boolean(intelligence?.analyzeSceneGraph),
+          temporalRenderPlan: Boolean(intelligence?.planTemporalRender),
+          visualCritic: Boolean(intelligence?.critiqueGeneration) && config.visualCriticEnabled,
+        },
+      },
+      qualityPolicy: {
+        visualCriticEnabled: config.visualCriticEnabled,
+        maxRegenerations: config.visualCriticMaxRegenerations,
+        thresholds: config.visualCriticThresholds,
       },
       timestamp: new Date().toISOString(),
     };
