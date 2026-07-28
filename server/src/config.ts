@@ -13,15 +13,15 @@ function boolEnv(name: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(raw.toLowerCase());
 }
 
+function numberEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? "8787"),
-  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://127.0.0.1:8787").replace(
-    /\/$/,
-    ""
-  ),
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "http://127.0.0.1:8787").replace(/\/$/, ""),
   minimaxApiKey: process.env.MINIMAX_API_KEY?.trim() ?? "",
-  // Image understanding is a Token Plan MCP capability. Keep its credential
-  // independent from the pay-as-you-go key used for image generation and M2.7.
   minimaxVlmApiKey: process.env.MINIMAX_VLM_API_KEY?.trim() ?? "",
   adminToken: process.env.ADMIN_TOKEN?.trim() ?? "",
   minimaxMock: boolEnv("MINIMAX_MOCK", false),
@@ -49,10 +49,17 @@ export const config = {
   minimaxApiBaseUrl: (process.env.MINIMAX_API_BASE_URL?.trim() || "https://api.minimaxi.com").replace(/\/$/, ""),
   minimaxTextModel: process.env.MINIMAX_TEXT_MODEL?.trim() || "MiniMax-M2.7-highspeed",
   minimaxStoryModel: process.env.MINIMAX_STORY_MODEL?.trim() || "MiniMax-M3",
+  visualCriticEnabled: boolEnv("VISUAL_CRITIC_ENABLED", true),
+  visualCriticMaxRegenerations: Math.max(0, Math.min(1, Math.round(numberEnv("VISUAL_CRITIC_MAX_REGENERATIONS", 1)))) as 0 | 1,
+  visualCriticThresholds: {
+    cameraConsistency: numberEnv("VISUAL_CRITIC_CAMERA_THRESHOLD", 0.78),
+    requiredChangeCompletion: numberEnv("VISUAL_CRITIC_CHANGE_THRESHOLD", 0.72),
+    environmentEvolution: numberEnv("VISUAL_CRITIC_ENVIRONMENT_THRESHOLD", 0.62),
+    eraCoherence: numberEnv("VISUAL_CRITIC_ERA_THRESHOLD", 0.72),
+  },
   /**
    * Optional explicit HTTPS proxy for MiniMax outbound calls.
    * Prefer env HTTPS_PROXY / HTTP_PROXY / MINIMAX_HTTPS_PROXY.
-   * Project local proxy example: http://127.0.0.1:7990
    */
   httpsProxy: process.env.MINIMAX_HTTPS_PROXY?.trim()
     || process.env.HTTPS_PROXY?.trim()
