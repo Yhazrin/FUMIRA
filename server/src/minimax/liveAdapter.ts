@@ -32,8 +32,6 @@ function classifyStatusCode(statusCode: number, statusMsg?: string): {
     };
   }
 
-  // Other 2xxx: rate limit / balance / permission — treat as retryable when
-  // the message suggests throttling; otherwise retryable for transient vendor faults.
   const msg = (statusMsg ?? "").toLowerCase();
   const rateLimited =
     msg.includes("rate") ||
@@ -64,11 +62,10 @@ async function sleep(ms: number): Promise<void> {
 
 /**
  * Real MiniMax image-01 I2I adapter.
- * - model fixed to image-01
- * - response_format fixed to base64
- * - HTTP timeout 240s
- * - Limited exponential backoff (max 2 retries) for retryable vendor errors / network
- * - Never logs Authorization or base64 payloads
+ *
+ * `subject_reference` is treated as a strong identity constraint. The provider
+ * boundary independently disables it for continuity modes where the original
+ * subject must disappear or be replaced, even if an older client requested it.
  */
 export class LiveMiniMaxAdapter implements MiniMaxAdapter {
   constructor(private readonly apiKey: string) {}
@@ -82,37 +79,30 @@ export class LiveMiniMaxAdapter implements MiniMaxAdapter {
       try {
         const result = await this.singleAttempt(input);
         if (result.ok) {
-          console.info(
-            JSON.stringify({
-              event: "minimax_ok",
-              requestId: input.requestId,
-              generationId: input.generationId,
-              attempt,
-              durationMs: Date.now() - started,
-            })
-          );
+          console.info(JSON.stringify({
+            event: "minimax_ok",
+            requestId: input.requestId,
+            generationId: input.generationId,
+            attempt,
+            durationMs: Date.now() - started,
+          }));
           return result;
         }
 
         lastFailure = result;
-        console.info(
-          JSON.stringify({
-            event: "minimax_fail",
-            requestId: input.requestId,
-            generationId: input.generationId,
-            attempt,
-            errorCode: result.errorCode,
-            durationMs: Date.now() - started,
-          })
-        );
+        console.info(JSON.stringify({
+          event: "minimax_fail",
+          requestId: input.requestId,
+          generationId: input.generationId,
+          attempt,
+          errorCode: result.errorCode,
+          durationMs: Date.now() - started,
+        }));
 
-        if (!result.retryable || attempt === maxAttempts) {
-          return result;
-        }
+        if (!result.retryable || attempt === maxAttempts) return result;
         await sleep(500 * 2 ** (attempt - 1));
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "network_error";
+        const message = error instanceof Error ? error.message : "network_error";
         const isTimeout =
           message.includes("aborted") ||
           message.includes("timeout") ||
@@ -126,29 +116,25 @@ export class LiveMiniMaxAdapter implements MiniMaxAdapter {
           retryable: true,
           statusMsg: message.slice(0, 200),
         };
-        console.info(
-          JSON.stringify({
-            event: "minimax_network",
-            requestId: input.requestId,
-            generationId: input.generationId,
-            attempt,
-            errorCode: lastFailure.errorCode,
-            durationMs: Date.now() - started,
-          })
-        );
+        console.info(JSON.stringify({
+          event: "minimax_network",
+          requestId: input.requestId,
+          generationId: input.generationId,
+          attempt,
+          errorCode: lastFailure.errorCode,
+          durationMs: Date.now() - started,
+        }));
         if (attempt === maxAttempts) return lastFailure;
         await sleep(500 * 2 ** (attempt - 1));
       }
     }
 
-    return (
-      lastFailure ?? {
-        ok: false,
-        errorCode: "unknown",
-        userMessage: "生成失败，请稍后重试。",
-        retryable: true,
-      }
-    );
+    return lastFailure ?? {
+      ok: false,
+      errorCode: "unknown",
+      userMessage: "生成失败，请稍后重试。",
+      retryable: true,
+    };
   }
 
   private async singleAttempt(
@@ -163,14 +149,21 @@ export class LiveMiniMaxAdapter implements MiniMaxAdapter {
       image_file: input.imageDataUrl,
     };
 
-    // subject_reference only when explicitly enabled for single-person portrait.
-    if (input.useSubjectReference) {
-      body.subject_reference = [
-        {
-          type: "character",
-          image_file: input.imageDataUrl,
-        },
-      ];
+    const incompatibleContinuity = /CONTINUITY\s+(?:MODE:\s*)?(site_only|lineage_or_successor)\b/i
+      .test(input.prompt);
+    const useSubjectReference = input.useSubjectReference && !incompatibleContinuity;
+    if (useSubjectReference) {
+      body.subject_reference = [{
+        type: "character",
+        image_file: input.imageDataUrl,
+      }];
+    } else if (input.useSubjectReference && incompatibleContinuity) {
+      console.info(JSON.stringify({
+        event: "subject_reference_suppressed",
+        requestId: input.requestId,
+        generationId: input.generationId,
+        reason: "continuity_mode_incompatible",
+      }));
     }
 
     const controller = new AbortController();
@@ -207,12 +200,10 @@ export class LiveMiniMaxAdapter implements MiniMaxAdapter {
 
       const statusCode = parsed.base_resp?.status_code ?? -1;
       const statusMsg = parsed.base_resp?.status_msg;
-
       if (statusCode === 0 && parsed.data?.image_base64?.[0]) {
-        const imageBytes = Buffer.from(parsed.data.image_base64[0], "base64");
         return {
           ok: true,
-          imageBytes,
+          imageBytes: Buffer.from(parsed.data.image_base64[0], "base64"),
           contentType: "image/jpeg",
         };
       }
