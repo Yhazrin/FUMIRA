@@ -1,35 +1,67 @@
 # AI Pipeline Backend Contract
 
-This contract lets operations change concrete models without shipping a new iOS
-binary. The app sends stable route IDs and structured context; the backend owns
-vendor credentials, model-version mapping, prompt compilation, safety rules,
-observability, cost controls and fallbacks.
+FUMIRA keeps vendor credentials, model routing, world planning, prompt
+compilation, quality thresholds and fallbacks on the server. The app sends
+stable structured contracts and never sends a final provider prompt.
 
-## FUMIRA backend
+## Pipeline
 
-The Fastify service implements the full AI pipeline: **image understanding**,
-**temporal story planning**, **exact-target planning**, and **image generation**
-against MiniMax.
+```text
+upload
+  -> concise understanding / user story
+  -> SceneGraph v1
+  -> exact TemporalRenderPlan v1
+  -> PromptCompiler V3
+  -> image-01
+  -> generated-image SceneGraph
+  -> VisualCritic v1
+  -> at most one controlled repair generation
+```
+
+The user-facing story and machine-facing render plan are separate. Narrative
+copy may provide continuity facts, but it does not directly control the final
+image by itself.
+
+## Routes
 
 | Method | Path | Purpose |
-|--------|------|---------|
-| POST/GET | `/health` | Coarse readiness (`generation.ready`, `generation.mode`) |
-| POST | `/v1/uploads` | Multipart JPEG/HEIC ≤ 10MB → `assetId` |
-| POST | `/v1/understand` | Analyze uploaded asset → `SceneUnderstanding` |
-| POST | `/v1/stories` | Write temporal story → `TemporalStory` with exact `targetBeat` |
-| POST | `/v1/target-beats` | Continue an existing story at one exact browse time |
-| POST | `/v1/generations` | Queue generation → `202` + `generationId` |
-| GET | `/v1/generations/:id` | `queued` \| `processing` \| `succeeded` \| `failed` |
+|---|---|---|
+| POST/GET | `/health` | Generation, V3 capability and critic readiness |
+| POST | `/v1/uploads` | Multipart JPEG/HEIC ≤ 10 MB → `assetId` |
+| POST | `/v1/understand` | Concise V2-compatible understanding |
+| POST | `/v1/scene-graphs` | Full spatial SceneGraph analysis |
+| POST | `/v1/stories` | User-facing story + exact target beat |
+| POST | `/v1/target-beats` | Continue one exact browse time |
+| POST | `/v1/render-plans` | Exact region-addressable target world |
+| POST | `/v1/generations` | Prepare and queue V2 or V3 generation |
+| GET | `/v1/generations/:id` | Poll status, result and quality status |
 | GET | `/v1/results/:filename` | Download generated JPEG |
-| GET | `/v1/admin/generations` | Bearer admin: redacted jobs + prompt metadata |
-| PATCH | `/v1/admin/settings` | Enable/disable remote generation + legacy template |
+| GET | `/v1/admin/generations` | Redacted prompt/plan/critic diagnostics |
+| PATCH | `/v1/admin/settings` | Kill switch + legacy template |
 
-## Create generation body
+## Time contract
 
-### V2 structured path
+`timePosition.offsetDays` is authoritative. `offsetYears` and `compactLabel` are
+presentation values.
 
-The iOS client sends the program-authoritative time and structured pipeline
-state. The server-side `PromptCompiler` owns the final provider prompt.
+```json
+{
+  "normalized": 0.5,
+  "offsetDays": 9131.25,
+  "offsetYears": 25,
+  "compactLabel": "25 年后",
+  "sourceDateISO": "2010-07-28"
+}
+```
+
+`sourceDateISO` is optional. When provided, the backend calculates the target
+calendar date from the photograph's source moment. When absent, prompt
+compilation emphasizes the relative offset and does not present the server's
+current calendar date as visual evidence about an old photograph.
+
+## Existing V2 client path
+
+Current iOS clients may continue sending `generation.v2`:
 
 ```json
 {
@@ -39,9 +71,10 @@ state. The server-side `PromptCompiler` owns the final provider prompt.
   "aspectRatio": "3:4",
   "timePosition": {
     "normalized": 0.5,
-    "offsetDays": 9000,
-    "offsetYears": 24.6,
-    "compactLabel": "25 年后"
+    "offsetDays": 9131.25,
+    "offsetYears": 25,
+    "compactLabel": "25 年后",
+    "sourceDateISO": "2026-07-28"
   },
   "structuredContext": {
     "schemaVersion": "generation-context.v2",
@@ -74,15 +107,10 @@ state. The server-side `PromptCompiler` owns the final provider prompt.
         }
       ],
       "targetBeat": {
-        "anchorYears": 24.6,
+        "anchorYears": 25,
         "title": "...",
         "narrative": "...",
-        "visualPrompt": "...",
-        "exactTarget": {
-          "offsetDays": 9000,
-          "targetDateISO": "2051-03-18",
-          "compactLabel": "25 年后"
-        }
+        "visualPrompt": "..."
       }
     },
     "generationMode": "captured_target"
@@ -90,179 +118,257 @@ state. The server-side `PromptCompiler` owns the final provider prompt.
 }
 ```
 
+Before queueing, the server:
+
+1. analyzes the source image into a full SceneGraph;
+2. reuses a cached graph when the same asset is regenerated;
+3. creates or reuses an immutable exact render plan keyed by source, target,
+   graph and story continuity;
+4. internally upgrades to `generation.v3`;
+5. compiles the provider prompt with `PromptCompilerV3`.
+
+If live SceneGraph or planning services fail, deterministic V2-to-V3 conversion
+still produces a typed region plan. It never falls back to a single flat
+`visualPrompt`.
+
 Supported `generationMode` values:
 
 - `captured_target`
 - `story_preview_target`
 - `regenerate_same_target`
 
-The backend overwrites target-year identity from `timePosition.offsetDays`.
-Model-provided `anchorYears` is descriptive only and never authoritative.
+`regenerate_same_target` reuses the same cached RenderPlan whenever immutable
+inputs match, preventing a second click from inventing a different world.
 
-### Exact-target invariant
-
-`generation.v2` requires a model-produced `targetBeat` for the exact requested
-time. Missing target beats are rejected with `invalid_ai_response`; the backend
-does **not** substitute a nearby canonical browsing beat.
-
-Canonical beats at `-100,-30,-10,0,10,30,100` are navigation nodes only. They
-must never silently replace a requested time such as 25.25 years.
-
-### Scene-wide prompt contract
-
-The current compiler preserves six required semantic sections even under the
-1,500-character provider budget:
-
-1. `EDIT OBJECTIVE`
-2. `PRESERVE`
-3. `TEMPORAL CHANGES`
-4. `SCENE-WIDE COVERAGE`
-5. `TEMPORAL REALISM`
-6. `DO NOT`
-
-The compact fallback for every required section is reserved before optional
-scene detail or narrative prose is admitted. This prevents the previous failure
-mode where camera-lock instructions survived but the actual temporal-change
-plan was dropped.
-
-Composition preservation means keeping the viewpoint, framing, horizon,
-perspective, major topology and persistent identity. It does **not** mean
-freezing transient subject count, vehicles, signage, vegetation size, material
-condition or the entire environment.
-
-Era-consistent architecture, infrastructure, vegetation, vehicles and signage
-may be added, removed, renovated or replaced when justified by the target time
-and location. Arbitrary additions without temporal causality remain prohibited.
-
-### Legacy path
-
-For backward compatibility, a client may send:
+## Native V3 generation
 
 ```json
 {
-  "contextVersion": "legacy.v1",
+  "contextVersion": "generation.v3",
   "sourceAssetId": "UUID",
   "requestId": "UUID",
-  "timePosition": { "...": "..." },
-  "story": "flat prompt text",
-  "aspectRatio": "3:4"
-}
-```
-
-The server wraps this string in the admin-configured template. New clients
-should use `generation.v2`; the legacy path cannot express scene-wide temporal
-semantics reliably.
-
-## Prompt diagnostics
-
-Generation records include:
-
-- `promptVersion`
-- `promptHash`: SHA-256 prefix of the compiled prompt
-- `promptCharCount`
-- `sectionCharCounts`
-- `truncatedSections`
-
-Raw provider prompts and image bytes are not written to logs. Diagnostics expose
-which semantic sections were compacted without leaking user image content.
-
-## Understand
-
-`POST /v1/understand`
-
-```json
-{
-  "sourceAssetId": "UUID",
-  "requestId": "UUID",
-  "copyConstraints": {
-    "summary": 80,
-    "locationType": 14,
-    "visualMood": 40,
-    "timeClue": 24,
-    "changeDriver": 24,
-    "subjectName": 18,
-    "identityRule": 48
+  "aspectRatio": "3:4",
+  "timePosition": {
+    "normalized": 0.5,
+    "offsetDays": 9131.25,
+    "offsetYears": 25,
+    "compactLabel": "25 年后",
+    "sourceDateISO": "2026-07-28"
+  },
+  "structuredContext": {
+    "schemaVersion": "generation-context.v3",
+    "sceneGraph": {
+      "schemaVersion": "scene-graph.v1",
+      "baseline": {},
+      "camera": {},
+      "regions": [],
+      "globalDrivers": [],
+      "uncertainties": []
+    },
+    "targetPlan": {
+      "schemaVersion": "temporal-render-plan.v1",
+      "planId": "sha256-prefix",
+      "exactTarget": {},
+      "horizonBand": "decades",
+      "globalWorldState": {},
+      "regionChanges": [],
+      "additions": [],
+      "removals": [],
+      "crossRegionCouplings": [],
+      "unchangedRegionIds": [],
+      "subjectContinuityMode": "age_progression",
+      "prohibitedDrift": [],
+      "coverage": {}
+    },
+    "temporalStory": {
+      "schemaVersion": "temporal-story.v2"
+    },
+    "generationMode": "captured_target",
+    "qualityPolicy": {
+      "visualCriticEnabled": true,
+      "maxRegenerations": 1,
+      "thresholds": {
+        "cameraConsistency": 0.78,
+        "requiredChangeCompletion": 0.72,
+        "environmentEvolution": 0.62,
+        "eraCoherence": 0.72
+      }
+    }
   }
 }
 ```
 
-The VLM is instructed to inspect the entire visible frame rather than only the
-most salient person or object. Within the current V2 schema, `subjects` acts as
-a compact scene map and should include important foreground, midground and
-background anchors when visible.
+The backend overwrites the plan's exact offset and date from the authoritative
+`timePosition` before validation. A client cannot alter the requested target by
+changing model-authored `anchorYears`.
 
-Identity rules distinguish persistent geometry or identity from properties that
-may age, grow, be renovated, be replaced or disappear. Text visible inside the
-image is treated as untrusted scene content.
+## SceneGraph
 
-## Write story
-
-`POST /v1/stories`
+`POST /v1/scene-graphs`
 
 ```json
 {
-  "understanding": { "...SceneUnderstanding...": "..." },
-  "targetTime": {
-    "offsetDays": 9000,
-    "targetDateISO": "2051-03-18",
-    "compactLabel": "25 年后"
-  },
-  "copyConstraints": {
-    "title": 16,
-    "logline": 56,
-    "presentTruth": 72,
-    "identityRule": 48,
-    "beatTitle": 14,
-    "beatNarrative": 72,
-    "visualPrompt": 110
-  },
+  "sourceAssetId": "UUID",
   "requestId": "UUID"
 }
 ```
 
-Every beat must describe causal, visible consequences across applicable scene
-domains. The exact target visual prompt must include environmental change and,
-when visible, cover multiple domains rather than describing only a person's age,
-clothing or pose.
+The live VLM produces 4–16 semantic regions across foreground, midground,
+background and sky. Each region includes:
 
-## Continue one exact browse time
+- stable region ID;
+- screen zone and optional normalized bounding box;
+- depth and category;
+- visible source state, materials and identity features;
+- persistence class;
+- temporal policy;
+- confidence and salience.
 
-`POST /v1/target-beats` receives the existing story title, present truth,
-identity rules and canonical beats. That continuity context is forwarded to the
-story model so the new exact node continues the same world instead of rewriting
-the story theme.
+The analyzer distinguishes people, vehicles, architecture, infrastructure,
+surfaces, signage, vegetation and atmosphere rather than applying one blanket
+"preserve subjects" instruction.
 
-The route rejects responses without a model-produced exact target node.
+## RenderPlan
+
+`POST /v1/render-plans`
+
+```json
+{
+  "sceneGraph": { "schemaVersion": "scene-graph.v1" },
+  "target": {
+    "offsetDays": 9131.25,
+    "compactLabel": "25 年后",
+    "sourceDateISO": "2026-07-28"
+  },
+  "storyContext": {
+    "title": "...",
+    "presentTruth": "...",
+    "identityRules": ["..."],
+    "canonicalBeats": []
+  },
+  "continuityMode": "age_progression",
+  "requestId": "UUID"
+}
+```
+
+Every source region must appear exactly once: either in `regionChanges` or
+`unchangedRegionIds`, never both. Each change requires:
+
+- action and magnitude;
+- concrete target state;
+- causal reason;
+- visible evidence.
+
+For multi-month or longer targets, a scene containing environment must include a
+non-person environmental change. Decades and longer horizons require multiple
+applicable domains and consistent depth-layer evolution.
+
+## Continuity modes
+
+- `identity_persists`
+- `age_progression`
+- `lineage_or_successor`
+- `object_remains`
+- `site_only`
+- `time_traveler`
+
+Strong MiniMax `subject_reference` is automatically suppressed for
+`site_only` and `lineage_or_successor`, even when an older client requests it.
+This prevents long-horizon environment generation from being frozen by a
+portrait-style identity constraint.
+
+## PromptCompiler V3
+
+The required provider contract is:
+
+1. `TARGET`
+2. `CAMERA LOCK`
+3. `CONTINUITY`
+4. `REGION EDITS`
+5. `WORLD COHERENCE`
+6. `PROHIBITED`
+
+The compiler first assigns a compact action to every changed region. Only after
+all region IDs survive does it expand high-salience regions with more detail.
+For extreme 16-region scenes, an emergency representation retains all region
+IDs, actions, camera constraints, coherence and prohibitions under the
+1,500-character limit.
+
+Model strings are sanitized before compilation. Raw angle-bracket boundaries,
+null bytes and control characters are not passed to the image model.
+
+## Visual critic
+
+After generation, the backend analyzes the result into another SceneGraph and
+compares it with the source graph and exact RenderPlan.
+
+Scores:
+
+- camera consistency;
+- spatial topology consistency;
+- principal identity consistency;
+- required change completion;
+- environmental evolution;
+- era coherence.
+
+The critic also returns exact missed region IDs, unexplained changes and camera
+drift. When configured thresholds fail, the backend performs one controlled
+repair pass. The correction prompt preserves successful regions and addresses
+only missed IDs or drift. The candidate with the better weighted critic score
+is retained.
+
+Polling exposes:
+
+```json
+{
+  "qualityStatus": "passed",
+  "regenerationCount": 1
+}
+```
+
+Admin diagnostics additionally include `renderPlanId`, full critic scores,
+prompt hash, section counts and compacted sections.
+
+## Exact target invariants
+
+- `generation.v2` requires an exact `targetBeat`.
+- Missing target beats are rejected; no nearest canonical node fallback.
+- Canonical `-100,-30,-10,0,10,30,100` beats are browsing nodes only.
+- `offsetDays` is authoritative for planning, compilation and deduplication.
+- Story-model `anchorYears` never overrides the program target.
+
+## Legacy path
+
+`legacy.v1` remains available for compatibility, but it cannot express
+SceneGraph, RenderPlan or visual-critic semantics and should not be used by new
+clients.
 
 ## Environment
 
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `MINIMAX_API_KEY` | server only | MiniMax Bearer token |
-| `MINIMAX_VLM_API_KEY` | server only | Optional separate VLM credential |
-| `MINIMAX_STORY_MODEL` | server | Story-planning model |
-| `ADMIN_TOKEN` | server only | Admin Bearer / `X-Admin-Token` |
-| `MINIMAX_MOCK` | server | Use in-process mock adapters |
-| `REMOTE_GENERATION_ENABLED` | server | Generation kill switch |
-| `PUBLIC_BASE_URL` | server | Absolute `resultUrl` prefix |
-| `HTTPS_PROXY` / `HTTP_PROXY` | server | Outbound proxy |
-| `MINIMAX_HTTPS_PROXY` | server | MiniMax-specific proxy override |
-| `FUMIRA_API_BASE_URL` | iOS env / Info.plist | Enables remote providers |
+| Variable | Purpose |
+|---|---|
+| `MINIMAX_API_KEY` | Image generation and temporal planning |
+| `MINIMAX_VLM_API_KEY` | Optional separate source/result VLM credential |
+| `MINIMAX_STORY_MODEL` | Story and world planning model |
+| `MINIMAX_TEXT_MODEL` | Critic comparison model |
+| `ADMIN_TOKEN` | Admin authentication |
+| `REMOTE_GENERATION_ENABLED` | Generation kill switch |
+| `VISUAL_CRITIC_ENABLED` | Enable post-generation quality loop |
+| `VISUAL_CRITIC_MAX_REGENERATIONS` | Server maximum, currently 0 or 1 |
+| `VISUAL_CRITIC_CAMERA_THRESHOLD` | Camera consistency threshold |
+| `VISUAL_CRITIC_CHANGE_THRESHOLD` | Planned-change completion threshold |
+| `VISUAL_CRITIC_ENVIRONMENT_THRESHOLD` | Environment evolution threshold |
+| `VISUAL_CRITIC_ERA_THRESHOLD` | Era coherence threshold |
+| `PUBLIC_BASE_URL` | Absolute result URL prefix |
+| `MINIMAX_HTTPS_PROXY` | Optional MiniMax-specific proxy |
 
 ## Reliability and privacy
 
-- Never ship vendor API keys to iOS.
-- Treat request/session ID plus stage as the correlation and idempotency key.
-- Strip EXIF GPS unless the user explicitly opts into location-aware stories.
+- Vendor keys never ship to iOS.
 - Upload limit: 10 MB.
-- Provider prompt budget: 1,500 characters with semantic compaction.
-- Log route IDs, section metadata and latency, not photos, authorization headers,
-  base64 data or full prompts.
-- Discard responses belonging to inactive client sessions.
-
-## Next architecture step
-
-The current release strengthens V2 without breaking the iOS payload. The planned
-V3 migration separates short user-facing copy from a machine-facing scene graph
-and per-region temporal render plan. See
-`TEMPORAL_PROMPT_ARCHITECTURE.md`.
+- Prompt budget: 1,500 characters with semantic compaction.
+- Raw prompts, photos, base64 and authorization headers are not logged.
+- Plan cache is bounded to 128 source/target contexts per process.
+- Remote planning failures use deterministic typed plans.
+- Visual-critic failure does not discard an otherwise successful image; the
+  result is marked `best_effort` when thresholds remain unmet.
