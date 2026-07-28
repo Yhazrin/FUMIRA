@@ -1,10 +1,8 @@
 import { createReadStream } from "node:fs";
 import { access } from "node:fs/promises";
 import type { FastifyInstance } from "fastify";
-import {
-  createGenerationJob,
-  toClientGeneration,
-} from "../queue.js";
+import { prepareAndCreateGenerationJob } from "../generationPreparation.js";
+import { toClientGeneration } from "../queue.js";
 import { getGeneration, getGeneratedAbsolutePath } from "../storage.js";
 import type { CreateGenerationBody } from "../types.js";
 
@@ -23,9 +21,9 @@ export async function registerGenerationRoutes(
         });
       }
 
-      // Runtime: pass raw body to createGenerationJob which handles
-      // discriminated union validation and contextVersion detection.
-      const result = createGenerationJob(body as unknown as CreateGenerationBody);
+      const result = await prepareAndCreateGenerationJob(
+        body as unknown as CreateGenerationBody
+      );
       if (!result.ok) {
         return reply.code(result.statusCode).send({
           errorCode: result.errorCode,
@@ -38,6 +36,8 @@ export async function registerGenerationRoutes(
         generationId: result.record.generationId,
         status: "queued" as const,
         requestId: result.record.requestId,
+        promptVersion: result.record.promptVersion,
+        renderPlanId: result.record.renderPlanId,
       });
     }
   );
