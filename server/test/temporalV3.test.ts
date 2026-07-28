@@ -16,6 +16,7 @@ const { buildCorrectionPromptV3, compilePromptV3 } = await import("../src/prompt
 import type {
   ExactTarget,
   GenerationContext,
+  RegionTemporalChange,
   SceneGraph,
   TemporalStoryPayloadV2,
   TimePositionPayload,
@@ -101,7 +102,7 @@ describe("SceneGraph V3 compatibility conversion", () => {
     const plan = deriveRenderPlanFromV2({ sceneGraph: graph, story: v2Story(), exactTarget: target() });
     assert.deepEqual(validateTemporalRenderPlan(graph, plan), []);
     assert.equal(plan.coverage.evaluatedRegionIds.length, graph.regions.length);
-    assert.ok(plan.regionChanges.some((change: TemporalStoryPayloadV2["targetBeat"] extends never ? never : any) => {
+    assert.ok(plan.regionChanges.some((change: RegionTemporalChange) => {
       const region = graph.regions.find((item: SceneGraph["regions"][number]) => item.id === change.regionId);
       return region?.category !== "person";
     }));
@@ -118,7 +119,7 @@ describe("SceneGraph V3 compatibility conversion", () => {
     });
     assert.equal(horizonBandFromOffsetDays(1_000_000 * 365.25), "deep_time");
     assert.equal(plan.subjectContinuityMode, "site_only");
-    assert.ok(plan.regionChanges.some((change: { action: string }) => ["remove", "replace"].includes(change.action)));
+    assert.ok(plan.regionChanges.some((change: RegionTemporalChange) => ["remove", "replace"].includes(change.action)));
   });
 });
 
