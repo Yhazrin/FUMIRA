@@ -33,12 +33,7 @@ export function compilePromptV3(input: {
   const regions = buildRegionSection(graph, plan, fixed);
   const optional = buildOptionalSections(graph, plan);
   let included: PromptSection[] = [
-    fixed[0],
-    fixed[1],
-    fixed[2],
-    regions,
-    fixed[3],
-    fixed[4],
+    fixed[0], fixed[1], fixed[2], regions, fixed[3], fixed[4],
   ];
 
   for (const section of optional) {
@@ -121,13 +116,14 @@ function buildFixedSections(
   aspectRatio: AspectRatio
 ): PromptSection[] {
   const camera = graph.camera;
+  const date = trustedTargetDate(timePosition, plan);
   return [
     {
       id: "target",
       required: true,
       text: [
         "TARGET",
-        `${safe(plan.exactTarget.compactLabel)} | ${safe(plan.exactTarget.targetDateISO)} | ${(timePosition.offsetDays / 365.25).toFixed(2)}y | ${aspectRatio} | plan ${safe(plan.planId)}. Same viewpoint, one target world.`,
+        `${safe(plan.exactTarget.compactLabel)}${date} | ${(timePosition.offsetDays / 365.25).toFixed(2)}y relative to source | ${aspectRatio} | plan ${safe(plan.planId)}. Same viewpoint, one target world.`,
       ].join("\n"),
     },
     {
@@ -182,8 +178,6 @@ function buildRegionSection(
     return bSalience - aSalience;
   });
 
-  // Every changed region first receives a compact instruction. Detail is added
-  // only after complete region coverage is secured.
   const lines = ordered.map((change) => {
     const region = graph.regions.find((item) => item.id === change.regionId);
     return formatCompactChange(region, change);
@@ -272,7 +266,7 @@ function emergencyPrompt(
   });
   return [
     "TARGET",
-    `${safe(plan.exactTarget.compactLabel)} ${safe(plan.exactTarget.targetDateISO)} ${(timePosition.offsetDays / 365.25).toFixed(1)}y ${aspectRatio}.`,
+    `${safe(plan.exactTarget.compactLabel)}${trustedTargetDate(timePosition, plan)} ${(timePosition.offsetDays / 365.25).toFixed(1)}y-relative ${aspectRatio}.`,
     "CAMERA LOCK",
     "Keep viewpoint, crop, horizon, perspective, vanishing points, scale and occlusion topology.",
     `CONTINUITY ${plan.subjectContinuityMode}.`,
@@ -286,6 +280,15 @@ function emergencyPrompt(
     "PROHIBITED",
     "No camera drift, arbitrary additions, filters, mixed eras, invented text or subject-only transformation.",
   ].filter(Boolean).join("\n").slice(0, TOTAL_BUDGET);
+}
+
+function trustedTargetDate(
+  timePosition: TimePositionPayload,
+  plan: TemporalRenderPlan
+): string {
+  return timePosition.sourceDateISO && /^\d{4}-\d{2}-\d{2}$/.test(timePosition.sourceDateISO)
+    ? ` | ${safe(plan.exactTarget.targetDateISO)}`
+    : "";
 }
 
 function formatChange(
@@ -316,7 +319,7 @@ function formatEmergencyChange(
   const locator = region
     ? `${safe(region.id)} ${region.screenZone}/${region.depth}`
     : safe(change.regionId);
-  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 32)}`;
+  return `${locator} ${change.action.toUpperCase()}: ${clip(change.targetState, 20)}`;
 }
 
 function renderSections(sections: PromptSection[]): string {
