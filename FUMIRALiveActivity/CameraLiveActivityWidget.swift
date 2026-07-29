@@ -8,18 +8,15 @@ struct CameraLiveActivityWidget: Widget {
             lockScreenView(context.state)
                 .activityBackgroundTint(CameraActivityStyle.islandBlack)
                 .activitySystemActionForegroundColor(CameraActivityStyle.paperWhite)
-                .widgetURL(CameraActivityLink.openCamera)
+                .widgetURL(activityURL(for: context.state))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    shutterMark
+                    activityMark(context.state)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.state.zoomLabel)
-                        .font(.system(.body, design: .rounded, weight: .bold))
-                        .foregroundStyle(CameraActivityStyle.paperWhite)
-                        .monospacedDigit()
+                    trailingValue(context.state)
                 }
 
                 DynamicIslandExpandedRegion(.center) {
@@ -35,19 +32,20 @@ struct CameraLiveActivityWidget: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    expandedControls(context.state)
+                    expandedContent(context.state)
                 }
             } compactLeading: {
-                shutterMark
+                activityMark(context.state)
             } compactTrailing: {
                 compactTrailing(context.state)
             } minimal: {
-                Image(systemName: "camera.aperture")
+                Image(systemName: phaseSymbol(for: context.state.phase))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(CameraActivityStyle.blue)
+                    .contentTransition(.symbolEffect(.replace))
             }
             .keylineTint(CameraActivityStyle.blue)
-            .widgetURL(CameraActivityLink.openCamera)
+            .widgetURL(activityURL(for: context.state))
         }
     }
 
@@ -56,7 +54,7 @@ struct CameraLiveActivityWidget: Widget {
     ) -> some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                shutterMark
+                activityMark(state)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("FUMIRA 时间相机")
@@ -69,13 +67,10 @@ struct CameraLiveActivityWidget: Widget {
 
                 Spacer(minLength: 8)
 
-                Text(state.zoomLabel)
-                    .font(.system(.title3, design: .rounded, weight: .bold))
-                    .foregroundStyle(CameraActivityStyle.paperWhite)
-                    .monospacedDigit()
+                trailingValue(state)
             }
 
-            expandedControls(state)
+            expandedContent(state)
         }
         .padding(16)
     }
@@ -97,21 +92,74 @@ struct CameraLiveActivityWidget: Widget {
             Image(systemName: "checkmark")
                 .font(.caption.weight(.black))
                 .foregroundStyle(CameraActivityStyle.paperWhite)
+        case .understanding, .storyWriting, .generating:
+            Text(state.normalizedProgress, format: .percent.precision(.fractionLength(0)))
+                .font(.caption2.weight(.black))
+                .foregroundStyle(CameraActivityStyle.paperWhite)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        case .ready:
+            Image(systemName: "sparkles")
+                .font(.caption.weight(.black))
+                .foregroundStyle(CameraActivityStyle.yellow)
+                .contentTransition(.symbolEffect(.replace))
+        case .failed:
+            Image(systemName: "exclamationmark")
+                .font(.caption.weight(.black))
+                .foregroundStyle(CameraActivityStyle.coral)
         }
     }
 
-    private var shutterMark: some View {
+    private func activityMark(
+        _ state: CameraLiveActivityAttributes.ContentState
+    ) -> some View {
         ZStack {
             Circle()
                 .fill(CameraActivityStyle.blue)
-            Circle()
-                .fill(CameraActivityStyle.paperWhite)
-                .padding(4)
-            Circle()
-                .fill(CameraActivityStyle.blue)
-                .frame(width: 4, height: 4)
+
+            if state.isCameraPhase {
+                Circle()
+                    .fill(CameraActivityStyle.paperWhite)
+                    .padding(4)
+                Circle()
+                    .fill(CameraActivityStyle.blue)
+                    .frame(width: 4, height: 4)
+            } else {
+                Image(systemName: phaseSymbol(for: state.phase))
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(
+                        state.phase == .ready
+                            ? CameraActivityStyle.yellow
+                            : CameraActivityStyle.paperWhite
+                    )
+                    .contentTransition(.symbolEffect(.replace))
+            }
         }
         .frame(width: 24, height: 24)
+    }
+
+    @ViewBuilder
+    private func expandedContent(
+        _ state: CameraLiveActivityAttributes.ContentState
+    ) -> some View {
+        if state.isCameraPhase {
+            expandedControls(state)
+        } else if state.isProcessing {
+            processingProgress(state)
+        } else if state.phase == .ready {
+            Link(destination: CameraActivityLink.result) {
+                Label("打开时间照片", systemImage: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(CameraActivityStyle.islandBlack)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .background(CameraActivityStyle.yellow, in: Capsule())
+            }
+        } else {
+            Label("轻点返回 FUMIRA", systemImage: "arrow.clockwise")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(CameraActivityStyle.secondaryText)
+                .frame(maxWidth: .infinity, minHeight: 36)
+        }
     }
 
     private func expandedControls(
@@ -142,6 +190,49 @@ struct CameraLiveActivityWidget: Widget {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 4)
+    }
+
+    private func processingProgress(
+        _ state: CameraLiveActivityAttributes.ContentState
+    ) -> some View {
+        VStack(spacing: 6) {
+            ProgressView(value: state.normalizedProgress)
+                .tint(CameraActivityStyle.yellow)
+
+            HStack {
+                Spacer()
+                Text(state.targetLabel)
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(CameraActivityStyle.secondaryText)
+        }
+        .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private func trailingValue(
+        _ state: CameraLiveActivityAttributes.ContentState
+    ) -> some View {
+        if state.isCameraPhase {
+            Text(state.zoomLabel)
+                .font(.system(.body, design: .rounded, weight: .bold))
+                .foregroundStyle(CameraActivityStyle.paperWhite)
+                .monospacedDigit()
+        } else if state.isProcessing {
+            Text(state.normalizedProgress, format: .percent.precision(.fractionLength(0)))
+                .font(.system(.body, design: .rounded, weight: .bold))
+                .foregroundStyle(CameraActivityStyle.paperWhite)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        } else {
+            Image(systemName: state.phase == .ready ? "checkmark" : "exclamationmark")
+                .font(.body.weight(.black))
+                .foregroundStyle(
+                    state.phase == .ready
+                        ? CameraActivityStyle.yellow
+                        : CameraActivityStyle.coral
+                )
+        }
     }
 
     private func activityControl(
@@ -187,13 +278,61 @@ struct CameraLiveActivityWidget: Widget {
         case .capturing:
             "正在捕捉"
         case .captured:
-            "已捕捉"
+            "现实已定锚"
+        case .understanding:
+            "正在拆开现实层"
+        case .storyWriting:
+            "正在寻找时间因果"
+        case .generating:
+            "正在聚合\(state.targetLabel)"
+        case .ready:
+            "\(state.targetLabel)已经抵达"
+        case .failed:
+            "时间生成需要处理"
+        }
+    }
+
+    private func phaseSymbol(
+        for phase: CameraLiveActivityAttributes.ContentState.Phase
+    ) -> String {
+        switch phase {
+        case .framing:
+            "camera.aperture"
+        case .capturing:
+            "camera.shutter.button.fill"
+        case .captured:
+            "scope"
+        case .understanding:
+            "viewfinder"
+        case .storyWriting:
+            "point.3.connected.trianglepath.dotted"
+        case .generating:
+            "square.3.layers.3d"
+        case .ready:
+            "sparkles"
+        case .failed:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    private func activityURL(
+        for state: CameraLiveActivityAttributes.ContentState
+    ) -> URL {
+        switch state.phase {
+        case .framing, .capturing, .captured:
+            CameraActivityLink.openCamera
+        case .understanding, .storyWriting, .generating, .failed:
+            CameraActivityLink.progress
+        case .ready:
+            CameraActivityLink.result
         }
     }
 }
 
 private enum CameraActivityLink {
     static let openCamera = URL(string: "fumira://camera")!
+    static let progress = URL(string: "fumira://progress")!
+    static let result = URL(string: "fumira://result")!
     static let flash = URL(string: "fumira://camera/flash")!
     static let lens = URL(string: "fumira://camera/lens")!
     static let grid = URL(string: "fumira://camera/grid")!
@@ -204,6 +343,8 @@ private enum CameraActivityStyle {
     static let blue = Color(red: 30 / 255, green: 156 / 255, blue: 224 / 255)
     static let paperWhite = Color(red: 250 / 255, green: 247 / 255, blue: 239 / 255)
     static let islandBlack = Color.black.opacity(0.96)
+    static let yellow = Color(red: 255 / 255, green: 211 / 255, blue: 58 / 255)
+    static let coral = Color(red: 233 / 255, green: 94 / 255, blue: 82 / 255)
     static let secondaryText = paperWhite.opacity(0.68)
     static let controlFill = paperWhite.opacity(0.12)
     static let activeControl = blue.opacity(0.34)

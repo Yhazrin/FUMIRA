@@ -7,7 +7,6 @@ struct ViewfinderView: View {
     var namespace: Namespace.ID
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var zoomGestureStartFactor: CGFloat?
 
     var body: some View {
         GeometryReader { proxy in
@@ -15,22 +14,47 @@ struct ViewfinderView: View {
                 aspectRatio: model.cameraAspectRatio,
                 in: proxy.size
             )
+            let cardShape = UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: 0,
+                    bottomLeading: layout.cornerRadius,
+                    bottomTrailing: layout.cornerRadius,
+                    topTrailing: 0
+                ),
+                style: .continuous
+            )
 
             ZStack {
-                // One full-screen preview is the source for both the clear crop
-                // and its translucent surround. Duplicating the preview at two
-                // aspect-fill sizes makes the scene discontinuous at the crop.
+                // The blue surface is the physical camera body. The preview is
+                // a separate top-anchored card whose lower edge moves as the
+                // user pinches between capture ratios.
+                PosterPalette.cameraBody
+                    .ignoresSafeArea()
+
+                cardShape
+                    .fill(PosterPalette.ink)
+                    .frame(
+                        width: layout.heroFrame.width,
+                        height: layout.heroFrame.height
+                    )
+                    .position(
+                        x: layout.heroFrame.midX,
+                        y: layout.heroFrame.midY
+                    )
+
                 model.cameraPreview
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .frame(
+                        width: layout.heroFrame.width,
+                        height: layout.heroFrame.height
+                    )
                     .clipped()
+                    .clipShape(cardShape)
+                    .position(
+                        x: layout.heroFrame.midX,
+                        y: layout.heroFrame.midY
+                    )
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
-
-                CameraCompositionGlass(
-                    cropFrame: layout.heroFrame,
-                    cornerRadius: layout.cornerRadius,
-                    drawsFrame: layout.cropFrame != nil
-                )
 
                 if model.isCameraGridEnabled {
                     CameraCompositionGrid(
@@ -38,16 +62,6 @@ struct ViewfinderView: View {
                         cornerRadius: layout.cornerRadius
                     )
                 }
-
-                // Status-bar scrim only — chrome contrast lives on the controls.
-                LinearGradient(
-                    colors: [PosterPalette.ink.opacity(0.22), Color.clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 104)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .allowsHitTesting(false)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .animation(
@@ -60,28 +74,13 @@ struct ViewfinderView: View {
             )
         }
         .ignoresSafeArea()
-        .simultaneousGesture(
-            MagnifyGesture()
-                .onChanged { value in
-                    guard model.supportsCameraZoom else { return }
-                    let start = zoomGestureStartFactor ?? model.cameraZoomSnapshot.factor
-                    if zoomGestureStartFactor == nil {
-                        zoomGestureStartFactor = start
-                    }
-                    model.setCameraZoomFactor(start * value.magnification)
-                }
-                .onEnded { _ in
-                    zoomGestureStartFactor = nil
-                }
-        )
-        // RootView hosts the chrome as a sibling above the preview and shade.
-        .accessibilityElement(children: .contain)
-        .accessibilityHidden(true)
     }
 
     /// Keeps the shade and grid moving in one local geometry space.
     fileprivate static func compositionMorphAnimation(reduceMotion: Bool) -> Animation? {
-        .posterHeroMorph(reduceMotion: reduceMotion)
+        reduceMotion
+            ? .linear(duration: PosterMotion.reduced)
+            : PosterMotion.cameraComposition
     }
 }
 
@@ -93,23 +92,165 @@ struct ViewfinderChromeOverlay: View {
     @State private var controlsAreReady = false
     @State private var albumPickerItem: PhotosPickerItem?
     @State private var captureOrientation: UIDeviceOrientation = .portrait
-    @State private var islandState: IslandState = .collapsed
+    @State private var aspectGestureStartRatio: CameraAspectRatio?
+    @State private var isAspectRatioBadgeVisible = false
+    @State private var aspectBadgeDismissTask: Task<Void, Never>?
+    @State private var systemTopInset: CGFloat = 0
+    @State private var systemBottomInset: CGFloat = 0
 
     var body: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
-                topChrome
-                    .padding(.top, PosterSpacing.sm)
-                    .allowsHitTesting(controlsAreReady)
+        GeometryReader { proxy in
+            let compositionFrame = CameraCompositionGeometry.layout(
+                aspectRatio: model.cameraAspectRatio,
+                in: proxy.size
+            ).heroFrame
+            let controlPlacement = CameraCompositionGeometry.controlPlacement(
+                below: compositionFrame,
+                in: proxy.size,
+                bottomSafeAreaInset: systemBottomInset
+            )
+            let topChromeTopY = max(
+                compositionFrame.minY + PosterSpacing.sm,
+                systemTopInset + PosterSpacing.sm
+            )
+            let feedbackCenterY = topChromeTopY
+                + CameraChromeMetrics.topRowHeight
+                + PosterSpacing.sm
+                + CameraChromeMetrics.compactFeedbackHeight * 0.5
 
-                Spacer(minLength: 0)
-                    .allowsHitTesting(false)
+            ZStack(alignment: .top) {
+                // The interaction surface now matches the visible camera card,
+                // so a pinch belongs to the viewfinder rather than the blue body.
+                Color.clear
+                    .frame(
+                        width: compositionFrame.width,
+                        height: compositionFrame.height
+                    )
+                    .contentShape(
+                        UnevenRoundedRectangle(
+                            cornerRadii: RectangleCornerRadii(
+                                topLeading: 0,
+                                bottomLeading: CameraCompositionGeometry
+                                    .compositionCornerRadius(for: compositionFrame),
+                                bottomTrailing: CameraCompositionGeometry
+                                    .compositionCornerRadius(for: compositionFrame),
+                                topTrailing: 0
+                            ),
+                            style: .continuous
+                        )
+                    )
+                    .position(
+                        x: compositionFrame.midX,
+                        y: compositionFrame.midY
+                    )
+                    .simultaneousGesture(aspectRatioGesture)
+                    .simultaneousGesture(
+                        subjectAnchorGesture(
+                            in: CGRect(origin: .zero, size: compositionFrame.size)
+                        )
+                    )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("viewfinder.aspect-control")
+                    .accessibilityLabel("取景画幅")
+                    .accessibilityValue(model.cameraAspectRatio.label)
+                    .accessibilityHint("双指捏合调整画幅；单指轻点选择时间主体")
+                    .accessibilityAdjustableAction(adjustAspectRatio)
+                    .accessibilityAction(named: Text("将画面中心设为时间主体")) {
+                        model.selectNarrativeSubject(
+                            at: CGPoint(x: 0.5, y: 0.5)
+                        )
+                    }
+                    .accessibilityAction(named: Text("清除时间主体")) {
+                        model.clearNarrativeSubject()
+                    }
+
+                VStack(spacing: 0) {
+                    topChrome
+                        .frame(width: compositionFrame.width)
+                        .padding(.top, topChromeTopY)
+                        .allowsHitTesting(controlsAreReady)
+
+                    Spacer(minLength: 0)
+                        .allowsHitTesting(false)
+                }
 
                 bottomChrome
-                    .padding(.horizontal, PosterSpacing.md)
-                    .padding(.bottom, PosterSpacing.xl)
-                    .safeAreaPadding(.bottom)
+                    .frame(width: proxy.size.width - PosterSpacing.md * 2)
+                    .position(
+                        x: proxy.size.width * 0.5,
+                        y: controlPlacement.centerY
+                    )
+                    .shadow(
+                        color: controlPlacement.overlaysPreview
+                            ? PosterEffects.cameraFloatingWaveShadow
+                            : .clear,
+                        radius: PosterEffects.cameraFloatingWaveShadowRadius,
+                        y: PosterEffects.cameraFloatingWaveShadowOffset
+                    )
                     .allowsHitTesting(controlsAreReady)
+
+                TimeAnchorReticle(motion: model.captureMotion)
+                    .frame(
+                        width: compositionFrame.width,
+                        height: compositionFrame.height
+                    )
+                    .position(
+                        x: compositionFrame.midX,
+                        y: compositionFrame.midY
+                    )
+                    .allowsHitTesting(false)
+
+                if let anchor = model.narrativeSubjectAnchor {
+                    NarrativeAnchorMarker()
+                        .position(
+                            x: markerCoordinate(
+                                normalized: anchor.normalizedX,
+                                lowerBound: compositionFrame.minX,
+                                extent: compositionFrame.width
+                            ),
+                            y: markerCoordinate(
+                                normalized: anchor.normalizedY,
+                                lowerBound: compositionFrame.minY,
+                                extent: compositionFrame.height
+                            )
+                        )
+                        .animation(
+                            reduceMotion ? nil : PosterMotion.interaction,
+                            value: anchor
+                        )
+                }
+
+                if isAspectRatioBadgeVisible {
+                    aspectRatioBadge
+                        .position(
+                            x: compositionFrame.midX,
+                            y: compositionFrame.maxY - PosterSpacing.xl
+                        )
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                        .transition(
+                            .opacity.combined(
+                                with: .scale(
+                                    scale: PosterMotion.cameraAspectBadgeTransitionScale
+                                )
+                            )
+                        )
+                        .zIndex(5)
+                }
+
+                if let feedback = model.cameraActivityFeedback {
+                    liveActivityFeedback(feedback)
+                        .frame(maxWidth: compositionFrame.width - PosterSpacing.xl * 2)
+                        .position(
+                            x: compositionFrame.midX,
+                            y: feedbackCenterY
+                        )
+                        .transition(
+                            .move(edge: .top)
+                                .combined(with: .opacity)
+                        )
+                        .zIndex(4)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -118,6 +259,7 @@ struct ViewfinderChromeOverlay: View {
         }
         .task {
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            syncSystemSafeAreaInsets()
             updateCaptureOrientation(UIDevice.current.orientation)
             try? await Task.sleep(for: PosterMotion.cameraInputGuard)
             guard !Task.isCancelled else { return }
@@ -129,6 +271,7 @@ struct ViewfinderChromeOverlay: View {
         .onReceive(
             NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)
         ) { _ in
+            syncSystemSafeAreaInsets()
             updateCaptureOrientation(UIDevice.current.orientation)
         }
         .onChange(of: albumPickerItem) { _, newItem in
@@ -138,93 +281,175 @@ struct ViewfinderChromeOverlay: View {
                 albumPickerItem = nil
             }
         }
-        .onChange(of: model.isPipelineBusy) { _, busy in
-            withAnimation(
-                reduceMotion
-                    ? .linear(duration: PosterMotion.reduced)
-                    : .spring(response: 0.34, dampingFraction: 0.84)
-            ) {
-                if busy {
-                    islandState = .recording
-                } else if islandState == .recording {
-                    islandState = .collapsed
-                }
-            }
+        .onDisappear {
+            aspectBadgeDismissTask?.cancel()
         }
-    }
-
-    /// One capsule per side. The trailing capsule requests the real ActivityKit
-    /// system surface; no in-app panel imitates the Dynamic Island.
-    @ViewBuilder
-    private var topChrome: some View {
-        let isMerged = islandState == .expanded
-        HStack(spacing: isMerged ? 0 : PosterSpacing.xs) {
-            if !isMerged {
-                albumPickerButton
-                    .transition(.scale.combined(with: .opacity))
-                Spacer(minLength: 0)
-            }
-
-            // Centerpiece: the in-app Dynamic Island. In the merged/expanded
-            // form it spans the full available width and the side capsules
-            // hide, so the whole top row reads as one continuous black pill.
-            InAppDynamicIsland(
-                state: $islandState,
-                timeCaption: islandCaption,
-                primaryActionTitle: "去取景",
-                primaryAction: {},
-                expandedMaxWidth: isMerged ? .infinity : nil,
-                controls: isMerged ? cameraIslandControls : []
-            )
-            .frame(maxWidth: isMerged ? .infinity : nil)
-            .allowsHitTesting(controlsAreReady)
-
-            if !isMerged {
-                Spacer(minLength: 0)
-                Button {
-                    withAnimation(
-                        reduceMotion
-                            ? .linear(duration: PosterMotion.reduced)
-                            : .spring(response: 0.30, dampingFraction: 0.78)
-                    ) {
-                        islandState = .expanded
-                    }
-                } label: {
-                    Image(systemName: "camera.aperture")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PosterPalette.paperWhite)
-                        .rotationEffect(chromeRotation)
-                        .frame(
-                            width: CameraChromeMetrics.islandSideCapsuleWidth,
-                            height: CameraChromeMetrics.islandSideCapsuleHeight
-                        )
-                        .background(PosterEffects.cameraChromeFill)
-                        .clipShape(Capsule())
-                        .overlay {
-                            Capsule()
-                                .stroke(PosterPalette.cameraShutterBlue, lineWidth: 1)
-                        }
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(PosterPressStyle())
-                .accessibilityLabel("展开时间相机灵动岛")
-                .accessibilityValue("当前倍率 \(formattedZoom)")
-                .accessibilityHint("点击/长按展开 app 内灵动岛，查看目标时间与快门")
-            }
-        }
-        .padding(.horizontal, isMerged ? PosterSpacing.lg : PosterSpacing.xl)
+        .animation(
+            reduceMotion ? nil : PosterMotion.interaction,
+            value: model.cameraActivityFeedback
+        )
         .animation(
             reduceMotion
                 ? .linear(duration: PosterMotion.reduced)
-                : .spring(response: 0.40, dampingFraction: 0.86),
-            value: isMerged
+                : PosterMotion.interaction,
+            value: isAspectRatioBadgeVisible
         )
-        .frame(maxWidth: .infinity)
+    }
+
+    private var aspectRatioGesture: some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0.01)
+            .onChanged { value in
+                let start = aspectGestureStartRatio ?? model.cameraAspectRatio
+                aspectGestureStartRatio = start
+                aspectBadgeDismissTask?.cancel()
+                isAspectRatioBadgeVisible = true
+
+                model.selectCameraAspectRatio(
+                    CameraAspectRatio.aspectRatio(
+                        afterPinchMagnification: value.magnification,
+                        startingAt: start
+                    )
+                )
+            }
+            .onEnded { _ in
+                aspectGestureStartRatio = nil
+                scheduleAspectBadgeDismissal()
+            }
+    }
+
+    private func scheduleAspectBadgeDismissal() {
+        aspectBadgeDismissTask?.cancel()
+        aspectBadgeDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: PosterMotion.cameraAspectBadgeHold)
+            guard !Task.isCancelled else { return }
+            isAspectRatioBadgeVisible = false
+        }
+    }
+
+    private func subjectAnchorGesture(in compositionFrame: CGRect) -> some Gesture {
+        SpatialTapGesture(coordinateSpace: .local)
+            .onEnded { value in
+                guard
+                    compositionFrame.width > 0,
+                    compositionFrame.height > 0,
+                    compositionFrame.contains(value.location)
+                else {
+                    return
+                }
+                model.selectNarrativeSubject(
+                    at: CGPoint(
+                        x: (value.location.x - compositionFrame.minX)
+                            / compositionFrame.width,
+                        y: (value.location.y - compositionFrame.minY)
+                            / compositionFrame.height
+                    )
+                )
+            }
+    }
+
+    private func markerCoordinate(
+        normalized: Double,
+        lowerBound: CGFloat,
+        extent: CGFloat
+    ) -> CGFloat {
+        let unclamped = lowerBound + CGFloat(normalized) * extent
+        return min(
+            max(unclamped, lowerBound + PosterSpacing.xl),
+            max(
+                lowerBound + extent - PosterSpacing.xl,
+                lowerBound + PosterSpacing.xl
+            )
+        )
+    }
+
+    private var aspectRatioBadge: some View {
+        Text(model.cameraAspectRatio.label)
+            .font(.callout.weight(.bold))
+            .foregroundStyle(PosterEffects.cameraChromeSolidForeground)
+            .padding(.horizontal, PosterSpacing.md)
+            .frame(minHeight: CameraChromeMetrics.compactFeedbackHeight)
+            .background(PosterEffects.cameraChromeSolidFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(PosterEffects.cameraChromeSolidStroke, lineWidth: 1)
+            }
+            .shadow(
+                color: PosterEffects.control,
+                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
+                y: PosterEffects.cameraChromeFeedbackShadowOffset
+            )
+    }
+
+    private func liveActivityFeedback(_ text: String) -> some View {
+        Label(text, systemImage: "wave.3.right.circle.fill")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(PosterEffects.cameraChromeSolidForeground)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .padding(.horizontal, PosterSpacing.md)
+            .frame(minHeight: CameraChromeMetrics.compactFeedbackHeight)
+            .background(PosterEffects.cameraChromeSolidFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(PosterEffects.cameraChromeSolidStroke, lineWidth: 1)
+            }
+            .shadow(
+                color: PosterEffects.control,
+                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
+                y: PosterEffects.cameraChromeFeedbackShadowOffset
+            )
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("viewfinder.live-activity-feedback")
+    }
+
+    private func adjustAspectRatio(_ direction: AccessibilityAdjustmentDirection) {
+        let magnification: CGFloat
+        switch direction {
+        case .increment:
+            magnification = 1.16
+        case .decrement:
+            magnification = 1 / 1.16
+        @unknown default:
+            return
+        }
+
+        model.selectCameraAspectRatio(
+            CameraAspectRatio.aspectRatio(
+                afterPinchMagnification: magnification,
+                startingAt: model.cameraAspectRatio
+            )
+        )
+    }
+
+    /// Only in-app camera actions live in this row. Live camera state belongs
+    /// to the system Dynamic Island through the ActivityKit widget extension.
+    @ViewBuilder
+    private var topChrome: some View {
+        HStack {
+            albumPickerButton
+            Spacer(minLength: 0)
+            CameraChromeButton(
+                systemImage: "dot.radiowaves.left.and.right",
+                rotation: chromeRotation,
+                accessibilityLabelText: "显示实时相机状态",
+                accessibilityHintText: "在系统灵动岛显示取景状态；长按可展开控制"
+            ) {
+                Task { await model.triggerCameraLiveActivity() }
+            }
+        }
+        .padding(.horizontal, PosterSpacing.md)
         .frame(height: CameraChromeMetrics.topRowHeight, alignment: .top)
     }
 
     #if DEBUG
     private func runDebugCompositionAuditIfNeeded() async {
+        if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_AUTO_CAPTURE"] == "trigger" {
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            await model.capture()
+            return
+        }
+
         if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_LIVE_ACTIVITY"] == "trigger" {
             try? await Task.sleep(for: .milliseconds(700))
             guard !Task.isCancelled else { return }
@@ -239,9 +464,11 @@ struct ViewfinderChromeOverlay: View {
 
         try? await Task.sleep(for: .milliseconds(900))
         guard !Task.isCancelled else { return }
+        isAspectRatioBadgeVisible = true
         withAnimation(ViewfinderView.compositionMorphAnimation(reduceMotion: reduceMotion)) {
             model.selectCameraAspectRatio(.fullScreen)
         }
+        scheduleAspectBadgeDismissal()
     }
     #endif
 
@@ -274,6 +501,7 @@ struct ViewfinderChromeOverlay: View {
             chromeRotation: chromeRotation
         )
         .padding(.bottom, PosterSpacing.sm)
+        .accessibilityIdentifier("viewfinder.shutter-wave")
     }
 
     private var albumPickerButton: some View {
@@ -284,21 +512,10 @@ struct ViewfinderChromeOverlay: View {
             matching: .images,
             photoLibrary: .shared()
         ) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(PosterPalette.paperWhite)
-                    .rotationEffect(iconRotation)
-                .frame(
-                    width: CameraChromeMetrics.islandSideCapsuleWidth,
-                    height: CameraChromeMetrics.islandSideCapsuleHeight
-                )
-                .background(PosterEffects.cameraChromeFill)
-                .clipShape(Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(PosterEffects.cameraChromeStroke, lineWidth: 1)
-                }
-                .contentShape(Capsule())
+            CameraChromeGlyph(
+                systemImage: "photo.on.rectangle",
+                rotation: iconRotation
+            )
         }
         .buttonStyle(PosterPressStyle())
         .accessibilityLabel("从相册导入")
@@ -343,96 +560,12 @@ struct ViewfinderChromeOverlay: View {
         }
     }
 
-    private var formattedZoom: String {
-        let value = max(model.cameraZoomSnapshot.displayFactor, 0)
-        if abs(value.rounded() - value) < 0.05 {
-            return "\(Int(value.rounded()))×"
-        }
-        return String(format: "%.1f×", value)
+    private func syncSystemSafeAreaInsets() {
+        let insets = CameraChromeMetrics.activeWindowSafeAreaInsets
+        systemTopInset = insets.top
+        systemBottomInset = insets.bottom
     }
 
-    /// Short caption shown inside the in-app Dynamic Island. Reflects the
-    /// currently selected time (e.g. "25 年后" or "此刻").
-    private var islandCaption: String {
-        if abs(model.selectedTime.offsetDays) < 0.5 {
-            return "此刻"
-        }
-        return model.selectedTime.compactLabel
-    }
-
-    /// Approximate top safe-area inset used to keep the island clear of the
-    /// status bar. We don't read the real one here because RootView already
-    /// places the chrome inside the safe area — this offset is the room
-    /// between the safe area and the top of the camera chrome.
-    private var topSafeAreaInset: CGFloat { 0 }
-
-    /// Camera controls shown inside the expanded island. Same chrome that
-    /// used to live in the side capsules of the top chrome (aspect ratio,
-    /// flip lens, flash, grid). Tapping any of them closes the island after
-    /// applying the change.
-    private var cameraIslandControls: [IslandControl] {
-        [
-            IslandControl(
-                id: "aspect",
-                systemImage: aspectIconName,
-                label: model.cameraAspectRatio.label,
-                isEnabled: true,
-                action: {
-                    model.selectCameraAspectRatio(model.cameraAspectRatio.next)
-                    closeIsland()
-                }
-            ),
-            IslandControl(
-                id: "flip",
-                systemImage: "arrow.triangle.2.circlepath",
-                label: "翻转",
-                isEnabled: model.cameraControlSnapshot.canSwitchCamera,
-                action: {
-                    Task { await model.switchCameraLens() }
-                    closeIsland()
-                }
-            ),
-            IslandControl(
-                id: "flash",
-                systemImage: model.cameraControlSnapshot.flashMode.systemImageName,
-                label: model.cameraControlSnapshot.flashMode.accessibilityLabel,
-                isEnabled: model.cameraControlSnapshot.supportsFlash,
-                action: {
-                    Task { await model.cycleFlashMode() }
-                }
-            ),
-            IslandControl(
-                id: "grid",
-                systemImage: model.isCameraGridEnabled ? "grid.circle.fill" : "grid",
-                label: model.isCameraGridEnabled ? "网格·开" : "网格·关",
-                isEnabled: true,
-                action: {
-                    model.toggleCameraGrid()
-                }
-            )
-        ]
-    }
-
-    /// SF Symbol used for the aspect-ratio control. Mirrors what the chrome
-    /// icon used to show in the older design.
-    private var aspectIconName: String {
-        switch model.cameraAspectRatio {
-        case .fullScreen: "rectangle.expand.vertical"
-        case .widescreen: "rectangle"
-        case .classic: "rectangle.portrait"
-        case .square: "square"
-        }
-    }
-
-    private func closeIsland() {
-        withAnimation(
-            reduceMotion
-                ? .linear(duration: PosterMotion.reduced)
-                : .easeInOut(duration: 0.20)
-        ) {
-            islandState = .collapsed
-        }
-    }
 }
 
 /// PhotosPicker Transferable for JPEG / PNG / HEIC library bytes.
@@ -476,92 +609,6 @@ private extension View {
     }
 }
 
-/// Adaptive frosted surround over the single continuous live preview.
-private struct CameraCompositionGlass: View {
-    let cropFrame: CGRect
-    let cornerRadius: CGFloat
-    let drawsFrame: Bool
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            surroundShape
-                .fill(.ultraThinMaterial, style: FillStyle(eoFill: true))
-
-            surroundShape
-                .fill(adaptiveTint, style: FillStyle(eoFill: true))
-        }
-        .overlay {
-            // The white frame is gone; corner focus brackets live in
-            // ``CameraCompositionCorners`` so the crop reads as a real camera
-            // AF viewfinder rather than a rounded rectangle.
-            if drawsFrame {
-                CameraCompositionCorners(
-                    frame: cropFrame,
-                    cornerRadius: cornerRadius
-                )
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var surroundShape: CompositionSurroundShape {
-        CompositionSurroundShape(
-            cropFrame: cropFrame,
-            cornerRadius: cornerRadius
-        )
-    }
-
-    private var adaptiveTint: Color {
-        colorScheme == .dark
-            ? PosterEffects.cameraCompositionDarkTint
-            : PosterEffects.cameraCompositionLightTint
-    }
-}
-
-private struct CompositionSurroundShape: Shape {
-    var cropFrame: CGRect
-    var cornerRadius: CGFloat
-
-    var animatableData: AnimatablePair<
-        AnimatablePair<CGFloat, CGFloat>,
-        AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat>
-    > {
-        get {
-            AnimatablePair(
-                AnimatablePair(cropFrame.origin.x, cropFrame.origin.y),
-                AnimatablePair(
-                    AnimatablePair(cropFrame.size.width, cropFrame.size.height),
-                    cornerRadius
-                )
-            )
-        }
-        set {
-            cropFrame = CGRect(
-                x: newValue.first.first,
-                y: newValue.first.second,
-                width: newValue.second.first.first,
-                height: newValue.second.first.second
-            )
-            cornerRadius = newValue.second.second
-        }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.addRect(rect)
-        path.addRoundedRect(
-            in: cropFrame,
-            cornerSize: CGSize(width: cornerRadius, height: cornerRadius),
-            style: .continuous
-        )
-        return path
-    }
-}
-
 private struct CameraCompositionGrid: View {
     let frame: CGRect
     let cornerRadius: CGFloat
@@ -586,7 +633,15 @@ private struct CameraCompositionGrid: View {
         }
         .frame(width: frame.width, height: frame.height)
         .clipShape(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: 0,
+                    bottomLeading: cornerRadius,
+                    bottomTrailing: cornerRadius,
+                    topTrailing: 0
+                ),
+                style: .continuous
+            )
         )
         .position(x: frame.midX, y: frame.midY)
         .allowsHitTesting(false)

@@ -36,8 +36,6 @@ enum PosterComposer {
     }
 
     static func yearLabel(for time: TimePosition) -> String {
-        let years = time.offsetYears
-        if abs(years) < 0.5 { return "NOW" }
-        return String(format: "%+.0f 年", years)
+        time.compactLabel
     }
 }

@@ -25,6 +25,7 @@ struct ShutterWaveTimeRail: View {
     @State private var dragStartValue: Double?
     @State private var isDragging = false
     @State private var lastHapticYears: Double?
+    @State private var lastModelPublication = Date.distantPast
     /// 0 = circular shutter, 1 = thin blue rail bar.
     #if DEBUG
     @State private var morphProgress: CGFloat =
@@ -42,7 +43,7 @@ struct ShutterWaveTimeRail: View {
     private let thumbInset: CGFloat = 36
     private let barMaxHeight: CGFloat = 44
     private let barMinHeight: CGFloat = 8
-    private let stageHeight: CGFloat = 100
+    private let stageHeight = CameraChromeMetrics.waveRailStageHeight
     private let barCount = WaveformGeometry.defaultBarCount
     private let shutterDiameter: CGFloat = 68
     private let railBarWidth: CGFloat = 5
@@ -65,18 +66,21 @@ struct ShutterWaveTimeRail: View {
         WaveformGeometry.continuousIndex(normalized: displayValue, barCount: barCount)
     }
 
-    /// Contract into the thin bar — a touch slower for readable morph.
+    /// The cursor conversion must finish before the next hand movement is
+    /// interpreted as a scrub. A monotonic curve avoids a spring fighting the
+    /// directly controlled thumb position.
     private var morphInAnimation: Animation {
         reduceMotion
             ? .linear(duration: PosterMotion.reduced)
-            : .spring(response: 0.56, dampingFraction: 0.80)
+            : PosterMotion.cameraShutterMorph
     }
 
-    /// Expand back into the shutter — slower soft settle.
+    /// Same curve in reverse: the control is an optical state change, not a
+    /// bouncing physical key.
     private var morphOutAnimation: Animation {
         reduceMotion
             ? .linear(duration: PosterMotion.reduced)
-            : .spring(response: 0.70, dampingFraction: 0.74)
+            : PosterMotion.cameraShutterMorph
     }
 
     var body: some View {
@@ -88,8 +92,6 @@ struct ShutterWaveTimeRail: View {
 
                 ZStack {
                     WaveformPartingCanvas(
-                        width: width,
-                        height: proxy.size.height,
                         centerY: centerY,
                         thumbX: thumbX,
                         continuousIndex: continuousIndex,
@@ -98,8 +100,7 @@ struct ShutterWaveTimeRail: View {
                         barInset: barInset,
                         barCount: barCount,
                         barMaxHeight: barMaxHeight,
-                        barMinHeight: barMinHeight,
-                        shutterDiameter: shutterDiameter
+                        barMinHeight: barMinHeight
                     )
                     .allowsHitTesting(false)
 
@@ -124,7 +125,7 @@ struct ShutterWaveTimeRail: View {
 
             scrubbingYearCapsule
         }
-        .frame(minHeight: 44)
+        .frame(height: CameraChromeMetrics.waveRailHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("时间轴与快门")
         .accessibilityValue(accessibilityValueText)
@@ -169,7 +170,7 @@ struct ShutterWaveTimeRail: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .background(PosterPalette.ink.opacity(0.78))
+        .background(PosterPalette.cardDark)
         .clipShape(Capsule())
         .overlay {
             Capsule(style: .continuous)
@@ -199,6 +200,7 @@ struct ShutterWaveTimeRail: View {
                     releaseValue = nil
                     releaseImpact = 0
                     lastHapticYears = nil
+                    lastModelPublication = .distantPast
                     touchBeganOnShutter = abs(gesture.startLocation.x - thumbX) <= shutterDiameter * 0.55
                     if touchBeganOnShutter {
                         onShutterPress()
@@ -210,14 +212,15 @@ struct ShutterWaveTimeRail: View {
                 if travel >= scrubMorphThreshold {
                     if !isDragging {
                         isDragging = true
-                        // Morph runs on its own spring; scrub position stays 1:1 with the finger.
+                        // Morph runs independently; the scrub position stays
+                        // 1:1 with the finger from the very next sample.
                         withAnimation(morphInAnimation) {
                             morphProgress = 1
                         }
                     }
                     let normalized = xToNormalized(gesture.location.x, width: width)
                     dragValue = normalized
-                    onChange(normalized)
+                    publishModelValueIfNeeded(normalized)
                     updateHaptics(for: normalized)
                 }
             }
@@ -243,7 +246,7 @@ struct ShutterWaveTimeRail: View {
                 }
 
                 if !didMove {
-                    onChange(snapped.normalized)
+                    publishModelValue(snapped.normalized)
                     if startedOnShutter {
                         onCapture()
                     }
@@ -259,7 +262,7 @@ struct ShutterWaveTimeRail: View {
                 guard !reduceMotion, direction != 0, kick > 0 else {
                     releaseValue = nil
                     releaseImpact = 0
-                    onChange(snapped.normalized)
+                    publishModelValue(snapped.normalized)
                     emitReleaseDetent(for: snapped)
                     return
                 }
@@ -273,7 +276,7 @@ struct ShutterWaveTimeRail: View {
                     )
                     releaseImpact = WaveTimeRollPhysics.impact(for: kick)
                 }
-                onChange(snapped.normalized)
+                publishModelValue(snapped.normalized)
                 emitReleaseDetent(for: snapped)
 
                 releaseTask = Task { @MainActor in
@@ -293,6 +296,23 @@ struct ShutterWaveTimeRail: View {
 
     private func emitReleaseDetent(for snapped: TimePosition) {
         onDetent(abs(snapped.offsetDays) < 0.5 ? .now : .decade)
+    }
+
+    private func publishModelValueIfNeeded(_ normalized: Double) {
+        let now = Date.now
+        guard WaveTimeModelPublicationGate.shouldPublish(
+            lastPublishedAt: lastModelPublication,
+            now: now
+        ) else {
+            return
+        }
+        lastModelPublication = now
+        onChange(normalized)
+    }
+
+    private func publishModelValue(_ normalized: Double) {
+        lastModelPublication = Date.now
+        onChange(normalized)
     }
 
     private func updateHaptics(for normalized: Double) {
@@ -341,8 +361,6 @@ struct ShutterWaveTimeRail: View {
 /// Neighbor bars fuse into the idle shutter instead of being crushed aside.
 /// Height envelope stays selection-relative for bars that remain visible.
 private struct WaveformPartingCanvas: View {
-    var width: CGFloat
-    var height: CGFloat
     var centerY: CGFloat
     var thumbX: CGFloat
     var continuousIndex: Double
@@ -352,18 +370,18 @@ private struct WaveformPartingCanvas: View {
     var barCount: Int
     var barMaxHeight: CGFloat
     var barMinHeight: CGFloat
-    var shutterDiameter: CGFloat
 
     var body: some View {
-        let usable = max(1, width - barInset * 2)
-        let spacing = usable / CGFloat(max(1, barCount - 1))
-        let strokeWidth = max(2.5, spacing * 0.42)
-        let openAmount = 1 - morphProgress
-        // Gentle outer nudge only — no hard pocket that compresses neighbors.
-        let softClearance = spacing * 0.85 * openAmount
+        Canvas(opaque: false, colorMode: .nonLinear, rendersAsynchronously: true) { context, size in
+            let width = size.width
+            let usable = max(1, width - barInset * 2)
+            let spacing = usable / CGFloat(max(1, barCount - 1))
+            let strokeWidth = max(2.5, spacing * 0.42)
+            let openAmount = 1 - morphProgress
+            // Gentle outer nudge only — no hard pocket that compresses neighbors.
+            let softClearance = spacing * 0.85 * openAmount
 
-        ZStack {
-            ForEach(0..<barCount, id: \.self) { index in
+            for index in 0..<barCount {
                 let naturalX = barInset + CGFloat(index) * spacing
                 let delta = naturalX - thumbX
                 let absDelta = abs(delta)
@@ -398,17 +416,24 @@ private struct WaveformPartingCanvas: View {
                 let opacity = 0.38 * (1 - fusion)
 
                 if opacity > 0.03 {
-                    Capsule(style: .continuous)
-                        .fill(PosterPalette.paperWhite.opacity(opacity))
-                        .frame(
-                            width: max(1.2, barWidth),
-                            height: max(barMinHeight * (1 - fusion), barHeight)
-                        )
-                        .position(x: drawnX, y: centerY)
+                    let renderedWidth = max(1.2, barWidth)
+                    let renderedHeight = max(barMinHeight * (1 - fusion), barHeight)
+                    let rect = CGRect(
+                        x: drawnX - renderedWidth * 0.5,
+                        y: centerY - renderedHeight * 0.5,
+                        width: renderedWidth,
+                        height: renderedHeight
+                    )
+                    context.fill(
+                        Path(
+                            roundedRect: rect,
+                            cornerRadius: min(renderedWidth, renderedHeight) * 0.5
+                        ),
+                        with: .color(PosterPalette.paperWhite.opacity(opacity))
+                    )
                 }
             }
         }
-        .frame(width: width, height: height)
         .allowsHitTesting(false)
     }
 }
@@ -442,19 +467,9 @@ private struct MorphingShutterCursor: View {
         Double(max(0, 1 - morphProgress * 1.25))
     }
 
-    private var shadowOpacity: Double {
-        let pressMultiplier = isPressed ? 0.35 : 1
-        return Double(max(0, openAmount) * 0.22 * pressMultiplier)
-    }
-
-    private var pressOffset: CGFloat {
-        guard !reduceMotion, isPressed else { return 0 }
-        return 4
-    }
-
     private var pressScale: CGFloat {
         guard !reduceMotion, isPressed else { return 1 }
-        return 0.985
+        return PosterMotion.cameraShutterPressedScale
     }
 
     /// Peaks mid-morph: ghosts visible while bars are mid-fusion.
@@ -484,17 +499,9 @@ private struct MorphingShutterCursor: View {
                     .offset(x: sideOffset)
             }
 
-            // Flat-color base and short top travel suggest a physical key while
-            // staying within FUMIRA's graphic poster language.
-            Capsule(style: .continuous)
-                .fill(PosterPalette.paperWhite)
-                .frame(
-                    width: max(barWidth, morphSize.width),
-                    height: max(barWidth, morphSize.height)
-                )
-                .offset(y: 4 * openAmount)
-                .opacity(ringOpacity)
-
+            // One flat surface: circular at rest, then continuously narrows
+            // into the active time bar. Press feedback comes from scale +
+            // haptics, never from a second pedestal or simulated button depth.
             Capsule(style: .continuous)
                 .fill(PosterPalette.paperWhite.opacity(0.96))
                 .overlay {
@@ -506,45 +513,23 @@ private struct MorphingShutterCursor: View {
                     width: max(barWidth, morphSize.width),
                     height: max(barWidth, morphSize.height)
                 )
-                .overlay(alignment: .top) {
-                    Capsule(style: .continuous)
-                        .stroke(PosterEffects.cameraShutterTopHighlight, lineWidth: 1)
-                        .padding(1)
-                        .opacity(ringOpacity)
-                }
-                .shadow(
-                    color: PosterEffects.cameraShutterBodyShadow.opacity(shadowOpacity),
-                    radius: (isPressed ? 1.5 : 5) * openAmount,
-                    y: (isPressed ? 1 : 3) * openAmount
-                )
-                .offset(y: pressOffset * openAmount)
-
-            Capsule(style: .continuous)
-                .fill(PosterPalette.paperWhite)
-                .frame(
-                    width: shutterDiameter * 0.82 * (1 - morphProgress * 0.9)
-                        + barWidth * morphProgress,
-                    height: shutterDiameter * 0.82 * (1 - morphProgress * 0.9)
-                        + barWidth * morphProgress
-                )
-                .opacity(ringOpacity)
                 .overlay {
                     Capsule(style: .continuous)
                         .stroke(PosterPalette.actionBlue.opacity(0.45), lineWidth: 1)
                         .opacity(ringOpacity)
                 }
-                .offset(y: -1 + pressOffset * openAmount)
 
             Circle()
                 .fill(PosterPalette.actionBlue)
                 .frame(width: 8, height: 8)
                 .opacity(ringOpacity)
-                .offset(y: -1 + pressOffset * openAmount)
         }
         // Fix the animation canvas before applying any scale. This keeps the
         // morph anchored at its center instead of inheriting a changing origin.
         .frame(width: shutterDiameter, height: shutterDiameter, alignment: .center)
-        .scaleEffect(pressScale)
+        // Bottom anchoring turns uniform compression into a short perceived
+        // downward travel while the actual layout position remains unchanged.
+        .scaleEffect(pressScale, anchor: .bottom)
         .animation(
             reduceMotion
                 ? .linear(duration: PosterMotion.reduced)

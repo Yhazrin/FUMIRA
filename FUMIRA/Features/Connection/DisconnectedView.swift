@@ -25,10 +25,12 @@ struct DisconnectedView: View {
                     fontSize: 38
                 )
 
-                Text(message ?? model.lastErrorMessage ?? "FutureCam 连接中断，可以重新连接或改用手机体验。")
-                    .font(.body)
-                    .foregroundStyle(PosterPalette.ink)
-                    .multilineTextAlignment(.leading)
+                if let message {
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(PosterPalette.ink)
+                        .multilineTextAlignment(.leading)
+                }
 
                 Spacer()
 

@@ -74,6 +74,24 @@ enum WaveformGeometry {
     }
 }
 
+// MARK: - Render publication gate
+
+/// The waveform follows a finger from view-local state, while the app model
+/// only needs periodic semantic updates (Live Activity, capture target, etc.).
+/// Limiting those writes avoids invalidating the entire viewfinder on every
+/// touch sample without adding visible latency to the rail itself.
+enum WaveTimeModelPublicationGate {
+    static let minimumInterval: TimeInterval = 1.0 / 30.0
+
+    static func shouldPublish(
+        lastPublishedAt: Date,
+        now: Date,
+        minimumInterval: TimeInterval = minimumInterval
+    ) -> Bool {
+        now.timeIntervalSince(lastPublishedAt) >= minimumInterval
+    }
+}
+
 // MARK: - Shutter morph geometry
 
 enum ShutterMorphGeometry {

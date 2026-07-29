@@ -20,17 +20,17 @@ struct TemporalParkScene: View {
             let size = proxy.size
             ZStack {
                 sky(in: size)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
                 backHill(in: size)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
                 midHill(in: size)
-                    .flatParallax(motionField, depth: .mid)
+                    .spatialDepth(.environment, motionField: motionField, reduceMotion: reduceMotion)
                 pathCone(in: size)
-                    .flatParallax(motionField, depth: .mid)
+                    .spatialDepth(.environment, motionField: motionField, reduceMotion: reduceMotion)
                 trees(in: size)
-                    .flatParallax(motionField, depth: .front)
+                    .spatialDepth(.hero, motionField: motionField, reduceMotion: reduceMotion)
                 monolith(in: size)
-                    .flatParallax(motionField, depth: .front)
+                    .spatialDepth(.hero, motionField: motionField, reduceMotion: reduceMotion)
                 timeOverlay(in: size)
             }
             .frame(width: size.width, height: size.height)

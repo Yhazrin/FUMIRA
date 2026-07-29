@@ -16,11 +16,20 @@ final class PosterShareTests: XCTestCase {
         XCTAssertNotNil(UIImage(data: data))
     }
 
-    func testYearLabelNearNowIsNOW() {
+    func testPosterTimeLabelMatchesVisibleTimePrecision() {
         XCTAssertEqual(PosterComposer.yearLabel(for: .now), "NOW")
-        // Nonlinear map: |normalized| ≲ 0.1 still lands inside the ±0.5y NOW band.
-        XCTAssertEqual(PosterComposer.yearLabel(for: TimePosition(normalized: 0.01)), "NOW")
-        XCTAssertTrue(PosterComposer.yearLabel(for: TimePosition(normalized: 0.2)).contains("年"))
+        XCTAssertEqual(
+            PosterComposer.yearLabel(
+                for: TimePosition(offsetDays: 8.5 * 365.25)
+            ),
+            "8.5 年后"
+        )
+        XCTAssertEqual(
+            PosterComposer.yearLabel(
+                for: TimePosition(offsetDays: -8.5 * 365.25)
+            ),
+            "8.5 年前"
+        )
     }
 
     func testMockStoragePersistsPNGAndReturnsFileURL() async throws {

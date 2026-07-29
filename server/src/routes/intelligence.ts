@@ -3,6 +3,7 @@ import { analyzeUploadedAsset, writeTargetBeat, writeTemporalStory } from "../in
 import { resolveStoryCopyConstraints } from "../storyCopy.js";
 import { resolveUnderstandingCopyConstraints } from "../understandingCopy.js";
 import type {
+  CameraObservationPayload,
   ExactTarget,
   SceneUnderstandingPayload,
   StoryCopyConstraints,
@@ -15,6 +16,8 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
     targetTime?: { offsetYears?: number; compactLabel?: string };
     copyConstraints?: Partial<UnderstandingCopyConstraints>;
     requestId?: string;
+    narrativeAnchor?: { normalizedX?: number; normalizedY?: number };
+    opticalContext?: Partial<CameraObservationPayload>;
   } }>(
     "/v1/understand",
     async (request, reply) => {
@@ -28,6 +31,8 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
         return reply.code(400).send(error("invalid_body", "缺少目标图片、目标时间或 requestId。", false));
       }
       const copyConstraints = resolveUnderstandingCopyConstraints(body.copyConstraints);
+      const narrativeAnchor = normalizeNarrativeAnchor(body.narrativeAnchor);
+      const opticalContext = normalizeOpticalContext(body.opticalContext);
       const result = await analyzeUploadedAsset({
         sourceAssetId: body.sourceAssetId,
         targetTime: {
@@ -36,6 +41,8 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
         },
         copyConstraints,
         requestId: body.requestId.trim(),
+        narrativeAnchor,
+        opticalContext,
       });
       if (!result.ok) {
         logFailure("understanding", body.requestId.trim(), result);
@@ -144,6 +151,49 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
       };
     }
   );
+}
+
+function normalizeNarrativeAnchor(
+  value: { normalizedX?: number; normalizedY?: number } | undefined
+): { normalizedX: number; normalizedY: number } | undefined {
+  if (
+    !Number.isFinite(value?.normalizedX)
+    || !Number.isFinite(value?.normalizedY)
+  ) {
+    return undefined;
+  }
+  return {
+    normalizedX: Math.min(Math.max(value?.normalizedX as number, 0), 1),
+    normalizedY: Math.min(Math.max(value?.normalizedY as number, 0), 1),
+  };
+}
+
+function normalizeOpticalContext(
+  value: Partial<CameraObservationPayload> | undefined
+): CameraObservationPayload | undefined {
+  if (!value) return undefined;
+  const allowedLightConditions = new Set([
+    "lowLight",
+    "balanced",
+    "bright",
+    "unknown",
+  ]);
+  const lightCondition = allowedLightConditions.has(value.lightCondition ?? "")
+    ? value.lightCondition as CameraObservationPayload["lightCondition"]
+    : "unknown";
+  const finite = (candidate: number | undefined): number | undefined =>
+    Number.isFinite(candidate) ? candidate : undefined;
+  return {
+    lensPosition: value.lensPosition === "front" || value.lensPosition === "back"
+      ? value.lensPosition
+      : undefined,
+    focusPosition: finite(value.focusPosition),
+    exposureDurationSeconds: finite(value.exposureDurationSeconds),
+    iso: finite(value.iso),
+    exposureTargetOffset: finite(value.exposureTargetOffset),
+    zoomFactor: finite(value.zoomFactor),
+    lightCondition,
+  };
 }
 
 function error(errorCode: string, userMessage: string, retryable: boolean) {

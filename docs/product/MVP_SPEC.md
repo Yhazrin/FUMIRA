@@ -14,7 +14,8 @@ then reveals the image and story together.
   failure, model settings, and share states
 - Fully interactive mock flow
 - Valid JPEG capture data visible throughout the pipeline
-- Real rear-camera permission, live full-screen preview and photo capture on iPhone
+- Real rear-camera permission, live full-width upper-card preview, blue camera
+  body controls, and photo capture on iPhone
 - Automatic interactive scene fallback when running in Simulator
 - Structured scene subjects, identity rules, clues, and change drivers
 - Target-photo-first pipeline with no pre-generation understanding/story gate

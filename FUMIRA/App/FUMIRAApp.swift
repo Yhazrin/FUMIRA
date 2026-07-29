@@ -34,7 +34,7 @@ struct FUMIRAApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(model: model)
-                .preferredColorScheme(model.phase == .viewfinder ? nil : .light)
+                .preferredColorScheme(model.phase == .viewfinder ? .dark : .light)
                 .task {
                     await model.prepare()
                     #if DEBUG
@@ -49,18 +49,30 @@ struct FUMIRAApp: App {
 
     #if DEBUG
     private func runDebugAuditTransitionIfNeeded() async {
+        let delay = auditTransitionDelay
         switch ProcessInfo.processInfo.environment["FUMIRA_AUDIT_TRANSITION"] {
         case "photoDrop":
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled, model.phase == .shuttered else { return }
             model.phase = .generating
         case "result":
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled, model.phase == .generating else { return }
             model.phase = .result
+        case "capture":
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, model.phase == .shuttered else { return }
+            model.phase = .understanding
         default:
             return
         }
+    }
+
+    private var auditTransitionDelay: Duration {
+        let milliseconds = Int(
+            ProcessInfo.processInfo.environment["FUMIRA_AUDIT_DELAY_MS"] ?? "900"
+        ) ?? 900
+        return .milliseconds(max(milliseconds, 0))
     }
     #endif
 }

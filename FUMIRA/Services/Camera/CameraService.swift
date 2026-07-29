@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import UIKit
 
 enum CameraAuthorization: Sendable {
@@ -94,6 +95,32 @@ enum CameraAspectRatio: String, CaseIterable, Sendable, Equatable {
         case .square: .fullScreen
         }
     }
+
+    /// Resolves a two-finger pinch into the nearest supported camera framing.
+    /// Opening the pinch expands toward the native full-frame composition;
+    /// closing it tightens toward the square crop. The mapping always begins
+    /// at the ratio held when the gesture began, so it is interruptible and
+    /// never accumulates stale gesture samples.
+    static func aspectRatio(
+        afterPinchMagnification magnification: CGFloat,
+        startingAt start: CameraAspectRatio
+    ) -> CameraAspectRatio {
+        guard magnification.isFinite, magnification > 0 else { return start }
+
+        let pinchStep: CGFloat = 1.16
+        let logarithmicDistance = log(magnification) / log(pinchStep)
+        let offset = Int(logarithmicDistance.rounded(.towardZero))
+        let startIndex = pinchOrder.firstIndex(of: start) ?? 0
+        let resolvedIndex = min(max(startIndex + offset, 0), pinchOrder.count - 1)
+        return pinchOrder[resolvedIndex]
+    }
+
+    private static let pinchOrder: [CameraAspectRatio] = [
+        .square,
+        .classic,
+        .widescreen,
+        .fullScreen,
+    ]
 }
 
 struct CameraControlSnapshot: Sendable, Equatable {
@@ -157,7 +184,19 @@ protocol CameraService: Sendable {
     func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto
 }
 
-actor MockCameraService: CameraService {
+/// Optional short-lived context sampler. It never produces a user-facing video
+/// and retains only a bounded set of low-resolution frames around the shutter.
+protocol TemporalCameraSampling: Sendable {
+    func microTimeSlice(around shutterDate: Date) async -> MicroTimeSlice
+}
+
+protocol CameraOpticalContextProviding: Sendable {
+    func opticalContext() async -> TemporalOpticalContext
+}
+
+actor MockCameraService: CameraService, TemporalCameraSampling, CameraOpticalContextProviding {
+    private var mostRecentCaptureData: Data?
+
     func requestAuthorization() async throws -> CameraAuthorization {
         .authorized
     }
@@ -167,41 +206,58 @@ actor MockCameraService: CameraService {
     func stopPreview() async {}
 
     func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto {
-        let data = await MainActor.run {
-            let size = CGSize(width: 1_200, height: 1_600)
-            let renderer = UIGraphicsImageRenderer(size: size)
-            return renderer.jpegData(withCompressionQuality: 0.92) { context in
-                let cg = context.cgContext
-                UIColor(red: 0.49, green: 0.81, blue: 0.98, alpha: 1).setFill()
-                cg.fill(CGRect(origin: .zero, size: size))
-
-                UIColor(red: 0.39, green: 0.72, blue: 0.38, alpha: 1).setFill()
-                cg.fillEllipse(in: CGRect(x: -300, y: 720, width: 1_300, height: 900))
-                UIColor(red: 0.24, green: 0.60, blue: 0.30, alpha: 1).setFill()
-                cg.fillEllipse(in: CGRect(x: 450, y: 650, width: 1_100, height: 1_000))
-
-                UIColor(red: 0.95, green: 0.84, blue: 0.58, alpha: 1).setFill()
-                let path = UIBezierPath()
-                path.move(to: CGPoint(x: 510, y: 1_600))
-                path.addLine(to: CGPoint(x: 690, y: 1_600))
-                path.addLine(to: CGPoint(x: 630, y: 770))
-                path.addLine(to: CGPoint(x: 570, y: 770))
-                path.close()
-                path.fill()
-
-                for (x, y, scale) in [(250.0, 650.0, 1.0), (880.0, 720.0, 1.25), (520.0, 850.0, 0.72)] {
-                    UIColor(red: 0.24, green: 0.34, blue: 0.16, alpha: 1).setFill()
-                    cg.fill(CGRect(x: x - 16 * scale, y: y, width: 32 * scale, height: 250 * scale))
-                    UIColor(red: 0.08, green: 0.47, blue: 0.23, alpha: 1).setFill()
-                    cg.fillEllipse(in: CGRect(
-                        x: x - 120 * scale,
-                        y: y - 150 * scale,
-                        width: 240 * scale,
-                        height: 250 * scale
-                    ))
-                }
+        let data = try await MainActor.run {
+            // Keep SwiftUI's logical-point canvas near an iPhone width so
+            // fixed-size poster details match the live preview. Renderer scale
+            // raises pixel density without shrinking those details.
+            let logicalSize = CGSize(width: 400, height: 1_600.0 / 3.0)
+            let renderer = ImageRenderer(
+                content: TemporalParkScene(time: .now, cornerRadius: 0)
+                    .frame(
+                        width: logicalSize.width,
+                        height: logicalSize.height
+                    )
+            )
+            renderer.proposedSize = ProposedViewSize(logicalSize)
+            renderer.scale = 3
+            renderer.isOpaque = true
+            guard
+                let image = renderer.uiImage,
+                let data = image.jpegData(compressionQuality: 0.92)
+            else {
+                throw PhotoImportAdapter.ImportError.invalidImage
             }
+            return data
         }
-        return try PhotoImportAdapter.makeCapturedPhoto(from: data, composition: composition)
+        let photo = try PhotoImportAdapter.makeCapturedPhoto(
+            from: data,
+            composition: composition
+        )
+        mostRecentCaptureData = photo.data
+        return photo
+    }
+
+    func microTimeSlice(around shutterDate: Date) async -> MicroTimeSlice {
+        try? await Task.sleep(for: .milliseconds(280))
+        guard let data = mostRecentCaptureData else { return .unavailable }
+        let offsets: [TimeInterval] = [-0.48, -0.32, -0.16, 0, 0.14, 0.28]
+        return MicroTimeSlice(
+            duration: 0.76,
+            frames: offsets.map {
+                TemporalFrameSample(offsetFromShutter: $0, jpegData: data)
+            }
+        )
+    }
+
+    func opticalContext() async -> TemporalOpticalContext {
+        TemporalOpticalContext(
+            lensPosition: .back,
+            focusPosition: 0.62,
+            exposureDurationSeconds: 1 / 120,
+            iso: 80,
+            exposureTargetOffset: 0,
+            zoomFactor: 1,
+            lightCondition: .balanced
+        )
     }
 }

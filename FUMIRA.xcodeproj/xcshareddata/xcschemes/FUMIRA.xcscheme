@@ -79,6 +79,17 @@
                ReferencedContainer = "container:FUMIRA.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C210695895CB2DAE72C47FD1"
+               BuildableName = "FUMIRAUITests.xctest"
+               BlueprintName = "FUMIRAUITests"
+               ReferencedContainer = "container:FUMIRA.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

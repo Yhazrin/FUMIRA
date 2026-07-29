@@ -9,6 +9,23 @@ enum HeroCoordinateSpace {
 struct HeroSlotPreference: Equatable, Sendable {
     var frame: CGRect
     var cornerRadius: CGFloat
+
+    func interpolated(
+        to destination: HeroSlotPreference,
+        progress rawProgress: CGFloat
+    ) -> HeroSlotPreference {
+        let progress = min(max(rawProgress, 0), 1)
+        return HeroSlotPreference(
+            frame: CGRect(
+                x: frame.minX + (destination.frame.minX - frame.minX) * progress,
+                y: frame.minY + (destination.frame.minY - frame.minY) * progress,
+                width: frame.width + (destination.frame.width - frame.width) * progress,
+                height: frame.height + (destination.frame.height - frame.height) * progress
+            ),
+            cornerRadius: cornerRadius
+                + (destination.cornerRadius - cornerRadius) * progress
+        )
+    }
 }
 
 /// Identifies the phase that owns a shared-photo destination. During an
@@ -20,6 +37,9 @@ enum HeroSlotOwner: Hashable, Sendable {
     case understanding
     case storyWriting
     case generating
+    /// The generated frame keeps the same RootView-owned photo object when the
+    /// pipeline resolves. ResultView only publishes this destination geometry.
+    case result
 }
 
 struct HeroSlotPreferenceKey: PreferenceKey {

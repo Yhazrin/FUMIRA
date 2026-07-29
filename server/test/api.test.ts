@@ -598,12 +598,28 @@ describe("fumira-server", () => {
     const { buildApp } = await import("../src/index.js");
     const overlong = "这是一段故意超过页面字符预算的动态故事文字".repeat(8);
     let analyzedTargetTime: { offsetYears: number; compactLabel: string } | undefined;
+    let analyzedNarrativeAnchor:
+      | { normalizedX: number; normalizedY: number }
+      | undefined;
+    let analyzedOpticalContext:
+      | {
+          lensPosition?: "front" | "back";
+          focusPosition?: number;
+          exposureDurationSeconds?: number;
+          iso?: number;
+          exposureTargetOffset?: number;
+          zoomFactor?: number;
+          lightCondition: "lowLight" | "balanced" | "bright" | "unknown";
+        }
+      | undefined;
     let storyTargetTime:
       | { offsetDays: number; targetDateISO: string; compactLabel: string }
       | undefined;
     const intelligence: MiniMaxIntelligenceAdapter = {
       async analyzeImage(input) {
         analyzedTargetTime = input.targetTime;
+        analyzedNarrativeAnchor = input.narrativeAnchor;
+        analyzedOpticalContext = input.opticalContext;
         return {
           ok: true as const,
           value: {
@@ -706,12 +722,38 @@ describe("fumira-server", () => {
             identityRule: 20,
           },
           requestId: "req-understand",
+          narrativeAnchor: {
+            normalizedX: 0.27,
+            normalizedY: 0.63,
+          },
+          opticalContext: {
+            lensPosition: "back",
+            focusPosition: 0.62,
+            exposureDurationSeconds: 0.008333,
+            iso: 80,
+            exposureTargetOffset: 0,
+            zoomFactor: 1,
+            lightCondition: "balanced",
+          },
         },
       });
       assert.equal(understand.statusCode, 200);
       assert.deepEqual(analyzedTargetTime, {
         offsetYears: 20,
         compactLabel: "20 年后",
+      });
+      assert.deepEqual(analyzedNarrativeAnchor, {
+        normalizedX: 0.27,
+        normalizedY: 0.63,
+      });
+      assert.deepEqual(analyzedOpticalContext, {
+        lensPosition: "back",
+        focusPosition: 0.62,
+        exposureDurationSeconds: 0.008333,
+        iso: 80,
+        exposureTargetOffset: 0,
+        zoomFactor: 1,
+        lightCondition: "balanced",
       });
       const understandBody = understand.json();
       assert.equal(understandBody.copyConstraints.locationType, 8);

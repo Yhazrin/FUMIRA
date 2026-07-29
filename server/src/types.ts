@@ -426,6 +426,11 @@ export interface MiniMaxIntelligenceAdapter {
     targetTime: { offsetYears: number; compactLabel: string };
     copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
+    narrativeAnchor?: {
+      normalizedX: number;
+      normalizedY: number;
+    };
+    opticalContext?: CameraObservationPayload;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>>;
   writeStory(input: {
     understanding: SceneUnderstandingPayload;
@@ -444,6 +449,16 @@ export interface MiniMaxIntelligenceAdapter {
     target: ExactTarget;
     requestId: string;
   }): Promise<MiniMaxIntelligenceResult<StoryBeatPayload>>;
+}
+
+export interface CameraObservationPayload {
+  lensPosition?: "front" | "back";
+  focusPosition?: number;
+  exposureDurationSeconds?: number;
+  iso?: number;
+  exposureTargetOffset?: number;
+  zoomFactor?: number;
+  lightCondition: "lowLight" | "balanced" | "bright" | "unknown";
 }
 
 /**

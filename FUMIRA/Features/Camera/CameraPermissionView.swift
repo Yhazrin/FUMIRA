@@ -3,24 +3,66 @@ import SwiftUI
 
 struct CameraPermissionView: View {
     let model: AppModel
+    var onLaunchViewfinder: (() -> Void)?
 
     /// Hidden until we know the user still needs a prompt (first grant / denied).
     @State private var showPrompt = false
 
     var body: some View {
-        PosterScreenContainer {
+        Group {
             if showPrompt {
-                promptContent
+                PosterScreenContainer {
+                    promptContent
+                }
             } else {
-                // Solid hold (not Color.clear) while auto-skipping to the viewfinder.
-                PosterPalette.canvas
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityLabel("正在进入取景器")
+                cameraEntryHold
             }
         }
         .task {
             await resolveEntry()
         }
+        .preferredColorScheme(showPrompt ? .light : .dark)
+    }
+
+    /// Permission can resolve faster than the viewfinder mounts. Hold the exact
+    /// destination silhouette during that short gap so entry never flashes a
+    /// white page or a one-pixel mask line.
+    private var cameraEntryHold: some View {
+        GeometryReader { proxy in
+            let layout = CameraCompositionGeometry.layout(
+                aspectRatio: model.cameraAspectRatio,
+                in: proxy.size
+            )
+            let shape = UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: 0,
+                    bottomLeading: layout.cornerRadius,
+                    bottomTrailing: layout.cornerRadius,
+                    topTrailing: 0
+                ),
+                style: .continuous
+            )
+
+            ZStack {
+                PosterPalette.cameraBody
+                    .ignoresSafeArea()
+
+                shape
+                    .fill(PosterPalette.sky)
+                    .frame(
+                        width: layout.heroFrame.width,
+                        height: layout.heroFrame.height
+                    )
+                    .position(
+                        x: layout.heroFrame.midX,
+                        y: layout.heroFrame.midY
+                    )
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .ignoresSafeArea()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("正在进入取景器")
     }
 
     private var promptContent: some View {
@@ -35,8 +77,8 @@ struct CameraPermissionView: View {
                 .clipShape(Circle())
                 .accessibilityHidden(true)
 
-            Text(guidance)
-                .font(.headline.weight(.semibold))
+            Text("拍下现在")
+                .font(PosterTypography.screenTitle)
                 .foregroundStyle(PosterPalette.ink)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -54,7 +96,7 @@ struct CameraPermissionView: View {
                     ? "请求相机权限并进入实时取景"
                     : "继续进入取景器"
             ) {
-                Task { await model.grantCameraAccess() }
+                requestViewfinder()
             }
             .frame(maxWidth: 280)
 
@@ -63,15 +105,14 @@ struct CameraPermissionView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var guidance: String {
-        model.isUsingLiveCamera
-            ? "允许相机权限，开始拍摄"
-            : "准备好后，开始取景"
-    }
-
     private func resolveEntry() async {
         guard canEnterWithoutPrompt else {
             showPrompt = true
+            return
+        }
+
+        if let onLaunchViewfinder {
+            onLaunchViewfinder()
             return
         }
 
@@ -85,8 +126,21 @@ struct CameraPermissionView: View {
     /// Live camera skips only when the system already granted access.
     /// Mock / first-time live still shows the prompt so the user consents once.
     private var canEnterWithoutPrompt: Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_AUTO_CAMERA_GRANT"] == "1" {
+            return true
+        }
+        #endif
         guard model.isUsingLiveCamera else { return false }
         return AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+    }
+
+    private func requestViewfinder() {
+        if let onLaunchViewfinder {
+            onLaunchViewfinder()
+        } else {
+            Task { await model.grantCameraAccess() }
+        }
     }
 }
 

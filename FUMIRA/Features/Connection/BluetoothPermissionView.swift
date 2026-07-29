@@ -16,8 +16,8 @@ struct BluetoothPermissionView: View {
                     .clipShape(Circle())
                     .accessibilityHidden(true)
 
-                Text("允许蓝牙，连接 FutureCam")
-                    .font(.headline.weight(.semibold))
+                Text("连接 FutureCam")
+                    .font(PosterTypography.screenTitle)
                     .foregroundStyle(PosterPalette.ink)
                     .multilineTextAlignment(.center)
 

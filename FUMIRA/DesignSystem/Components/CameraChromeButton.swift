@@ -1,42 +1,85 @@
 import SwiftUI
+import UIKit
 
 enum CameraChromeMetrics {
-    static let topRowHeight: CGFloat = 48
-    static let islandSideCapsuleWidth: CGFloat = 60
-    static let islandSideCapsuleHeight: CGFloat = 44
+    static let topRowHeight: CGFloat = 44
+    static let controlDiameter: CGFloat = 44
+    static let compactFeedbackHeight: CGFloat = 36
+    /// Fixed optical bounds for the morphing shutter + waveform. Geometry
+    /// placement uses the same height so it can decide whether the control
+    /// fits in the exposed blue body or must float over the preview.
+    static let waveRailStageHeight: CGFloat = 100
+    static let waveRailHeight: CGFloat = 132
+
+    /// Root camera surfaces are full-bleed, so their local GeometryReader
+    /// reports zero safe-area insets. Read the system-owned window geometry
+    /// once here so live chrome and its capture afterimage cannot disagree.
+    @MainActor
+    static var activeWindowSafeAreaInsets: UIEdgeInsets {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets ?? .zero
+    }
 }
 
-/// Lightweight circular control for immersive camera chrome — no thick cards.
+/// Solid circular camera action: Doraemon blue, white SF Symbol, no glass card.
 struct CameraChromeButton: View {
     let systemImage: String
     var isEnabled: Bool = true
+    var rotation: Angle = .zero
     var accessibilityLabelText: String
     var accessibilityHintText: String = ""
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(
-                    isEnabled
-                        ? PosterPalette.paperWhite
-                        : PosterPalette.paperWhite.opacity(0.35)
-                )
-                .frame(width: 48, height: 48)
-                .background(PosterEffects.cameraChromeFill)
-                .clipShape(Circle())
-                .overlay {
-                    Circle()
-                        .stroke(PosterEffects.cameraChromeStroke, lineWidth: 1)
-                }
-                .contentShape(Circle())
+            CameraChromeGlyph(
+                systemImage: systemImage,
+                isEnabled: isEnabled,
+                rotation: rotation
+            )
         }
         .buttonStyle(PosterPressStyle())
         .disabled(!isEnabled)
-        .frame(minWidth: 44, minHeight: 44)
+        .frame(
+            minWidth: CameraChromeMetrics.controlDiameter,
+            minHeight: CameraChromeMetrics.controlDiameter
+        )
         .accessibilityLabel(accessibilityLabelText)
         .accessibilityHint(accessibilityHintText)
+    }
+}
+
+/// Shared visual surface for the viewfinder's 44pt camera controls. Keeping
+/// the glyph separate lets `PhotosPicker` use the exact same button geometry.
+struct CameraChromeGlyph: View {
+    let systemImage: String
+    var isEnabled: Bool = true
+    var rotation: Angle = .zero
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(PosterTypography.label)
+            .foregroundStyle(
+                isEnabled
+                    ? PosterEffects.cameraActionForeground
+                    : PosterEffects.cameraActionForeground.opacity(0.35)
+            )
+            .rotationEffect(rotation)
+            .frame(
+                width: CameraChromeMetrics.controlDiameter,
+                height: CameraChromeMetrics.controlDiameter
+            )
+            .background(PosterEffects.cameraActionFill)
+            .clipShape(Circle())
+            .shadow(
+                color: PosterEffects.control,
+                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
+                y: PosterEffects.cameraChromeFeedbackShadowOffset
+            )
+            .contentShape(Circle())
     }
 }
 

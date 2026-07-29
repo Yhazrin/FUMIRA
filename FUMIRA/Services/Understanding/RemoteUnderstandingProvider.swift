@@ -23,7 +23,9 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
                     let understanding = try await understand(
                         assetID: assetID,
                         targetTime: request.targetTime,
-                        requestID: request.sessionID
+                        requestID: request.sessionID,
+                        narrativeAnchor: request.narrativeAnchor,
+                        opticalContext: request.opticalContext
                     )
                     continuation.yield(.progress(label: "锁定空间锚点与时间层", value: 0.82))
                     continuation.yield(.completed(understanding))
@@ -71,7 +73,9 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
     private func understand(
         assetID: String,
         targetTime: TimePosition,
-        requestID: UUID
+        requestID: UUID,
+        narrativeAnchor: TemporalSubjectAnchor?,
+        opticalContext: TemporalOpticalContext
     ) async throws -> SceneUnderstanding {
         var urlRequest = URLRequest(url: baseURL.appending(path: "v1/understand"))
         urlRequest.httpMethod = "POST"
@@ -82,7 +86,11 @@ actor RemoteUnderstandingProvider: ImageUnderstandingProvider {
             sourceAssetId: assetID,
             targetTime: UnderstandingTargetTimeRelayDTO(targetTime),
             copyConstraints: .appLayout,
-            requestId: requestID.uuidString
+            requestId: requestID.uuidString,
+            narrativeAnchor: narrativeAnchor.map(NarrativeAnchorRelayDTO.init),
+            opticalContext: opticalContext.isAvailable
+                ? OpticalContextRelayDTO(opticalContext)
+                : nil
         ))
 
         let (data, response) = try await session.data(for: urlRequest)
@@ -126,6 +134,42 @@ private struct UnderstandRequest: Encodable {
     let targetTime: UnderstandingTargetTimeRelayDTO
     let copyConstraints: UnderstandingCopyConstraintsRelayDTO
     let requestId: String
+    let narrativeAnchor: NarrativeAnchorRelayDTO?
+    let opticalContext: OpticalContextRelayDTO?
+}
+
+private struct NarrativeAnchorRelayDTO: Codable {
+    let normalizedX: Double
+    let normalizedY: Double
+
+    init(_ anchor: TemporalSubjectAnchor) {
+        normalizedX = anchor.normalizedX
+        normalizedY = anchor.normalizedY
+    }
+}
+
+private struct OpticalContextRelayDTO: Codable {
+    let lensPosition: String?
+    let focusPosition: Float?
+    let exposureDurationSeconds: Double?
+    let iso: Float?
+    let exposureTargetOffset: Float?
+    let zoomFactor: Double?
+    let lightCondition: String
+
+    init(_ context: TemporalOpticalContext) {
+        lensPosition = switch context.lensPosition {
+        case .front: "front"
+        case .back: "back"
+        case nil: nil
+        }
+        focusPosition = context.focusPosition
+        exposureDurationSeconds = context.exposureDurationSeconds
+        iso = context.iso
+        exposureTargetOffset = context.exposureTargetOffset
+        zoomFactor = context.zoomFactor
+        lightCondition = context.lightCondition.rawValue
+    }
 }
 
 private struct UnderstandingTargetTimeRelayDTO: Codable {

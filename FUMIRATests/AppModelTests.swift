@@ -21,6 +21,71 @@ final class AppModelTests: XCTestCase {
         #endif
     }
 
+    func testResultRevealFallbackCompletesTimeDoor() {
+        let model = AppModel(dependencies: .test)
+        model.prepareResultReveal()
+
+        model.updateResultRevealProgress(0.42)
+        XCTAssertEqual(model.resultRevealProgress, 0.42, accuracy: 0.001)
+
+        model.completeResultReveal()
+        XCTAssertEqual(model.resultRevealProgress, 1, accuracy: 0.001)
+    }
+
+    func testResultRevealMapsShortestYawArcIntoContinuousProgress() {
+        XCTAssertEqual(
+            ResultView.revealProgress(yaw: 0.115, baseline: 0),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ResultView.revealProgress(yaw: 0.23, baseline: 0),
+            1,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ResultView.revealProgress(
+                yaw: -.pi + 0.115,
+                baseline: .pi
+            ),
+            0.5,
+            accuracy: 0.001
+        )
+    }
+
+    func testRealityAlignmentUsesCapturedAttitudeAndWrapsAngles() {
+        let captured = CaptureMotionSample(
+            timestamp: 1,
+            roll: .pi,
+            pitch: 0,
+            yaw: 0,
+            rotationRate: 0,
+            acceleration: 0,
+            stability: 1
+        )
+
+        XCTAssertEqual(
+            RealityAlignmentGeometry.progress(
+                currentRoll: -.pi,
+                currentPitch: 0,
+                currentYaw: 0,
+                captured: captured
+            ),
+            1,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            RealityAlignmentGeometry.progress(
+                currentRoll: -.pi + 0.12,
+                currentPitch: 0,
+                currentYaw: 0,
+                captured: captured
+            ),
+            0.5,
+            accuracy: 0.001
+        )
+    }
+
     func testMockCameraHidesUnsupportedLiveControls() async {
         let model = AppModel(dependencies: .test)
         await model.prepare()
@@ -55,11 +120,27 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.activeSessionID)
     }
 
+    func testCancelPipelineWorksDuringRealityUnderstanding() {
+        let model = AppModel(dependencies: .test)
+        model.phase = .understanding
+        model.activeSessionID = UUID()
+        model.understandingProgress = 0.48
+        model.pipelineStatusText = "正在读取空间"
+
+        model.cancelPipeline()
+
+        XCTAssertEqual(model.phase, .viewfinder)
+        XCTAssertNil(model.activeSessionID)
+        XCTAssertEqual(model.understandingProgress, 0)
+        XCTAssertTrue(model.pipelineStatusText.isEmpty)
+    }
+
     func testCaptureCompletesTargetPhotoFirstPipelineWithoutReviewGate() async {
         let model = AppModel(dependencies: .test)
         await model.prepare()
         model.beginPhoneOnlyPath()
         await model.grantCameraAccess()
+        model.selectNarrativeSubject(at: CGPoint(x: 0.27, y: 0.63))
 
         await model.capture()
 
@@ -74,6 +155,39 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.generationProgress, 1)
         XCTAssertEqual(model.understandingProgress, 1)
         XCTAssertEqual(model.storyProgress, 1)
+        XCTAssertEqual(model.temporalCapturePacket?.origin, .camera)
+        XCTAssertEqual(model.temporalCapturePacket?.composition, .classic)
+        XCTAssertEqual(model.temporalCapturePacket?.microTimeSlice.frames.count, 6)
+        XCTAssertTrue(model.temporalCapturePacket?.microTimeSlice.isAvailable == true)
+        XCTAssertEqual(model.decodedMicroTimeSliceFrames.count, 6)
+        XCTAssertTrue(model.temporalCapturePacket?.visualContext.isAvailable == true)
+        XCTAssertTrue(model.temporalCapturePacket?.opticalContext.isAvailable == true)
+        XCTAssertEqual(
+            model.temporalCapturePacket?.opticalContext.lightCondition,
+            .balanced
+        )
+        XCTAssertEqual(
+            model.temporalCapturePacket?.visualContext.salientRegions.count,
+            2
+        )
+        XCTAssertEqual(
+            model.temporalCapturePacket?.subjectAnchor,
+            TemporalSubjectAnchor(normalizedX: 0.27, normalizedY: 0.63)
+        )
+    }
+
+    func testTemporalSalientRegionClampsToNormalizedBounds() {
+        let region = TemporalSalientRegion(
+            normalizedX: -0.4,
+            normalizedY: 1.4,
+            normalizedWidth: 2,
+            normalizedHeight: -1
+        )
+
+        XCTAssertEqual(region.normalizedX, 0)
+        XCTAssertEqual(region.normalizedY, 1)
+        XCTAssertEqual(region.normalizedWidth, 1)
+        XCTAssertEqual(region.normalizedHeight, 0)
     }
 
     func testPipelineOrdersSourceUnderstandingAndStoryBeforeGeneration() async {
@@ -137,6 +251,25 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(past, present)
         XCTAssertNotEqual(present, future)
         XCTAssertNotEqual(past, future)
+    }
+
+    func testVisibleNarrativeDoesNotRepeatDedicatedTimeLabel() {
+        let time = TimePosition(offsetDays: 8.5 * 365.25)
+
+        XCTAssertEqual(
+            StoryCopyPolicy.removingRepeatedTimePrefix(
+                from: "8.5 年后，植被覆盖了旧步道。",
+                time: time
+            ),
+            "植被覆盖了旧步道。"
+        )
+        XCTAssertEqual(
+            StoryCopyPolicy.removingRepeatedTimePrefix(
+                from: "树影越过了旧围墙。",
+                time: time
+            ),
+            "树影越过了旧围墙。"
+        )
     }
 
     func testMockFallbackPromptStaysShortAndPanoramic() {
@@ -239,6 +372,132 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(preferences[.generating], generating)
         XCTAssertEqual(preferences[.understanding], understanding)
+    }
+
+    func testHeroSlotPreferencesRetainResultDestinationForPersistentPhoto() {
+        let generating = HeroSlotPreference(
+            frame: CGRect(x: 80, y: 260, width: 180, height: 240),
+            cornerRadius: PosterRadius.photoPaper
+        )
+        let result = HeroSlotPreference(
+            frame: CGRect(x: 0, y: 58, width: 390, height: 520),
+            cornerRadius: PosterRadius.card
+        )
+        var preferences = HeroSlotPreferenceKey.defaultValue
+
+        HeroSlotPreferenceKey.reduce(value: &preferences) {
+            [.generating: generating]
+        }
+        HeroSlotPreferenceKey.reduce(value: &preferences) {
+            [.result: result]
+        }
+
+        XCTAssertEqual(preferences[.generating], generating)
+        XCTAssertEqual(preferences[.result], result)
+    }
+
+    func testSpatialTimelinesOnlyRunForNarrativeTransitions() {
+        XCTAssertEqual(
+            MotionTimeline.transition(from: .viewfinder, to: .shuttered),
+            .capture
+        )
+        XCTAssertEqual(
+            MotionTimeline.transition(from: .shuttered, to: .understanding),
+            .capture
+        )
+        XCTAssertEqual(
+            MotionTimeline.transition(from: .generating, to: .result),
+            .timeReveal
+        )
+        XCTAssertEqual(
+            MotionTimeline.transition(from: .share, to: .result),
+            .none
+        )
+        XCTAssertEqual(
+            MotionTimeline.transition(from: .connection, to: .cameraPermission),
+            .cameraEntry
+        )
+    }
+
+    func testSpatialMotionClampAndRangeMapping() {
+        XCTAssertEqual(FUMIRASpatialMotion.clamp(-1), 0)
+        XCTAssertEqual(FUMIRASpatialMotion.clamp(2), 1)
+        XCTAssertEqual(
+            FUMIRASpatialMotion.map(0.5, from: 0.25...0.75, to: 10...30),
+            20,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.map(-1, from: 0.25...0.75, to: 10...30),
+            10,
+            accuracy: 0.001
+        )
+    }
+
+    func testTimeDoorMotionUsesTheSharedRevealProgress() {
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorDepartureProgress(0),
+            0,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorDepartureProgress(0.54),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorDepartureProgress(1),
+            1,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorFadeProgress(0.47),
+            0,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorFadeProgress(0.71),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            FUMIRASpatialMotion.timeDoorFadeProgress(1),
+            1,
+            accuracy: 0.001
+        )
+    }
+
+    func testSpatialDepthIsOrderedAndChromeStaysStable() {
+        XCTAssertLessThan(
+            SpatialDepthLayer.background.parallaxPoints,
+            SpatialDepthLayer.environment.parallaxPoints
+        )
+        XCTAssertLessThan(
+            SpatialDepthLayer.environment.parallaxPoints,
+            SpatialDepthLayer.hero.parallaxPoints
+        )
+        XCTAssertLessThanOrEqual(SpatialDepthLayer.chrome.parallaxPoints, 2)
+        XCTAssertEqual(SpatialDepthLayer.chrome.rotationDegrees, 0)
+    }
+
+    func testSpatialPhotoShadowMovesOppositeYawAndLiftsAway() {
+        let neutral = FUMIRASpatialMotion.photoShadowOffset(
+            lift: 0,
+            pitch: 0,
+            yaw: 0,
+            motionRoll: 0,
+            motionPitch: 0
+        )
+        let tilted = FUMIRASpatialMotion.photoShadowOffset(
+            lift: 0.8,
+            pitch: 0,
+            yaw: 8,
+            motionRoll: 0,
+            motionPitch: 0
+        )
+
+        XCTAssertLessThan(tilted.width, neutral.width)
+        XCTAssertGreaterThan(tilted.height, neutral.height)
     }
 
     func testRemoteGenerationPollingOutlivesRelayTimeoutBudget() {
@@ -515,6 +774,15 @@ final class AppModelTests: XCTestCase {
         let ratio = Double(photo.pixelWidth) / Double(photo.pixelHeight)
         XCTAssertEqual(ratio, 4.0 / 3.0, accuracy: 0.02)
         XCTAssertNotNil(UIImage(data: photo.data))
+        XCTAssertEqual(model.temporalCapturePacket?.origin, .photoLibrary)
+        XCTAssertFalse(model.temporalCapturePacket?.microTimeSlice.isAvailable ?? true)
+        XCTAssertFalse(model.temporalCapturePacket?.motion.wasAnchored ?? true)
+        XCTAssertTrue(model.temporalCapturePacket?.visualContext.isAvailable == true)
+        XCTAssertFalse(model.temporalCapturePacket?.opticalContext.isAvailable ?? true)
+        XCTAssertEqual(
+            model.temporalCapturePacket?.visualContext.salientRegions.count,
+            2
+        )
     }
 
     func testRegenerateResultReplacesFrameAndSupportsOneUndo() async {

@@ -6,6 +6,8 @@ struct ImageUnderstandingRequest: Sendable {
     let targetTime: TimePosition
     let sessionID: UUID
     let model: AIModelOption
+    var narrativeAnchor: TemporalSubjectAnchor? = nil
+    var opticalContext: TemporalOpticalContext = .unavailable
 }
 
 enum UnderstandingEvent: Sendable {

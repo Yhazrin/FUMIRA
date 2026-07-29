@@ -67,6 +67,37 @@ final class FlatMotionTests: XCTestCase {
             XCTAssertLessThanOrEqual(size.width, 68)
         }
     }
+
+    func testTimeModelPublicationIsBoundedToFrameFriendlyCadence() {
+        let start = Date(timeIntervalSinceReferenceDate: 1_000)
+
+        XCTAssertFalse(
+            WaveTimeModelPublicationGate.shouldPublish(
+                lastPublishedAt: start,
+                now: start.addingTimeInterval(0.02)
+            )
+        )
+        XCTAssertTrue(
+            WaveTimeModelPublicationGate.shouldPublish(
+                lastPublishedAt: start,
+                now: start.addingTimeInterval(
+                    WaveTimeModelPublicationGate.minimumInterval + 0.001
+                )
+            )
+        )
+    }
+
+    func testHandPoseStaysWithinItsPhotoSlotBounds() {
+        let pose = TemporalPhotoHandPose.held(
+            at: CGSize(width: 10_000, height: -10_000)
+        )
+
+        XCTAssertEqual(pose.translation.width, PosterSpacing.xl * 2)
+        XCTAssertEqual(pose.translation.height, -PosterSpacing.xl * 1.5)
+        XCTAssertGreaterThan(pose.lift, 0)
+        XCTAssertGreaterThan(pose.yawDegrees, 0)
+        XCTAssertGreaterThan(pose.pitchDegrees, 0)
+    }
 }
 
 final class WaveTimeAccessibilityTests: XCTestCase {

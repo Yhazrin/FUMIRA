@@ -21,11 +21,20 @@ enum PosterPalette {
     /// 浅色控件 / 卡片填充 — 纯白；白底上靠描边或阴影建立层级
     static let paperWhite = canvas
 
+    /// 浅色信息卡 — 必须保持完全不透明，避免照片透过卡片干扰阅读
+    static let cardLight = canvas
+
+    /// 深色信息卡 — 必须保持完全不透明；空间透明度只留给画面遮罩
+    static let cardDark = ink
+
     /// 天空青蓝 — Connection 气质基准：大面积天空、相机叠层、时间强调
     static let sky = Color(red: 123 / 255, green: 200 / 255, blue: 235 / 255) // #7BC8EB
 
     /// 天空近地 / 底部渐变
     static let skySoft = Color(red: 184 / 255, green: 224 / 255, blue: 245 / 255) // #B8E0F5
+
+    /// 选中态信息卡 — 纯色浅蓝，不使用半透明蓝叠在页面上
+    static let cardActive = skySoft
 
     /// 深青蓝 — 叠层、生成标题、深色天空面
     static let skyDeep = Color(red: 61 / 255, green: 139 / 255, blue: 181 / 255) // #3D8BB5
@@ -41,6 +50,12 @@ enum PosterPalette {
 
     /// 哆啦 A 梦蓝暗面 — 按压、描边与高对比文字
     static let actionBlueDeep = cameraShutterBlueDeep
+
+    /// 相机机身蓝 — 取景卡后方的实体底层与控制甲板
+    static let cameraBody = actionBlueDeep
+
+    /// 相机机身亮面 — 快门、选中态与短促反馈
+    static let cameraBodyAccent = actionBlue
 
     /// 玩具红 — 首屏镜头口袋 / 快门点睛，不用于错误状态
     static let toyRed = Color(red: 232 / 255, green: 42 / 255, blue: 52 / 255)

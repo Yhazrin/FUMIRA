@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { outboundFetch } from "../http/outboundFetch.js";
 import type {
   ExactTarget,
+  CameraObservationPayload,
   MiniMaxIntelligenceAdapter,
   MiniMaxIntelligenceResult,
   SceneUnderstandingPayload,
@@ -31,6 +32,11 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
     targetTime: { offsetYears: number; compactLabel: string };
     copyConstraints: UnderstandingCopyConstraints;
     requestId: string;
+    narrativeAnchor?: {
+      normalizedX: number;
+      normalizedY: number;
+    };
+    opticalContext?: CameraObservationPayload;
   }): Promise<MiniMaxIntelligenceResult<SceneUnderstandingPayload>> {
     const endpoint = `${config.minimaxApiBaseUrl}/v1/coding_plan/vlm`;
     const response = await this.requestJSON(endpoint, {
@@ -45,6 +51,12 @@ export class LiveMiniMaxIntelligenceAdapter implements MiniMaxIntelligenceAdapte
         "temporalLayers must cover architecture, infrastructure, surfaces, vegetation, movableObjects, and peopleAndUse when visible. Check every layer; decide what may change vs must stay. Do not invent unseen facilities.",
         "timeClues are present-day visible age cues. changeDrivers and storySeeds are bounded hypotheses for later temporal evolution, not asserted events.",
         "List 2-6 visually important subjects in foreground-to-background order. Each identityRule must lock spatial position, relative scale, silhouette/material/color when visible, and the feature allowed to age or change.",
+        input.narrativeAnchor
+          ? `The person explicitly selected normalized image point (${input.narrativeAnchor.normalizedX.toFixed(3)}, ${input.narrativeAnchor.normalizedY.toFixed(3)}) as the narrative anchor. Identify the visible subject nearest that point, put it first in subjects, and preserve its identity. This is narrative priority only: still decompose and evolve the entire foreground, midground, background, infrastructure, atmosphere, and traces of use.`
+          : "No narrative subject was explicitly selected; choose the clearest stable subject without narrowing the whole-scene analysis.",
+        input.opticalContext
+          ? `Native shutter metadata says lens=${input.opticalContext.lensPosition ?? "unknown"}, zoom=${input.opticalContext.zoomFactor?.toFixed(2) ?? "unknown"}, focus=${input.opticalContext.focusPosition?.toFixed(2) ?? "unknown"}, ISO=${input.opticalContext.iso?.toFixed(0) ?? "unknown"}, exposure=${input.opticalContext.exposureDurationSeconds?.toFixed(5) ?? "unknown"}s, light=${input.opticalContext.lightCondition}. Use this only to interpret camera perspective and capture lighting; never override visible evidence or invent hidden scene content.`
+          : "No native shutter metadata is available; infer camera and light only from visible evidence.",
         "hardConstraints must include composition locks and forbid unrelated or attention-stealing subjects without causal basis.",
         "sceneGraph is machine-facing and must decompose the whole image, not only the most salient person or object. Include every visible depth band and the environmental envelope: ground surfaces, architecture, vegetation, infrastructure, vehicles, signage, skyline, lighting and atmosphere.",
         "For each sceneGraph region, assign a stable id, spatial anchor, materials/current condition, and exactly one temporalPolicy. If visible, include at least one foreground, midground and background region.",

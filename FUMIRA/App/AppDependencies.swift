@@ -13,6 +13,8 @@ struct AppDependencies {
     let storage: any PosterStorage
     let haptics: any HapticsClient
     let motionField: any MotionFieldProviding
+    let captureMotion: any CaptureMotionProviding
+    let sceneLayerAnalyzer: any SceneLayerAnalyzing
 
     init(
         camera: any CameraService,
@@ -26,6 +28,8 @@ struct AppDependencies {
         storage: any PosterStorage,
         haptics: any HapticsClient,
         motionField: any MotionFieldProviding,
+        captureMotion: any CaptureMotionProviding = MockCaptureMotionService(),
+        sceneLayerAnalyzer: any SceneLayerAnalyzing = MockSceneLayerAnalyzer(),
         cameraActivity: any CameraLiveActivityService = MockCameraLiveActivityService()
     ) {
         self.camera = camera
@@ -40,6 +44,8 @@ struct AppDependencies {
         self.storage = storage
         self.haptics = haptics
         self.motionField = motionField
+        self.captureMotion = captureMotion
+        self.sceneLayerAnalyzer = sceneLayerAnalyzer
     }
 
     static var preview: AppDependencies {
@@ -54,7 +60,9 @@ struct AppDependencies {
             modelConfigurationStore: UserDefaultsAIModelConfigurationStore(),
             storage: MockPosterStorage(),
             haptics: MockHapticsClient(),
-            motionField: MockMotionFieldService()
+            motionField: MockMotionFieldService(),
+            captureMotion: MockCaptureMotionService(),
+            sceneLayerAnalyzer: MockSceneLayerAnalyzer()
         )
     }
 
@@ -70,7 +78,9 @@ struct AppDependencies {
             modelConfigurationStore: InMemoryAIModelConfigurationStore(),
             storage: MockPosterStorage(),
             haptics: MockHapticsClient(),
-            motionField: MockMotionFieldService()
+            motionField: MockMotionFieldService(),
+            captureMotion: MockCaptureMotionService(),
+            sceneLayerAnalyzer: MockSceneLayerAnalyzer()
         )
     }
 
@@ -94,6 +104,8 @@ struct AppDependencies {
             storage: PhotoLibraryPosterStorage(),
             haptics: LiveHapticsClient(),
             motionField: MockMotionFieldService(),
+            captureMotion: MockCaptureMotionService(),
+            sceneLayerAnalyzer: MockSceneLayerAnalyzer(),
             cameraActivity: LiveCameraLiveActivityService()
         )
         #else
@@ -110,6 +122,8 @@ struct AppDependencies {
             storage: PhotoLibraryPosterStorage(),
             haptics: LiveHapticsClient(),
             motionField: CoreMotionFieldService(),
+            captureMotion: CoreCaptureMotionService(),
+            sceneLayerAnalyzer: VisionSceneLayerAnalyzer(),
             cameraActivity: LiveCameraLiveActivityService()
         )
         #endif

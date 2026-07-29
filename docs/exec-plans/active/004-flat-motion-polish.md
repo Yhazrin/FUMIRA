@@ -1,20 +1,28 @@
 # Flat Motion Polish
 
+> Superseded for functional capture/reveal behavior by
+> `005-spatial-time-capsule.md`. This plan remains the authority for the flat
+> poster palette, time rail, and the three transient spatial-print tracks.
+
 ## Goal
 
-Refine FUMIRA's latest park-poster UI so motion feels like animated print:
-flat color planes, crisp silhouettes, purposeful depth, and restrained device
-tilt. Fix the waveform time rail, redraw the connection backdrop, remove the
-duplicate/displaced invite title behavior, and eliminate the ochre accent.
+Refine FUMIRA's latest park-poster UI so motion feels like spatial print:
+flat color planes and crisp silhouettes, with perspective reserved for a brief
+narrative camera/photo transition. Fix the waveform time rail, redraw the
+connection backdrop, remove the duplicate/displaced invite title behavior, and
+eliminate the ochre accent.
 
 ## Product direction
 
 - The memorable interaction is the time waveform: the precise selected
   position is always the unique tallest peak.
-- 2.5D is allowed only as separated flat planes. Do not introduce glass,
-  photorealistic 3D, continuous floating, neon gradients, or particle noise.
-- Camera preview, shutter, waveform, title, body copy, and CTA must remain
-  stable under device tilt. Only decorative background planes may move.
+- Spatial print perspective is allowed only for the narrative lens and temporal
+  photo, and only during camera entry, capture, and generated-result reveal.
+  It always settles back to a flat pose; it is not an idle or device-driven
+  effect. Do not introduce glass, photorealistic 3D, realistic lighting,
+  continuous floating, neon gradients, or particle noise.
+- Controls, camera preview/chrome, shutter, waveform/time rail, numeric date,
+  title, body copy, CTA, and export layout remain flat and spatially stable.
 - Replace the ochre `moss` accent (`#C9B35A`) with the Doraemon-like
   `actionBlue` for controls, progress, and time selection. Landscape
   illustration may retain leaf green as a non-interactive natural color.
@@ -65,22 +73,42 @@ tick.
   whole-view alignment or offset. Use a one-shot, cancel-safe entrance that
   animates opacity and a small transform of stable-layout segments.
 
-## Device tilt
+## Spatial-print tracks
 
-Add a small CoreMotion-backed service compatible with Swift 6 strict
-concurrency. It must:
+Implement exactly three continuous, interruptible narrative tracks. Each begins
+and ends flat, runs only for its semantic transition, has no bounce/overshoot,
+and is inactive while idle, backgrounded, or disappeared.
 
-- publish clamped normalized gravity/attitude values on the main actor;
-- update at 20–30 Hz, start only while an eligible screen is visible, and stop
-  on disappear/background;
-- remain inactive for Reduce Motion and Low Power Mode;
-- never move camera preview, camera grid, waveform, shutter, headline, body
-  copy, or CTA;
-- offset only decorative flat planes by approximately 1.5 / 3 / 5 points in
-  opposing directions;
-- optionally rotate one rigid result-poster decoration by at most 0.75 degrees.
+1. **Lens aperture / camera entry:** the narrative lens seals the connection
+   scene and opens into the camera from the aperture button center. The lens
+   alone may use a shallow perspective turn while it travels.
+2. **Temporal exposure / capture:** the matched captured photo persists through
+   flash and exposure, with one shallow perspective pass that settles before
+   camera controls are interactive again.
+3. **Interpretation reveal / generated result:** that temporal photo develops
+   into the generated treatment, may briefly recede/return in perspective, then
+   locks into the flat result poster. Copy and controls never join the transform.
 
-The effect must read as layered screen printing, not a floating glass card.
+Keep the existing `MotionFieldProviding` service decorative-only: it may offset
+flat background planes but never drives the narrative lens/photo. Functional
+capture motion is owned separately by `CaptureMotionProviding` under plan 005.
+Do not add a persistent 3D card. Perspective belongs only to the narrative
+lens/photo during those three tracks and must read as printed material moving
+through a camera, not as glass.
+
+## Current implementation checkpoint
+
+- `FUMIRASpatialMotion`, `MotionTimeline`, `SpatialDepthLayer`, and
+  `SpatialTransformModifier` own the shared mapping, semantic admission, and
+  device-motion depth rules.
+- `CameraEntryPortal` grows the connection aperture into a preview hold and is
+  reused after permission before the viewfinder becomes interactive.
+- Root-owned `cameraEntryProgress`, `captureProgress`, and
+  `timeRevealProgress` drive the three narrative tracks. The capture business
+  task now has one semantic still hold rather than separate crossfade/dwell
+  sleeps.
+- `TemporalPhotoCard` supplies front/back/rim/edge/highlight/shadow treatment;
+  `TimeRevealMask` develops the result inside the established photo crop.
 
 ## Motion language
 
@@ -90,17 +118,19 @@ The effect must read as layered screen printing, not a floating glass card.
 - Every motion has a Reduce Motion fallback.
 - No continuous animation when the view is idle.
 - Avoid animating layout size, alignment, or padding.
+- Reduce Motion uses the `Reduced` duration opacity crossfade only: no
+  perspective, rotation, scale, or geometry travel.
 
 ## System camera surface
 
-- The top camera chrome keeps one capsule on each side of the Dynamic Island.
-- The trailing capsule triggers a real ActivityKit Live Activity. On systems
-  that support transient Live Activities, the system presents the expanded
-  Dynamic Island camera deck; iOS 17 retains the standard Live Activity fallback.
-- Compact and minimal presentations show camera status and zoom. The expanded
-  presentation exposes flash, lens, grid, and aspect-ratio deep-link actions.
-- The WidgetKit extension renders state only. Capture and AVCaptureSession
-  ownership remain in the main app.
+- The top camera chrome keeps two 48pt circular in-app controls. The trailing
+  control starts the official ActivityKit Live Activity rather than imitating
+  system hardware in the app view hierarchy.
+- `FUMIRALiveActivity` renders compact, minimal, and expanded content with
+  WidgetKit's `DynamicIsland`. iOS owns the island's outline, position,
+  expansion gesture, and animation.
+- The expanded presentation exposes flash, lens, grid, and aspect-ratio deep
+  links. Capture and AVCaptureSession ownership remain in the main app.
 
 ## Required tests and verification
 
@@ -114,3 +144,10 @@ The effect must read as layered screen printing, not a floating glass card.
 - Build the simulator target and run the full test suite.
 - Inspect Swift 6 concurrency diagnostics.
 - Verify Reduce Motion and Low Power behavior in code and previews.
+- Exercise all three spatial-print tracks and verify perspective is transient,
+  begins/ends flat, and is applied only to the narrative lens or temporal photo.
+- During those tracks, verify controls, camera grid/chrome, shutter, text,
+  numeric date, and WaveTimeRail retain stable position, size, and orientation.
+- Verify device tilt remains decorative-only and respects its existing Reduce
+  Motion, Low Power Mode, and scene-activity gates; spatial-print tracks add no
+  idle motion.

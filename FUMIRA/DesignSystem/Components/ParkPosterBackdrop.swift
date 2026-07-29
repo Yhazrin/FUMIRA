@@ -9,6 +9,8 @@ import SwiftUI
 struct ParkPosterBackdrop: View {
     var motionField: MotionFieldModel?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
@@ -25,31 +27,31 @@ struct ParkPosterBackdrop: View {
                 )
 
                 cloud(at: CGPoint(x: size.width * 0.20, y: size.height * 0.115), scale: 1.0)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
 
                 cloud(at: CGPoint(x: size.width * 0.72, y: size.height * 0.315), scale: 0.6)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
 
                 birds(in: size)
-                    .flatParallax(motionField, depth: .mid)
+                    .spatialDepth(.environment, motionField: motionField, reduceMotion: reduceMotion)
 
                 backHill(in: size)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
 
                 distantTree(in: size)
-                    .flatParallax(motionField, depth: .back)
+                    .spatialDepth(.background, motionField: motionField, reduceMotion: reduceMotion)
 
                 midHill(in: size)
-                    .flatParallax(motionField, depth: .mid)
+                    .spatialDepth(.environment, motionField: motionField, reduceMotion: reduceMotion)
 
                 grove(in: size)
-                    .flatParallax(motionField, depth: .mid)
+                    .spatialDepth(.environment, motionField: motionField, reduceMotion: reduceMotion)
 
                 frontHill(in: size)
-                    .flatParallax(motionField, depth: .front)
+                    .spatialDepth(.hero, motionField: motionField, reduceMotion: reduceMotion)
 
                 meadowDetails(in: size)
-                    .flatParallax(motionField, depth: .front)
+                    .spatialDepth(.hero, motionField: motionField, reduceMotion: reduceMotion)
             }
         }
         .ignoresSafeArea()

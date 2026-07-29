@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import Foundation
 import ImageIO
 import SwiftUI
@@ -30,12 +31,18 @@ enum LiveCameraError: LocalizedError, Sendable {
     }
 }
 
-final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraZoomProviding, CameraPreviewFactory, @unchecked Sendable {
+final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraZoomProviding, CameraPreviewFactory, TemporalCameraSampling, CameraOpticalContextProviding, @unchecked Sendable {
     let isLive = true
 
     private let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let temporalFrameSampler = TemporalFrameSampler()
     private let sessionQueue = DispatchQueue(label: "com.fumira.camera.session")
+    private let temporalFrameQueue = DispatchQueue(
+        label: "com.fumira.camera.temporal-frames",
+        qos: .userInitiated
+    )
     private var isConfigured = false
     private var captureDelegates: [Int64: PhotoCaptureDelegate] = [:]
     private var videoDeviceInput: AVCaptureDeviceInput?
@@ -136,6 +143,43 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                 }
                 captureDelegates[uniqueID] = delegate
                 photoOutput.capturePhoto(with: settings, delegate: delegate)
+            }
+        }
+    }
+
+    func microTimeSlice(around shutterDate: Date) async -> MicroTimeSlice {
+        // Keep sampling briefly after the shutter. The UI already shows the
+        // frozen still, so this never makes the camera feel unresponsive.
+        try? await Task.sleep(for: .milliseconds(280))
+        return temporalFrameSampler.snapshot(around: shutterDate)
+    }
+
+    func opticalContext() async -> TemporalOpticalContext {
+        await withCheckedContinuation { continuation in
+            sessionQueue.async { [self] in
+                guard let device = videoDeviceInput?.device else {
+                    continuation.resume(returning: .unavailable)
+                    return
+                }
+                let exposureDuration = device.exposureDuration.seconds
+                let iso = device.iso
+                let lightCondition: TemporalLightCondition
+                if iso >= 640 || exposureDuration >= 1.0 / 30.0 {
+                    lightCondition = .lowLight
+                } else if iso <= 80, exposureDuration <= 1.0 / 250.0 {
+                    lightCondition = .bright
+                } else {
+                    lightCondition = .balanced
+                }
+                continuation.resume(returning: TemporalOpticalContext(
+                    lensPosition: currentPosition == .front ? .front : .back,
+                    focusPosition: device.lensPosition,
+                    exposureDurationSeconds: exposureDuration,
+                    iso: iso,
+                    exposureTargetOffset: device.exposureTargetOffset,
+                    zoomFactor: Double(device.videoZoomFactor),
+                    lightCondition: lightCondition
+                ))
             }
         }
     }
@@ -245,6 +289,21 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         }
         session.addOutput(photoOutput)
         photoOutput.maxPhotoQualityPrioritization = .quality
+
+        // Optional context output. Failure to add it must never disable normal
+        // photo capture on a constrained or older device.
+        if session.canAddOutput(videoOutput) {
+            videoOutput.alwaysDiscardsLateVideoFrames = true
+            videoOutput.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String:
+                    kCVPixelFormatType_32BGRA
+            ]
+            videoOutput.setSampleBufferDelegate(
+                temporalFrameSampler,
+                queue: temporalFrameQueue
+            )
+            session.addOutput(videoOutput)
+        }
         currentPosition = .back
         isConfigured = true
     }
@@ -410,6 +469,83 @@ private extension CameraFlashMode {
         case .off: self = .off
         @unknown default: self = .off
         }
+    }
+}
+
+private final class TemporalFrameSampler: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+    private struct BufferedFrame {
+        let date: Date
+        let data: Data
+    }
+
+    private let lock = NSLock()
+    private let context = CIContext(options: [.cacheIntermediates: false])
+    private let colorSpace = CGColorSpaceCreateDeviceRGB()
+    private var frames: [BufferedFrame] = []
+    private var lastEncodedAt = Date.distantPast
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        let now = Date()
+        guard now.timeIntervalSince(lastEncodedAt) >= 0.12 else { return }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return
+        }
+        lastEncodedAt = now
+
+        let source = CIImage(cvPixelBuffer: pixelBuffer)
+        let scale = min(240 / max(source.extent.width, 1), 1)
+        let scaled = source.transformed(
+            by: CGAffineTransform(scaleX: scale, y: scale)
+        )
+        let normalized = scaled.transformed(
+            by: CGAffineTransform(
+                translationX: -scaled.extent.minX,
+                y: -scaled.extent.minY
+            )
+        )
+        guard let data = context.jpegRepresentation(
+            of: normalized,
+            colorSpace: colorSpace,
+            options: [:]
+        ) else {
+            return
+        }
+
+        lock.lock()
+        frames.append(BufferedFrame(date: now, data: data))
+        let cutoff = now.addingTimeInterval(-1.6)
+        frames.removeAll { $0.date < cutoff }
+        if frames.count > 12 {
+            frames.removeFirst(frames.count - 12)
+        }
+        lock.unlock()
+    }
+
+    func snapshot(around shutterDate: Date) -> MicroTimeSlice {
+        lock.lock()
+        let selected = frames.filter {
+            let offset = $0.date.timeIntervalSince(shutterDate)
+            return offset >= -0.72 && offset <= 0.38
+        }
+        lock.unlock()
+
+        guard !selected.isEmpty else { return .unavailable }
+        let samples = selected.map {
+            TemporalFrameSample(
+                offsetFromShutter: $0.date.timeIntervalSince(shutterDate),
+                jpegData: $0.data
+            )
+        }
+        let first = selected.first?.date ?? shutterDate
+        let last = selected.last?.date ?? first
+        return MicroTimeSlice(
+            duration: max(last.timeIntervalSince(first), 0),
+            frames: samples
+        )
     }
 }
 

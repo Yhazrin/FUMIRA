@@ -2,13 +2,16 @@ import SwiftUI
 
 struct ConnectionView: View {
     let model: AppModel
+    var entryProgress: CGFloat = 0
     let onLaunchCamera: () -> Void
 
     init(
         model: AppModel,
+        entryProgress: CGFloat = 0,
         onLaunchCamera: @escaping () -> Void = {}
     ) {
         self.model = model
+        self.entryProgress = entryProgress
         self.onLaunchCamera = onLaunchCamera
     }
 
@@ -33,12 +36,15 @@ struct ConnectionView: View {
                         .top,
                         proxy.safeAreaInsets.top + PosterSpacing.xl + 12
                     )
+                    .opacity(1 - FUMIRASpatialMotion.map(entryProgress, from: 0.18...0.62, to: 0...1))
+                    .scaleEffect(1 - FUMIRASpatialMotion.map(entryProgress, from: 0...0.62, to: 0...0.035), anchor: .topLeading)
 
                 CameraLaunchIconButton(action: onLaunchCamera)
                     .position(
                         x: proxy.size.width * 0.5,
                         y: proxy.size.height * 0.46
                     )
+                    .opacity(1 - FUMIRASpatialMotion.map(entryProgress, from: 0...0.14, to: 0...1))
             }
         }
     }
@@ -48,7 +54,7 @@ private struct FUMIRAWordmark: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("FUMIRA")
-                .font(PosterTypography.script(68))
+                .font(PosterTypography.wordmark)
                 .foregroundStyle(PosterPalette.actionBlueDeep)
 
             HStack(spacing: PosterSpacing.sm) {

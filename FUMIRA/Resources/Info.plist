@@ -68,11 +68,6 @@
 	<string>用于导入一张照片体验时间相机。</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
-	<key>UIAppFonts</key>
-	<array>
-		<string>LXGWMarkerGothic-Regular.ttf</string>
-		<string>CaveatBrush-Regular.ttf</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

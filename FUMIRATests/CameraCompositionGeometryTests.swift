@@ -43,7 +43,7 @@ final class CameraCompositionGeometryTests: XCTestCase {
         }
     }
 
-    func testFullScreenUsesContainerWithoutCompositionHole() {
+    func testFullScreenOccupiesTheEntireStageWithoutCardCorners() {
         let size = CGSize(width: 402, height: 874)
         let layout = CameraCompositionGeometry.layout(
             aspectRatio: .fullScreen,
@@ -51,9 +51,130 @@ final class CameraCompositionGeometryTests: XCTestCase {
         )
 
         XCTAssertNil(layout.cropFrame)
-        XCTAssertEqual(layout.heroFrame, CGRect(origin: .zero, size: size))
+        XCTAssertEqual(layout.heroFrame, layout.viewport)
         XCTAssertEqual(layout.viewport, layout.heroFrame)
+        XCTAssertEqual(layout.heroFrame.minX, 0)
+        XCTAssertEqual(layout.heroFrame.minY, 0)
+        XCTAssertEqual(layout.heroFrame.width, size.width)
+        XCTAssertEqual(layout.heroFrame.height, size.height)
+        XCTAssertEqual(layout.heroFrame.maxY, size.height)
         XCTAssertEqual(layout.cornerRadius, 0)
+    }
+
+    func testModernPortraitRatiosUseTheFullScreenWidth() throws {
+        let size = CGSize(width: 393, height: 852)
+
+        for aspectRatio in [CameraAspectRatio.widescreen, .classic, .square] {
+            let frame = try XCTUnwrap(
+                CameraCompositionGeometry.layout(
+                    aspectRatio: aspectRatio,
+                    in: size
+                ).cropFrame
+            )
+
+            XCTAssertEqual(frame.minX, 0, accuracy: 0.001)
+            XCTAssertEqual(frame.width, size.width, accuracy: 0.001)
+        }
+    }
+
+    func testAspectCardsShareTopEdgeAndExposeMoreBodyAsTheyShorten() throws {
+        let size = CGSize(width: 402, height: 874)
+        let fullScreen = CameraCompositionGeometry.layout(
+            aspectRatio: .fullScreen,
+            in: size
+        )
+        let classic = try XCTUnwrap(
+            CameraCompositionGeometry.layout(aspectRatio: .classic, in: size).cropFrame
+        )
+        let square = try XCTUnwrap(
+            CameraCompositionGeometry.layout(aspectRatio: .square, in: size).cropFrame
+        )
+        let widescreen = try XCTUnwrap(
+            CameraCompositionGeometry.layout(aspectRatio: .widescreen, in: size).cropFrame
+        )
+
+        XCTAssertEqual(classic.minY, fullScreen.heroFrame.minY, accuracy: 0.001)
+        XCTAssertEqual(square.minY, fullScreen.heroFrame.minY, accuracy: 0.001)
+        XCTAssertEqual(widescreen.minY, fullScreen.heroFrame.minY, accuracy: 0.001)
+        XCTAssertLessThan(widescreen.maxY, fullScreen.heroFrame.maxY)
+        XCTAssertLessThan(classic.maxY, fullScreen.heroFrame.maxY)
+        XCTAssertLessThan(square.maxY, classic.maxY)
+        XCTAssertGreaterThan(size.height - square.maxY, size.height - classic.maxY)
+    }
+
+    func testWaveShutterTracksTheOpticalCenterOfEachExposedDeck() {
+        let size = CGSize(width: 393, height: 852)
+        let bottomSafeArea: CGFloat = 34
+        let classic = CameraCompositionGeometry.layout(
+            aspectRatio: .classic,
+            in: size
+        ).heroFrame
+        let square = CameraCompositionGeometry.layout(
+            aspectRatio: .square,
+            in: size
+        ).heroFrame
+        let classicCenter = CameraCompositionGeometry.controlDeckCenterY(
+            below: classic,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
+        let squareCenter = CameraCompositionGeometry.controlDeckCenterY(
+            below: square,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
+
+        XCTAssertGreaterThan(classicCenter, classic.maxY)
+        XCTAssertGreaterThan(squareCenter, square.maxY)
+        XCTAssertLessThan(classicCenter, size.height - bottomSafeArea)
+        XCTAssertLessThan(squareCenter, classicCenter)
+    }
+
+    func testWaveShutterFloatsForFullScreenAndShallowDecks() throws {
+        let size = CGSize(width: 393, height: 852)
+        let bottomSafeArea: CGFloat = 34
+        let fullScreen = CameraCompositionGeometry.layout(
+            aspectRatio: .fullScreen,
+            in: size
+        ).heroFrame
+        let widescreen = try XCTUnwrap(
+            CameraCompositionGeometry.layout(
+                aspectRatio: .widescreen,
+                in: size
+            ).cropFrame
+        )
+        let classic = try XCTUnwrap(
+            CameraCompositionGeometry.layout(
+                aspectRatio: .classic,
+                in: size
+            ).cropFrame
+        )
+        let fullPlacement = CameraCompositionGeometry.controlPlacement(
+            below: fullScreen,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
+        let widescreenPlacement = CameraCompositionGeometry.controlPlacement(
+            below: widescreen,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
+        let classicPlacement = CameraCompositionGeometry.controlPlacement(
+            below: classic,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
+
+        XCTAssertTrue(fullPlacement.overlaysPreview)
+        XCTAssertTrue(widescreenPlacement.overlaysPreview)
+        XCTAssertFalse(classicPlacement.overlaysPreview)
+        XCTAssertLessThan(fullPlacement.centerY, fullScreen.maxY)
+        XCTAssertEqual(
+            fullPlacement.centerY,
+            widescreenPlacement.centerY,
+            accuracy: 0.001
+        )
+        XCTAssertLessThan(classicPlacement.centerY, fullPlacement.centerY)
     }
 
     func testLandscapeRatiosFollowPhysicalOrientation() throws {
@@ -88,6 +209,24 @@ final class CameraCompositionGeometryTests: XCTestCase {
             XCTAssertEqual(frame.width / frame.height, 3.0 / 4.0, accuracy: 0.001)
             assertContains(frame, in: CGRect(origin: .zero, size: size))
         }
+    }
+
+    func testHeroSlotInterpolationPreservesEndpointsAndClampsProgress() {
+        let source = HeroSlotPreference(
+            frame: CGRect(x: 0, y: 20, width: 400, height: 700),
+            cornerRadius: 0
+        )
+        let destination = HeroSlotPreference(
+            frame: CGRect(x: 60, y: 160, width: 280, height: 360),
+            cornerRadius: 24
+        )
+
+        XCTAssertEqual(source.interpolated(to: destination, progress: -1), source)
+        XCTAssertEqual(source.interpolated(to: destination, progress: 2), destination)
+
+        let midpoint = source.interpolated(to: destination, progress: 0.5)
+        XCTAssertEqual(midpoint.frame, CGRect(x: 30, y: 90, width: 340, height: 530))
+        XCTAssertEqual(midpoint.cornerRadius, 12)
     }
 
     private func assertContains(

@@ -24,7 +24,7 @@ targets:
       - path: FUMIRA/Resources
         excludes:
           - Info.plist
-          - Fonts/**/OFL.txt
+          - Fonts/**
         buildPhase: resources
       - path: FUMIRA-icon.icon
         buildPhase: resources
@@ -32,9 +32,6 @@ targets:
       path: FUMIRA/Resources/Info.plist
       properties:
         CFBundleDisplayName: FUMIRA
-        UIAppFonts:
-          - LXGWMarkerGothic-Regular.ttf
-          - CaveatBrush-Regular.ttf
         UILaunchScreen:
           UIColorName: Paper
         NSCameraUsageDescription: 用于实时取景、拍照并生成过去与未来的场景。
@@ -120,6 +117,17 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera.tests
         GENERATE_INFOPLIST_FILE: YES
+  FUMIRAUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: FUMIRAUITests
+    dependencies:
+      - target: FUMIRA
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera.uitests
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   FUMIRA:
     build:
@@ -131,3 +139,4 @@ schemes:
       gatherCoverageData: true
       targets:
         - name: FUMIRATests
+        - name: FUMIRAUITests

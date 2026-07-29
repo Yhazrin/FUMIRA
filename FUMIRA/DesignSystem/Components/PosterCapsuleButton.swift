@@ -15,7 +15,7 @@ struct PosterCapsuleButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.body.weight(.semibold))
+                .font(PosterTypography.button)
                 .foregroundStyle(foregroundColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)

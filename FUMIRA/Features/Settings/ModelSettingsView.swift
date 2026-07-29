@@ -9,14 +9,8 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
-                    LabeledContent("产品", value: "FUMIRA 时间相机")
-                    Text("通用偏好保持克制。取景器顶部只放真实相机控件；模型路由属于开发与联调配置。")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("关于")
+                    LabeledContent("FUMIRA", value: "时间相机")
                 }
-                .posterStaggerReveal(index: 0)
 
                 Section {
                     Toggle(
@@ -33,14 +27,11 @@ struct SettingsView: View {
                     .tint(PosterPalette.actionBlue)
                 } header: {
                     Text("拍摄")
-                } footer: {
-                    Text("网格也可在取景器左上角开关。")
                 }
-                .posterStaggerReveal(index: 1)
 
                 Section {
                     Picker(
-                        "图片生成服务",
+                        "生成服务",
                         selection: Binding(
                             get: { model.modelConfiguration.imageOptionID },
                             set: { optionID in
@@ -56,37 +47,19 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-
-                    if let option = model.modelOption(for: .image) {
-                        LabeledContent("当前模型", value: option.displayName)
-                        Text(option.detail)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
                 } header: {
                     Text("图片生成")
-                } footer: {
-                    Text("选择只影响最终图片生成。图片理解与故事仍使用各自的模型路由，服务密钥保存在 FUMIRA 后台。")
                 }
-                .posterStaggerReveal(index: 2)
 
                 Section {
                     NavigationLink {
                         ModelRoutingAdvancedView(model: model)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("模型路由")
-                            Text("识图 / 故事 / 生图 · 开发与联调")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text("模型路由")
                     }
                 } header: {
                     Text("高级")
-                } footer: {
-                    Text("App 只保存路由 ID。供应商密钥与具体模型版本由 FUMIRA 后台管理，不会写入客户端。普通使用无需进入此页。")
                 }
-                .posterStaggerReveal(index: 3)
 
                 if let message = model.lastErrorMessage {
                     Section {
@@ -94,7 +67,6 @@ struct SettingsView: View {
                             .font(.footnote)
                             .foregroundStyle(PosterPalette.errorCoral)
                     }
-                    .posterStaggerReveal(index: 4)
                 }
             }
             .navigationTitle("设置")
@@ -119,12 +91,6 @@ private struct ModelRoutingAdvancedView: View {
 
     var body: some View {
         List {
-            Section {
-                Text("仅在本地调试、远端 API 切换或配置失败恢复时使用。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
             ForEach(AIModelRole.allCases, id: \.self) { role in
                 Section {
                     ForEach(model.modelCatalog.options(for: role)) { option in
@@ -146,7 +112,7 @@ private struct ModelRoutingAdvancedView: View {
                                                     : PosterPalette.mutedInk
                                             )
                                     }
-                                    Text("\(option.provider.displayName) · \(option.detail)")
+                                    Text(option.detail)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -163,12 +129,7 @@ private struct ModelRoutingAdvancedView: View {
                         .disabled(option.availability == .requiresBackend)
                     }
                 } header: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(role.displayName)
-                        Text(role.shortDescription)
-                            .font(.caption2)
-                            .textCase(nil)
-                    }
+                    Text(role.displayName)
                 }
             }
         }

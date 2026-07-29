@@ -28,34 +28,26 @@ actor LiveCameraLiveActivityService: CameraLiveActivityService {
         let attributes = CameraLiveActivityAttributes(cameraName: "FUMIRA")
         let content = ActivityContent(
             state: state,
-            staleDate: Date().addingTimeInterval(10 * 60)
+            staleDate: Date().addingTimeInterval(20 * 60)
         )
 
-        if #available(iOS 18.0, *) {
-            activity = CameraActivityHandle(
-                try Activity.request(
-                    attributes: attributes,
-                    content: content,
-                    pushType: nil,
-                    style: .transient
-                )
+        // This activity deliberately survives shutter capture so the user can
+        // put the phone down while the temporal pipeline continues. A
+        // transient activity would disappear at exactly the wrong moment.
+        activity = CameraActivityHandle(
+            try Activity.request(
+                attributes: attributes,
+                content: content,
+                pushType: nil
             )
-        } else {
-            activity = CameraActivityHandle(
-                try Activity.request(
-                    attributes: attributes,
-                    content: content,
-                    pushType: nil
-                )
-            )
-        }
+        )
     }
 
     func update(with state: CameraLiveActivityAttributes.ContentState) async {
         guard let current = currentActivity else { return }
         let content = ActivityContent(
             state: state,
-            staleDate: Date().addingTimeInterval(10 * 60)
+            staleDate: Date().addingTimeInterval(20 * 60)
         )
         await current.value.update(content)
     }
@@ -63,9 +55,18 @@ actor LiveCameraLiveActivityService: CameraLiveActivityService {
     func finish(with state: CameraLiveActivityAttributes.ContentState) async {
         guard let current = currentActivity else { return }
         let content = ActivityContent(state: state, staleDate: nil)
+        let dismissalDelay: TimeInterval = switch state.phase {
+        case .ready:
+            45
+        case .failed:
+            8
+        case .framing, .capturing, .captured,
+             .understanding, .storyWriting, .generating:
+            3
+        }
         await current.value.end(
             content,
-            dismissalPolicy: .after(Date().addingTimeInterval(1.2))
+            dismissalPolicy: .after(Date().addingTimeInterval(dismissalDelay))
         )
         activity = nil
     }

@@ -2,6 +2,7 @@ import { getAsset, readAssetBytes } from "./storage.js";
 import { toJpegDataUrl } from "./prompt.js";
 import type {
   ExactTarget,
+  CameraObservationPayload,
   MiniMaxIntelligenceAdapter,
   SceneUnderstandingPayload,
   StoryBeatPayload,
@@ -27,6 +28,11 @@ export async function analyzeUploadedAsset(input: {
   targetTime: { offsetYears: number; compactLabel: string };
   copyConstraints: UnderstandingCopyConstraints;
   requestId: string;
+  narrativeAnchor?: {
+    normalizedX: number;
+    normalizedY: number;
+  };
+  opticalContext?: CameraObservationPayload;
 }) {
   if (!adapter) return unavailable("understanding_unavailable", "图片理解暂未就绪。");
   if (!input.sourceAssetId || !getAsset(input.sourceAssetId)) {
@@ -39,6 +45,8 @@ export async function analyzeUploadedAsset(input: {
     targetTime: input.targetTime,
     copyConstraints: input.copyConstraints,
     requestId: input.requestId,
+    narrativeAnchor: input.narrativeAnchor,
+    opticalContext: input.opticalContext,
   });
   if (!result.ok) return result;
   return {

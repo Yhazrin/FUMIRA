@@ -27,27 +27,88 @@ enum PreviewFixtures {
             width: previewSize.width,
             height: previewSize.height
         )
-        model.capturedPhoto = CapturedPhoto(
+        let previewPhoto = CapturedPhoto(
             data: previewImageData,
             pixelWidth: previewSize.width,
             pixelHeight: previewSize.height
         )
+        model.capturedPhoto = previewPhoto
         model.decodedCapturedImage = UIImage(data: previewImageData)
+        model.decodedMicroTimeSliceFrames = Array(
+            repeating: UIImage(data: previewImageData),
+            count: 6
+        ).compactMap { $0 }
+        let foregroundMaskData = makePreviewForegroundMaskData(
+            width: previewSize.width,
+            height: previewSize.height
+        )
+        let visualContext = TemporalVisualContext(
+            foregroundMaskPNG: foregroundMaskData,
+            salientRegions: [
+                TemporalSalientRegion(
+                    normalizedX: 0.24,
+                    normalizedY: 0.37,
+                    normalizedWidth: 0.52,
+                    normalizedHeight: 0.22
+                ),
+                TemporalSalientRegion(
+                    normalizedX: 0.08,
+                    normalizedY: 0.62,
+                    normalizedWidth: 0.84,
+                    normalizedHeight: 0.30
+                ),
+            ]
+        )
+        model.decodedForegroundMask = UIImage(data: foregroundMaskData)
+        model.temporalCapturePacket = TemporalCapturePacket(
+            photo: previewPhoto,
+            origin: .camera,
+            composition: photoAspectRatio,
+            shutterDate: Date(),
+            motion: .unavailable,
+            microTimeSlice: MicroTimeSlice(
+                duration: 0.7,
+                frames: Array(repeating: previewImageData, count: 6)
+                    .enumerated()
+                    .map { index, data in
+                        TemporalFrameSample(
+                            offsetFromShutter: Double(index - 3) * 0.1,
+                            jpegData: data
+                        )
+                    }
+            ),
+            subjectAnchor: TemporalSubjectAnchor(
+                normalizedX: 0.68,
+                normalizedY: 0.52
+            ),
+            visualContext: visualContext,
+            opticalContext: TemporalOpticalContext(
+                lensPosition: .back,
+                focusPosition: 0.62,
+                exposureDurationSeconds: 1 / 120,
+                iso: 80,
+                exposureTargetOffset: 0,
+                zoomFactor: 1,
+                lightCondition: .balanced
+            )
+        )
         model.sceneUnderstanding = .parkReference
         model.temporalStory = .parkReference
-        model.generatedPhoto = CapturedPhoto(
-            data: previewImageData,
-            pixelWidth: previewSize.width,
-            pixelHeight: previewSize.height
-        )
-        model.generatedFrame = GeneratedFrame(
-            sessionID: UUID(),
-            time: model.selectedTime,
-            storyBeatID: model.temporalStory?.beat(for: model.selectedTime)?.id,
-            prompt: TemporalImagePrompt.make(for: model.selectedTime),
-            imageData: previewImageData
-        )
-        model.decodedGeneratedImage = UIImage(data: previewImageData)
+        if phase == .result || phase == .share {
+            model.generatedPhoto = CapturedPhoto(
+                data: previewImageData,
+                pixelWidth: previewSize.width,
+                pixelHeight: previewSize.height
+            )
+            model.generatedFrame = GeneratedFrame(
+                sessionID: UUID(),
+                time: model.selectedTime,
+                storyBeatID: model.temporalStory?.beat(for: model.selectedTime)?.id,
+                prompt: TemporalImagePrompt.make(for: model.selectedTime),
+                imageData: previewImageData
+            )
+            model.decodedGeneratedImage = UIImage(data: previewImageData)
+        }
         if phase == .connected || phase == .viewfinder {
             model.hardwareSnapshot = HardwareSnapshot(name: "FutureCam_01", batteryLevel: 86)
         }
@@ -137,6 +198,42 @@ enum PreviewFixtures {
                     weight: .black
                 ),
                 .foregroundColor: UIColor.black,
+            ]
+            let labelSize = label.size(withAttributes: attributes)
+            label.draw(
+                at: CGPoint(
+                    x: (renderSize.width - labelSize.width) / 2,
+                    y: (renderSize.height - labelSize.height) / 2
+                ),
+                withAttributes: attributes
+            )
+        }
+    }
+
+    private static func makePreviewForegroundMaskData(
+        width: Int,
+        height: Int
+    ) -> Data {
+        let ratio = CGFloat(max(width, 1)) / CGFloat(max(height, 1))
+        let renderWidth: CGFloat = min(max(CGFloat(width), 320), 900)
+        let renderSize = CGSize(
+            width: renderWidth,
+            height: max(renderWidth / max(ratio, 0.01), 1)
+        )
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: renderSize, format: format)
+        return renderer.pngData { _ in
+            UIColor.clear.setFill()
+            UIRectFill(CGRect(origin: .zero, size: renderSize))
+
+            let label = "TARGET"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(
+                    ofSize: min(renderSize.width * 0.1, 54),
+                    weight: .black
+                ),
+                .foregroundColor: UIColor.white,
             ]
             let labelSize = label.size(withAttributes: attributes)
             label.draw(

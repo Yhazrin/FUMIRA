@@ -653,6 +653,27 @@ enum StoryCopyPolicy {
     static func limit(_ value: String, to maximum: Int) -> String {
         GeneratedCopyLimiter.limit(value, to: maximum)
     }
+
+    /// The selected time already has a dedicated large label in result and
+    /// poster layouts. Providers may still begin the narrative with the same
+    /// label; strip only that exact leading phrase so the prose starts with
+    /// the actual change instead of repeating the card header.
+    static func removingRepeatedTimePrefix(
+        from value: String,
+        time: TimePosition
+    ) -> String {
+        let label = time.compactLabel
+        for separator in ["，", ", ", ",", "：", ": ", ":"] {
+            let prefix = label + separator
+            guard value.hasPrefix(prefix) else { continue }
+            let remainder = String(value.dropFirst(prefix.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !remainder.isEmpty {
+                return remainder
+            }
+        }
+        return value
+    }
 }
 
 struct TemporalStory: Identifiable, Hashable, Codable, Sendable {

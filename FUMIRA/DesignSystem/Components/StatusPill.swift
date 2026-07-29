@@ -15,7 +15,7 @@ struct StatusPill: View {
         .foregroundStyle(PosterPalette.ink)
         .padding(.horizontal, PosterSpacing.md)
         .padding(.vertical, PosterSpacing.sm)
-        .background(isActive ? PosterPalette.actionBlue.opacity(0.14) : PosterPalette.canvas)
+        .background(isActive ? PosterPalette.cardActive : PosterPalette.cardLight)
         .clipShape(Capsule())
         .overlay {
             Capsule()

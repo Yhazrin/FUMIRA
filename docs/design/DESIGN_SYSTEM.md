@@ -19,6 +19,9 @@ Raw hex values live only in `PosterPalette`. Features must use semantic tokens.
 | `canvas` / `pageBackground` | `#FFFFFF` | **纯白画布** — App chrome、设置、结果留白、默认页背景 |
 | `paper` | `#F6F3E8` | 米白纸张 — **仅**海报合成区 / 公园装饰形 / 场景叠色 |
 | `paperWhite` | `#FFFFFF` | 浅色控件填充（同 `canvas`）；白底靠描边建立层级 |
+| `cardLight` | `#FFFFFF` | 完全不透明的浅色信息卡 |
+| `cardDark` | `#111111` | 完全不透明的深色信息卡 |
+| `cardActive` | `#B8E0F5` | 完全不透明的浅蓝选中态信息卡 |
 | `sky` | `#7BC8EB` | 天空青蓝 — Connection 基准、相机叠层、时间强调 |
 | `skySoft` | `#B8E0F5` | 天空近地 / 底部渐变 |
 | `skyDeep` | `#3D8BB5` | 深青蓝 — 叠层、理解页大色块 |
@@ -65,6 +68,12 @@ Used by `TemporalParkScene` interpolation — do not hardcode in Features.
 - `leafGreen` is a natural illustration accent, never an interactive fill.
 - Primary buttons prefer `pine` or `ink`; secondary is stroke + `ink` on `canvas`.
 - White-on-white cards need `line` stroke (or shadow) for edge definition.
+- Information cards, clue tags, evidence pills, and result consoles use
+  `cardLight`, `cardDark`, or `cardActive` at full opacity. Do not use Material or
+  translucent color fills for these reading surfaces.
+- Transparency is reserved for spatial media effects that must reveal the scene:
+  viewfinder surrounds, exposure masks, comparison boundaries, and the micro
+  time-slice slit. These are not cards.
 - Photo / park scene remains the visual hero; tokens support it, not compete with it.
 - No raw `Color(red:…)` product colors outside `PosterPalette`.
 
@@ -88,17 +97,35 @@ Used by `TemporalParkScene` interpolation — do not hardcode in Features.
 
 ## Typography
 
-- Poster Chinese: LXGW Marker Gothic when bundled; system rounded fallback.
-- Handwritten English: Caveat Brush when bundled; system rounded italic fallback.
-- Functional labels/status/buttons: system font with semantic text styles.
-- Poster text may rotate by 1–4 degrees as a deliberate decoration.
+- All in-app type uses Apple system fonts.
+- Functional titles, labels, status and buttons use the normal SF family via
+  semantic text styles. Rounded SF is reserved for the wordmark and occasional
+  poster metric, so functional UI stays calm and recognisably native.
+- Expressive poster character comes from weight, spacing, color, and restrained
+  1–2 degree rotation — never from oversized novelty type.
+
+## Visible copy hierarchy
+
+- Each stage has one primary sentence and one primary action. Do not expose
+  implementation notes, reliability disclaimers, or a second paraphrase of the
+  same gesture in the visible interface.
+- Prefer a large, direct verb phrase (`拖动，看时间差`) over an eyebrow, title,
+  subtitle, helper paragraph, and footer that all explain the same operation.
+- A value already communicated by the photo, time rail, or progress number does
+  not need another status badge.
+- Keep precise behavior and recovery detail in VoiceOver labels and hints so
+  visual simplicity never removes accessible instructions.
+- Opaque rounded cards group one decision or one status. Fewer, larger cards are
+  preferred to several translucent pills.
 
 ## Layout
 
 - The Figma artboards are 390×844 references.
 - Runtime layout is safe-area-aware and scales to compact/large iPhones.
 - Content padding baseline is 24pt; primary control height is 56pt.
-- Poster/card radius: 24–30pt. Primary button radius: half its height.
+- Card radius: 26pt; photo-paper radius: 20pt; compact controls: 18pt. Primary
+  button radius is half its height. Use continuous corners and one subtle
+  1pt border or soft shadow — never both heavily.
 - Minimum interactive target: 44×44pt.
 
 ## Scene
@@ -122,13 +149,20 @@ from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
 
 ### Viewfinder（沉浸相机）
 
-- Full-bleed live / simulator preview is the subject.
-- Controls sit on **top/bottom scrims only** — no large white rounded cards,
-  no redundant instructional copy under the shutter.
-- Top: flash (when supported) + optional simulator chip + minimal time chip
-  (`NOW · 2026` or selected year). No large slogan.
-- Bottom: `WaveTimeRail` (`.immersive` chrome) floating on the scrim; centered
-  paper-white shutter with `cameraShutterBlue` shell; circular chrome flip + grid.
+- The screen is a two-layer camera object. `cameraBody` fills the permanent
+  lower layer; the live / simulator preview is a separate upper card.
+- The preview begins behind the system status region, spans the exact screen
+  width, and uses only continuous bottom corners. It has no side gutter, border,
+  bottom shadow, frosted surround, or artificial Dynamic Island.
+- 16:9, 3:4, and 1:1 keep the card's top and width fixed while only the bottom
+  edge moves upward. Native/full framing is a distinct, taller final stop.
+- Two 44pt Doraemon-blue / white-symbol controls sit inside the upper card with
+  16pt side insets. Their icon contrast is 3.05:1; compact textual feedback uses
+  `actionBlueDeep` instead (5.81:1 against white). iOS owns status-bar and
+  Dynamic Island geometry.
+- The wave-shutter stays visually centered in the exposed blue camera body for
+  every card height. Ratio feedback appears briefly inside the card near its
+  lower edge; there is no persistent instruction paragraph.
 
 ### Chrome screens（权限 / 生成 / 理解 / 故事 / 结果 / 设置 / 失败）
 

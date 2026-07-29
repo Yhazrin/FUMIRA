@@ -25,14 +25,7 @@ struct GenerationFailureView: View {
                 )
 
                 VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                    if let category = errorCategoryLabel {
-                        Text(category)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.skyDeep)
-                            .textCase(.uppercase)
-                    }
-
-                    Text(model.lastErrorMessage ?? "这一阶段暂时没有完成，前面的结果已经保留。")
+                    Text(failureMessage)
                         .font(.body)
                         .foregroundStyle(PosterPalette.ink)
                         .multilineTextAlignment(.leading)
@@ -84,24 +77,24 @@ struct GenerationFailureView: View {
         }
     }
 
-    private var errorCategoryLabel: String? {
+    private var failureMessage: String {
         switch model.lastGenerationError {
         case .timedOut:
-            "超时 · 可重试"
+            "等得太久了。"
         case .networkFailure:
-            "网络 · 可重试"
+            "网络没有接通。"
         case .uploadFailure:
-            "上传 · 可重试"
-        case .rateLimited:
-            "繁忙 · 稍后重试"
-        case .serverUnavailable:
-            "服务未就绪 · 可重试"
+            "照片没有送达。"
         case .invalidParameters:
-            "参数无效 · 请先调整"
+            "这个时间暂时无法生成。"
+        case .rateLimited:
+            "服务正忙。"
+        case .serverUnavailable:
+            "时间通道暂时关闭。"
         case .generationFailed:
-            model.canRetryFailedStage ? "生成失败 · 可重试" : "生成失败"
-        case .none:
-            nil
+            "这一帧没有生成。"
+        case nil:
+            "已有内容已保留。"
         }
     }
 
@@ -127,7 +120,7 @@ struct GenerationFailureView: View {
         if model.lastGenerationError == .rateLimited {
             return "稍后再试一次"
         }
-        return "从这里继续"
+        return "重试"
     }
 
     private var retryAccessibilityHint: String {
