@@ -13,7 +13,8 @@ enum PosterComposer {
         yearLabel: String,
         title: String,
         narrative: String,
-        sceneImageData: Data?
+        sceneImageData: Data?,
+        interpretationTrace: TemporalInterpretationTrace? = nil
     ) throws -> Data {
         let sceneImage = sceneImageData.flatMap(UIImage.init(data:))
         let content = PosterExportCard(
@@ -21,7 +22,8 @@ enum PosterComposer {
             yearLabel: yearLabel,
             title: title,
             narrative: narrative,
-            sceneImage: sceneImage
+            sceneImage: sceneImage,
+            interpretationTrace: interpretationTrace
         )
         .frame(width: exportWidth, height: exportHeight)
 

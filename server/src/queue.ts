@@ -23,6 +23,7 @@ import {
 } from "./storage.js";
 import type {
   CreateGenerationBody,
+  ExactTarget,
   GenerationContext,
   GenerationRecord,
   ImageGenerationAdapter,
@@ -30,6 +31,7 @@ import type {
   SceneUnderstandingPayload,
   StoryBeatPayload,
   StructuredGenerationBody,
+  TimePositionPayload,
 } from "./types.js";
 import {
   getPostGenerationValidationAdapter,
@@ -104,6 +106,10 @@ export function createGenerationJob(
   const imageProvider: ImageGenerationProvider =
     body.imageProvider === "apimart" ? "apimart" : "minimax";
   const adapter = getImageGenerationAdapter(imageProvider);
+  const imageModel =
+    imageProvider === "apimart"
+      ? resolveAPIMartImageModel(body.imageModel)
+      : undefined;
   // Runtime readiness = admin kill-switch + the specifically requested adapter.
   if (!settings.remoteGenerationEnabled || !adapter) {
     return {
@@ -130,9 +136,9 @@ export function createGenerationJob(
     return contractError(400, "invalid_source_asset", "源图片不存在或已过期。");
   }
 
-  if (!body.timePosition || typeof body.timePosition.normalized !== "number") {
-    return contractError(400, "invalid_time_position", "时间位置无效。");
-  }
+  const timeValidation = validateTimePosition(body.timePosition);
+  if (timeValidation) return timeValidation;
+  const timePosition = canonicalTimePosition(body.timePosition.offsetDays);
 
   const contextVersion =
     (body as { contextVersion?: string }).contextVersion ?? "legacy.v1";
@@ -152,10 +158,10 @@ export function createGenerationJob(
     const structured = body as StructuredGenerationBody;
     const validation = validateStructuredContext(structured.structuredContext);
     if (validation) return validation;
-    const ctx = injectTargetTime(structured);
+    const ctx = injectTargetTime(structured, timePosition);
     built = compilePrompt({
       context: ctx,
-      timePosition: body.timePosition,
+      timePosition,
       aspectRatio,
     });
     understanding = ctx.understanding;
@@ -172,14 +178,14 @@ export function createGenerationJob(
       ? clientPrompt
       : null;
     beat = legacy.storyBeat
-      ?? pickNearestBeat(legacy.temporalStory, body.timePosition.offsetYears)
+      ?? pickNearestBeat(legacy.temporalStory, timePosition.offsetYears)
       ?? null;
     understanding = legacy.understanding ?? null;
 
     if (legacy.understanding || legacy.temporalStory || legacy.storyBeat) {
       const corePrompt = forceMarker
         ?? compileStoryDrivenPrompt({
-          time: body.timePosition,
+          time: timePosition,
           understanding: legacy.understanding,
           story: legacy.temporalStory
             ? {
@@ -190,11 +196,11 @@ export function createGenerationJob(
             : null,
           beat,
         })
-        ?? makeTemporalImagePrompt(body.timePosition);
+        ?? makeTemporalImagePrompt(timePosition);
       built = buildPrompt({
         template: settings.promptTemplate,
         corePrompt,
-        timePosition: body.timePosition,
+        timePosition,
         aspectRatio,
       });
     } else {
@@ -210,7 +216,7 @@ export function createGenerationJob(
         : buildLegacyPrompt({
             template: settings.promptTemplate,
             story: clientPrompt,
-            timePosition: body.timePosition,
+            timePosition,
             aspectRatio,
           });
     }
@@ -226,7 +232,10 @@ export function createGenerationJob(
     status: "queued",
     createdAt: now,
     updatedAt: now,
-    modelName: imageProvider === "apimart" ? "gpt-image-2" : settings.modelName,
+    modelName:
+      imageProvider === "apimart"
+        ? (imageModel ?? "gpt-image-2")
+        : settings.modelName,
     imageProvider,
     aspectRatio,
     promptTruncated: built.truncated,
@@ -242,7 +251,7 @@ export function createGenerationJob(
     useSubjectReference: Boolean(body.useSubjectReference),
     understanding,
     storyBeat: beat,
-    targetTime: body.timePosition,
+    targetTime: timePosition,
   });
 
   putGeneration(record);
@@ -285,6 +294,84 @@ const VALID_SCHEMA_VERSIONS = new Set([
   "generation-context.v2",
   "generation-context.v3",
 ]);
+
+export const MAXIMUM_TIME_OFFSET_DAYS = 36_525;
+const TIME_POSITION_CURVE_EXPONENT = 2.35;
+const TIME_POSITION_TOLERANCE_YEARS = 0.001;
+const TIME_POSITION_TOLERANCE_NORMALIZED = 1e-9;
+
+/**
+ * Rebuild every derived time field from offsetDays, the generation contract's
+ * sole time identity. Callers must range-check before invoking this helper.
+ */
+export function canonicalTimePosition(
+  offsetDays: number,
+  referenceDate = new Date()
+): TimePositionPayload & { targetDateISO: string } {
+  const normalized = offsetDays === 0
+    ? 0
+    : Math.sign(offsetDays) * Math.pow(
+        Math.abs(offsetDays) / MAXIMUM_TIME_OFFSET_DAYS,
+        1 / TIME_POSITION_CURVE_EXPONENT
+      );
+  const targetDate = new Date(
+    referenceDate.getTime() + offsetDays * 86_400_000
+  );
+  return {
+    normalized,
+    offsetDays,
+    offsetYears: offsetDays / 365.25,
+    compactLabel: compactTimeLabel(offsetDays),
+    targetDateISO: targetDate.toISOString().slice(0, 10),
+  };
+}
+
+function compactTimeLabel(offsetDays: number): string {
+  const days = Math.abs(offsetDays);
+  if (days < 1 / 48) return "NOW";
+
+  const direction = offsetDays < 0 ? "前" : "后";
+  if (days < 1) return `${Math.round(days * 24)} 小时${direction}`;
+  if (days < 31) return `${Math.round(days)} 天${direction}`;
+  if (days < 365.25) return `${(days / 30.44).toFixed(1)} 个月${direction}`;
+  if (days < 3_652.5) return `${(days / 365.25).toFixed(1)} 年${direction}`;
+  return `${Math.round(days / 365.25)} 年${direction}`;
+}
+
+function validateTimePosition(
+  timePosition: CreateGenerationBody["timePosition"] | undefined
+): ReturnType<typeof contractError> | null {
+  if (
+    !timePosition
+    || !Number.isFinite(timePosition.normalized)
+    || !Number.isFinite(timePosition.offsetDays)
+    || !Number.isFinite(timePosition.offsetYears)
+    || typeof timePosition.compactLabel !== "string"
+    || !timePosition.compactLabel.trim()
+  ) {
+    return contractError(400, "invalid_time_position", "时间位置无效。");
+  }
+
+  if (
+    Math.abs(timePosition.normalized) > 1
+    || Math.abs(timePosition.offsetDays) > MAXIMUM_TIME_OFFSET_DAYS
+  ) {
+    return contractError(400, "invalid_time_position", "时间超出可生成的前后一百年范围。");
+  }
+
+  const canonical = canonicalTimePosition(timePosition.offsetDays);
+  if (
+    Math.abs(timePosition.offsetYears - canonical.offsetYears)
+      > TIME_POSITION_TOLERANCE_YEARS
+    || Math.abs(timePosition.normalized - canonical.normalized)
+      > TIME_POSITION_TOLERANCE_NORMALIZED
+    || timePosition.compactLabel.trim() !== canonical.compactLabel
+  ) {
+    return contractError(400, "invalid_time_position", "时间位置字段彼此不一致。");
+  }
+
+  return null;
+}
 
 function validateStructuredContext(
   ctx: GenerationContext | undefined
@@ -345,14 +432,14 @@ function validateStructuredContext(
  * Inject program-authoritative time values into the targetBeat.
  * The LLM's anchorYears is a hint; offsetDays is the truth.
  */
-function injectTargetTime(body: StructuredGenerationBody): GenerationContext {
-  const offsetDays = body.timePosition.offsetDays;
-  const now = new Date();
-  const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
-  const exactTarget: import("./types.js").ExactTarget = {
-    offsetDays,
-    targetDateISO: targetDate.toISOString().slice(0, 10),
-    compactLabel: body.timePosition.compactLabel,
+function injectTargetTime(
+  body: StructuredGenerationBody,
+  timePosition: TimePositionPayload & { targetDateISO: string }
+): GenerationContext {
+  const exactTarget: ExactTarget = {
+    offsetDays: timePosition.offsetDays,
+    targetDateISO: timePosition.targetDateISO,
+    compactLabel: timePosition.compactLabel,
   };
   return {
     ...body.structuredContext,
@@ -361,7 +448,7 @@ function injectTargetTime(body: StructuredGenerationBody): GenerationContext {
       targetBeat: {
         ...body.structuredContext.story.targetBeat,
         // Overwrite the LLM's anchorYears with the program-authoritative value.
-        anchorYears: offsetDays / 365.25,
+        anchorYears: timePosition.offsetYears,
         exactTarget,
         renderPlan: body.structuredContext.story.targetBeat.renderPlan
           ? {
@@ -417,6 +504,7 @@ async function processGeneration(generationId: string): Promise<void> {
       useSubjectReference: Boolean(stored?.useSubjectReference),
       requestId: current.requestId,
       generationId,
+      modelName: current.modelName,
     });
 
     promptByGeneration.delete(generationId);
@@ -719,6 +807,22 @@ export function toAdminGeneration(record: GenerationRecord) {
 
 export function adminList() {
   return listGenerations().map(toAdminGeneration);
+}
+
+const APIMART_IMAGE_MODELS = new Set([
+  "gpt-image-2",
+  "gemini-3.1-flash-image-preview",
+  "gemini-3-pro-image-preview",
+  "doubao-seedream-5-0-pro",
+  "flux-kontext-pro",
+]);
+
+function resolveAPIMartImageModel(raw: string | undefined): string {
+  const trimmed = raw?.trim();
+  if (trimmed && APIMART_IMAGE_MODELS.has(trimmed)) {
+    return trimmed;
+  }
+  return "gpt-image-2";
 }
 
 /** Wait helper for tests. */

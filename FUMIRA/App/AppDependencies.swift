@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 struct AppDependencies {
     let camera: any CameraService
     let cameraPreview: any CameraPreviewFactory
@@ -14,6 +15,9 @@ struct AppDependencies {
     let haptics: any HapticsClient
     let motionField: any MotionFieldProviding
     let captureMotion: any CaptureMotionProviding
+    let temporalDarkroom: any TemporalDarkroomProviding
+    let temporalShake: any TemporalShakeProviding
+    let blowInput: any BlowInputProviding
     let sceneLayerAnalyzer: any SceneLayerAnalyzing
 
     init(
@@ -29,6 +33,11 @@ struct AppDependencies {
         haptics: any HapticsClient,
         motionField: any MotionFieldProviding,
         captureMotion: any CaptureMotionProviding = MockCaptureMotionService(),
+        temporalDarkroom: any TemporalDarkroomProviding = MockTemporalDarkroomService(),
+        temporalShake: any TemporalShakeProviding = MockTemporalShakeService(),
+        blowInput: any BlowInputProviding = MockBlowInputService(
+            availability: .fallbackRequired(.inputUnavailable)
+        ),
         sceneLayerAnalyzer: any SceneLayerAnalyzing = MockSceneLayerAnalyzer(),
         cameraActivity: any CameraLiveActivityService = MockCameraLiveActivityService()
     ) {
@@ -45,6 +54,9 @@ struct AppDependencies {
         self.haptics = haptics
         self.motionField = motionField
         self.captureMotion = captureMotion
+        self.temporalDarkroom = temporalDarkroom
+        self.temporalShake = temporalShake
+        self.blowInput = blowInput
         self.sceneLayerAnalyzer = sceneLayerAnalyzer
     }
 
@@ -62,6 +74,11 @@ struct AppDependencies {
             haptics: MockHapticsClient(),
             motionField: MockMotionFieldService(),
             captureMotion: MockCaptureMotionService(),
+            temporalDarkroom: MockTemporalDarkroomService(),
+            temporalShake: MockTemporalShakeService(),
+            blowInput: MockBlowInputService(
+                availability: .fallbackRequired(.inputUnavailable)
+            ),
             sceneLayerAnalyzer: MockSceneLayerAnalyzer()
         )
     }
@@ -80,6 +97,11 @@ struct AppDependencies {
             haptics: MockHapticsClient(),
             motionField: MockMotionFieldService(),
             captureMotion: MockCaptureMotionService(),
+            temporalDarkroom: MockTemporalDarkroomService(),
+            temporalShake: MockTemporalShakeService(),
+            blowInput: MockBlowInputService(
+                availability: .fallbackRequired(.inputUnavailable)
+            ),
             sceneLayerAnalyzer: MockSceneLayerAnalyzer()
         )
     }
@@ -105,6 +127,9 @@ struct AppDependencies {
             haptics: LiveHapticsClient(),
             motionField: MockMotionFieldService(),
             captureMotion: MockCaptureMotionService(),
+            temporalDarkroom: MockTemporalDarkroomService(),
+            temporalShake: MockTemporalShakeService(),
+            blowInput: LiveBlowInputService(),
             sceneLayerAnalyzer: MockSceneLayerAnalyzer(),
             cameraActivity: LiveCameraLiveActivityService()
         )
@@ -123,6 +148,9 @@ struct AppDependencies {
             haptics: LiveHapticsClient(),
             motionField: CoreMotionFieldService(),
             captureMotion: CoreCaptureMotionService(),
+            temporalDarkroom: DeviceTemporalDarkroomService(),
+            temporalShake: DeviceTemporalShakeService(),
+            blowInput: LiveBlowInputService(),
             sceneLayerAnalyzer: VisionSceneLayerAnalyzer(),
             cameraActivity: LiveCameraLiveActivityService()
         )

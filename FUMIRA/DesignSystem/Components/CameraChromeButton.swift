@@ -72,13 +72,11 @@ struct CameraChromeGlyph: View {
                 width: CameraChromeMetrics.controlDiameter,
                 height: CameraChromeMetrics.controlDiameter
             )
-            .background(PosterEffects.cameraActionFill)
+            .background {
+                Circle()
+                    .fill(PosterEffects.cameraActionFill)
+            }
             .clipShape(Circle())
-            .shadow(
-                color: PosterEffects.control,
-                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
-                y: PosterEffects.cameraChromeFeedbackShadowOffset
-            )
             .contentShape(Circle())
     }
 }
@@ -88,12 +86,12 @@ struct CameraChromeGlyph: View {
         PosterPalette.skyDeep.ignoresSafeArea()
         HStack(spacing: PosterSpacing.lg) {
             CameraChromeButton(
-                systemImage: "bolt.badge.automatic.fill",
-                accessibilityLabelText: "闪光灯"
+                systemImage: "photo.on.rectangle",
+                accessibilityLabelText: "从相册导入"
             ) {}
             CameraChromeButton(
                 systemImage: "arrow.triangle.2.circlepath",
-                accessibilityLabelText: "翻转镜头"
+                accessibilityLabelText: "翻转摄像头"
             ) {}
         }
     }

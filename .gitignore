@@ -46,3 +46,8 @@ Package.resolved
 .xcconfig
 .tmp-*.png
 .tmp-*.jpg
+
+# Generated pixel-sequence / visual build outputs (rebuilt via tools/build_pixel_sequences.py)
+artifacts/
+tools/__pycache__/
+**/__pycache__/

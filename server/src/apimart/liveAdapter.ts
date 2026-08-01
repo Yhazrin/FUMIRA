@@ -179,7 +179,7 @@ export class LiveAPIMartAdapter implements ImageGenerationAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-image-2",
+          model: input.modelName?.trim() || "gpt-image-2",
           prompt: input.prompt,
           n: 1,
           size: input.aspectRatio,

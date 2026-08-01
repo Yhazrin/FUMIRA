@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var heroSlot: HeroSlotPreference?
+    @State private var heroSlotOwner: HeroSlotOwner?
     /// The shutter view uses a root-computed crop instead of publishing a
     /// preference. Cache that exact rect so the first developing frame can
     /// continue from it while the incoming destination preference resolves.
@@ -15,6 +16,7 @@ struct RootView: View {
     @State private var availableHeroSlots: [HeroSlotOwner: HeroSlotPreference] = [:]
     @State private var shutterFlash = 0.0
     @State private var cameraEntryProgress: CGFloat = 0
+    @State private var viewfinderSlideProgress: CGFloat = 1
     @State private var captureProgress: CGFloat = 0
     @State private var spatialTimelineID = UUID()
     @State private var isEnteringCamera = false
@@ -30,7 +32,6 @@ struct RootView: View {
                 // Permanent stage fill — phase views never fade this away.
                 stageBackdrop
                     .ignoresSafeArea()
-                    .animation(.posterPhaseChange(reduceMotion: reduceMotion), value: model.phase)
 
                 // The persistent still-image hero begins after capture. The
                 // live viewfinder owns its one full-screen preview independently.
@@ -39,6 +40,7 @@ struct RootView: View {
                         HeroPhotoSurface(
                             model: model,
                             spatialProgress: photoSpatialProgress,
+                            captureFlipProgress: photoCaptureFlipProgress,
                             timeRevealProgress: model.resultRevealProgress,
                             handManipulationEnabled: true
                         )
@@ -57,6 +59,7 @@ struct RootView: View {
                         HeroPhotoSurface(
                             model: model,
                             spatialProgress: photoSpatialProgress,
+                            captureFlipProgress: photoCaptureFlipProgress,
                             timeRevealProgress: model.resultRevealProgress
                         )
                             .frame(width: max(slot.frame.width, 1), height: max(slot.frame.height, 1))
@@ -75,20 +78,15 @@ struct RootView: View {
 
                 // Page chrome above the hero (z > 20). Scope the phase
                 // transaction here so camera/hero layers are not reanimated.
-                phaseContent
+                phaseContent(in: rootSize)
                     .zIndex(30)
-                    .animation(.posterPhaseChange(reduceMotion: reduceMotion), value: model.phase)
 
-                // Viewfinder controls remain a sibling above the preview/shade.
+                // Viewfinder controls stay put — only the preview card slides.
+                // The wave rail plays its own flat-graphic intro in place.
                 if model.phase == .viewfinder {
                     ViewfinderChromeOverlay(model: model)
                         .zIndex(50)
-                        .transition(
-                            .opacity.animation(
-                                .posterPhaseChange(reduceMotion: reduceMotion)
-                                    ?? .linear(duration: PosterMotion.reduced)
-                            )
-                        )
+                        .transition(.identity)
                 } else if model.phase == .shuttered {
                     CameraCaptureDepartureChrome(
                         progress: captureProgress,
@@ -116,6 +114,7 @@ struct RootView: View {
                 }
             }
             .frame(width: rootSize.width, height: rootSize.height)
+            .clipped()
             .coordinateSpace(name: HeroCoordinateSpace.name)
             .onChange(of: activeSlot, initial: true) { _, slot in
                 if model.phase == .shuttered, let slot {
@@ -182,10 +181,13 @@ struct RootView: View {
             resetSpatialTimelines()
             model.motionField.deactivate()
             model.captureMotion.deactivate()
+            model.temporalDarkroom.deactivate()
+            model.temporalShake.deactivate()
         }
         .onChange(of: model.phase) { previous, phase in
             syncMotionField()
             syncSpatialTimeline(from: previous, to: phase)
+            syncViewfinderSlide(from: previous, to: phase)
             if previous == .shuttered,
                phase == .understanding,
                heroSlot == nil {
@@ -195,6 +197,7 @@ struct RootView: View {
                 updateActiveHeroSlot(from: availableHeroSlots)
             } else {
                 heroSlot = nil
+                heroSlotOwner = nil
                 shutteredHeroSlot = nil
                 availableHeroSlots = [:]
             }
@@ -207,12 +210,8 @@ struct RootView: View {
             syncMotionField()
             resetSpatialTimelinesForCurrentPhase()
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                syncMotionField()
-            } else {
-                model.motionField.deactivate()
-            }
+        .onChange(of: scenePhase) { _, _ in
+            syncMotionField()
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -245,16 +244,35 @@ struct RootView: View {
         // the same render pass. Selecting by owner keeps the result image tied
         // to the result frame instead of whichever page reduced last.
         let isFirstPlacement = heroSlot == nil
+        let ownerChanged = heroSlotOwner != owner
+        if let current = heroSlot,
+           framesApproximatelyEqual(current.frame, preference.frame),
+           abs(current.cornerRadius - preference.cornerRadius) < 0.5 {
+            heroSlotOwner = owner
+            return
+        }
+
         let apply = {
             heroSlot = preference
+            heroSlotOwner = owner
         }
-        if reduceMotion || isFirstPlacement {
+        // Result content can scroll. Its root-owned hero must follow the slot
+        // directly instead of starting a fresh 0.48s morph on every geometry
+        // preference update.
+        if reduceMotion || isFirstPlacement || (model.phase == .result && !ownerChanged) {
             apply()
         } else {
             withAnimation(.posterHeroMorph(reduceMotion: false)) {
                 apply()
             }
         }
+    }
+
+    private func framesApproximatelyEqual(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        abs(lhs.minX - rhs.minX) < 0.75
+            && abs(lhs.minY - rhs.minY) < 0.75
+            && abs(lhs.width - rhs.width) < 0.75
+            && abs(lhs.height - rhs.height) < 0.75
     }
 
     private var activeHeroSlotOwner: HeroSlotOwner? {
@@ -275,7 +293,7 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private var phaseContent: some View {
+    private func phaseContent(in rootSize: CGSize) -> some View {
         switch model.phase {
         case .connection:
             ConnectionView(
@@ -306,7 +324,10 @@ struct RootView: View {
 
         case .viewfinder:
             ViewfinderView(model: model, namespace: sceneNamespace)
-                .transition(.cameraAperture(reduceMotion: reduceMotion))
+                // Explicit progress — AppModel phase swaps are not wrapped in
+                // withAnimation, so AnyTransition alone never slides.
+                .offset(y: viewfinderSlideOffset(in: rootSize))
+                .transition(.identity)
 
         case .shuttered:
             ShutterFeedbackView(model: model, namespace: sceneNamespace)
@@ -347,7 +368,6 @@ struct RootView: View {
     /// The result screen keeps its own time-door and panel gestures, while the
     /// developing stages turn the shared print into an object users can hold.
     private var heroHandManipulationEnabled: Bool {
-        guard !reduceMotion else { return false }
         return switch model.phase {
         case .understanding, .storyWriting, .generating:
             true
@@ -363,22 +383,43 @@ struct RootView: View {
             return
         }
 
-        isEnteringCamera = true
-        let timelineID = UUID()
-        spatialTimelineID = timelineID
-        withAnimation(PosterMotion.cameraEntry) {
-            cameraEntryProgress = 1
-        } completion: {
-            guard spatialTimelineID == timelineID else { return }
-            isEnteringCamera = false
+        // Mount the portal at the exact source diameter in its own render pass.
+        // If insertion and the `0 → 1` write share a transaction, SwiftUI can
+        // rasterize the first visible frame at the destination scale, which
+        // reads as a large circle popping in before it expands.
+        var mountTransaction = Transaction()
+        mountTransaction.animation = nil
+        withTransaction(mountTransaction) {
+            isEnteringCamera = true
             cameraEntryProgress = 0
         }
-
-        // Navigation is an immediate response to the user's tap. The portal
-        // is only a transient acknowledgement layer; it must never own the
-        // permission flow or hold the app on the connection screen if an
-        // animation completion is interrupted by a system permission sheet.
-        model.beginPhoneOnlyPath()
+        let timelineID = UUID()
+        spatialTimelineID = timelineID
+        Task {
+            await model.prewarmCameraPreviewIfAuthorized()
+        }
+        Task { @MainActor in
+            // One frame is enough for CameraEntryPortal to establish the same
+            // 88pt circle as the touched control. The following transaction
+            // then interpolates one persistent object to the full field.
+            await Task.yield()
+            guard spatialTimelineID == timelineID, isEnteringCamera else { return }
+            withAnimation(PosterMotion.cameraEntry) {
+                cameraEntryProgress = 1
+            } completion: {
+                guard spatialTimelineID == timelineID else { return }
+                // Mount the next blue hold underneath the already-solid field,
+                // then drop the overlay without reversing the liquid timeline
+                // (animating progress back to 0 reads as a sudden collapse).
+                model.beginPhoneOnlyPath()
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(90))
+                    guard spatialTimelineID == timelineID else { return }
+                    isEnteringCamera = false
+                    cameraEntryProgress = 0
+                }
+            }
+        }
     }
 
     /// Reuses the same lens portal after the permission page. The permission
@@ -386,6 +427,33 @@ struct RootView: View {
     /// interruptible progress value rather than a delayed page swap.
     private func beginViewfinderEntry() {
         Task { await model.grantCameraAccess() }
+    }
+
+    private func viewfinderSlideOffset(in rootSize: CGSize) -> CGFloat {
+        guard !reduceMotion else { return 0 }
+        let travel = max(rootSize.height, 1)
+        return (1 - viewfinderSlideProgress) * -travel
+    }
+
+    private func syncViewfinderSlide(from previous: AppPhase, to phase: AppPhase) {
+        guard phase == .viewfinder else {
+            if previous == .viewfinder {
+                viewfinderSlideProgress = 1
+            }
+            return
+        }
+
+        guard !reduceMotion else {
+            viewfinderSlideProgress = 1
+            return
+        }
+
+        // Restart from above whenever we enter the viewfinder so the slide is
+        // always visible, including mock auto-grant paths.
+        viewfinderSlideProgress = 0
+        withAnimation(PosterMotion.cameraViewfinderSlide) {
+            viewfinderSlideProgress = 1
+        }
     }
 
     #if DEBUG
@@ -406,13 +474,14 @@ struct RootView: View {
     }
     #endif
 
-    /// Camera capture and the first paper landing share full-screen geometry.
-    /// Utility/review pages keep system safe areas so compact titles never sit
-    /// beneath status-bar or home-indicator content.
+    /// Camera capture and the in-hand developing print share full-screen
+    /// geometry. Reading and export pages use the system safe area so titles
+    /// never sit underneath status-bar or Dynamic Island content; their stage
+    /// backdrops still extend full-bleed independently.
     private var usesFullBleedRoot: Bool {
         switch model.phase {
-        case .connection, .cameraPermission, .viewfinder, .shuttered, .understanding,
-             .storyWriting, .generating:
+        case .connection, .cameraPermission, .viewfinder, .shuttered,
+             .understanding, .storyWriting, .generating:
             true
         default:
             false
@@ -484,7 +553,7 @@ struct RootView: View {
         switch model.phase {
         case .viewfinder:
             .clear
-        case .understanding, .storyWriting, .generating:
+        case .understanding, .storyWriting, .generating, .result:
             PosterEffects.photoPaperShadow
         case .shuttered:
             PosterPalette.ink.opacity(0.22)
@@ -498,6 +567,11 @@ struct RootView: View {
         case .viewfinder: 0
         case .shuttered: 18 * captureLiftProgress
         case .understanding: PosterEffects.photoPaperLandingShadowRadius
+        case .result:
+            reduceMotion
+                ? 0
+                : 4 + photoSpatialProgress
+                    * PosterEffects.photoPaperLandingShadowRadius
         default: 14
         }
     }
@@ -507,6 +581,11 @@ struct RootView: View {
         case .viewfinder: 0
         case .shuttered: 10 * captureLiftProgress
         case .understanding: PosterEffects.photoPaperLandingShadowOffset
+        case .result:
+            reduceMotion
+                ? 0
+                : PosterSpacing.xs + photoSpatialProgress
+                    * PosterEffects.photoPaperLandingShadowOffset
         default: 8
         }
     }
@@ -566,10 +645,13 @@ struct RootView: View {
              .generating,
              .share:
             false
-        case .result,
-             .pipelineFailure,
+        case .pipelineFailure,
              .disconnected:
             !model.isPipelineBusy && !model.isRealityAlignmentPresented
+        case .result:
+            // The result page owns a compact More menu. A second root-level gear
+            // competes with the time heading and can overlap it at larger type.
+            false
         }
     }
 
@@ -579,15 +661,16 @@ struct RootView: View {
     @ViewBuilder
     private var stageBackdrop: some View {
         switch model.phase {
+        case .cameraPermission:
+            // Matches the liquid portal / hold so the viewfinder slide reveals
+            // blue underneath instead of a white canvas flash.
+            PosterPalette.actionBlue
         case .viewfinder, .shuttered:
-            PosterPalette.cameraBody
+            PosterPalette.actionBlue
         case .understanding, .storyWriting, .generating:
-            FrozenRealityBackdrop(
-                image: model.decodedCapturedImage,
-                motion: model.captureMotion
-            )
+            PosterPalette.canvas
         case .connection, .bluetoothPermission, .connected,
-             .cameraPermission, .result, .share,
+             .result, .share,
              .pipelineFailure, .disconnected:
             PosterPalette.canvas
         }
@@ -617,11 +700,24 @@ struct RootView: View {
     /// chrome and destination geometry only, while these values remain
     /// continuous through the phase boundary.
     private var photoSpatialProgress: CGFloat {
-        switch model.phase {
+        guard !reduceMotion else { return 0 }
+        return switch model.phase {
         case .shuttered, .understanding:
             FUMIRASpatialMotion.spatialPulse(captureProgress)
         case .result:
             FUMIRASpatialMotion.spatialPulse(model.resultRevealProgress)
+        default:
+            0
+        }
+    }
+
+    /// Capture timeline progress for the Y-axis flip mapper. The degrees
+    /// mapping completes a full turn by lift peak (`0.72`), so shuttered
+    /// never parks the card on its blank reverse.
+    private var photoCaptureFlipProgress: CGFloat {
+        switch model.phase {
+        case .shuttered, .understanding:
+            captureProgress
         default:
             0
         }
@@ -681,6 +777,16 @@ struct RootView: View {
         guard scenePhase == .active else {
             model.motionField.deactivate()
             model.captureMotion.deactivate()
+            model.syncTemporalDarkroom(
+                for: model.phase,
+                reduceMotion: reduceMotion,
+                sceneIsActive: false
+            )
+            model.syncTemporalShake(
+                for: model.phase,
+                reduceMotion: reduceMotion,
+                sceneIsActive: false
+            )
             return
         }
         model.syncMotionField(
@@ -689,6 +795,16 @@ struct RootView: View {
             lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled
         )
         model.syncCaptureMotion(for: model.phase, sceneIsActive: true)
+        model.syncTemporalDarkroom(
+            for: model.phase,
+            reduceMotion: reduceMotion,
+            sceneIsActive: true
+        )
+        model.syncTemporalShake(
+            for: model.phase,
+            reduceMotion: reduceMotion,
+            sceneIsActive: true
+        )
     }
 }
 

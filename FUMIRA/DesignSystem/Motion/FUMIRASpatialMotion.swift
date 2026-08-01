@@ -29,6 +29,13 @@ enum FUMIRASpatialMotion {
         sin(clamp(progress) * .pi)
     }
 
+    /// One full card revolution on the capture timeline. The spin completes by
+    /// the lift peak (`0.72`); settle (`0.72...1`) keeps the front face so the
+    /// print never rests on its blank reverse during the shuttered hold.
+    static func captureFlipDegrees(_ progress: CGFloat) -> Double {
+        Double(map(progress, from: 0...0.72, to: 0...1)) * 360
+    }
+
     static func captureHeroProgress(_ progress: CGFloat) -> CGFloat {
         map(progress, from: 0...0.72, to: 0...1)
     }
@@ -39,25 +46,6 @@ enum FUMIRASpatialMotion {
 
     static func captureTextProgress(_ progress: CGFloat) -> CGFloat {
         map(progress, from: 0.52...0.88, to: 0...1)
-    }
-
-    /// A direct derivative of the result reveal. The dark time-door card starts
-    /// yielding early, while remaining readable until the generated frame is
-    /// more than halfway visible.
-    static func timeDoorDepartureProgress(_ progress: CGFloat) -> CGFloat {
-        map(
-            progress,
-            from: PosterMotion.timeDoorDepartureStart...1,
-            to: 0...1
-        )
-    }
-
-    static func timeDoorFadeProgress(_ progress: CGFloat) -> CGFloat {
-        map(
-            progress,
-            from: PosterMotion.timeDoorFadeStart...PosterMotion.timeDoorFadeEnd,
-            to: 0...1
-        )
     }
 
     static func cameraPortalScale(_ progress: CGFloat, in size: CGSize) -> CGFloat {

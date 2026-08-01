@@ -5,6 +5,8 @@ struct TimePosition: Hashable, Codable, Sendable {
     static let curveExponent = 2.35
     static let now = TimePosition(normalized: 0)
 
+    private static let exactIdentityToleranceDays = 1.0 / (24 * 60 * 60)
+
     let normalized: Double
 
     init(normalized: Double) {
@@ -27,15 +29,29 @@ struct TimePosition: Hashable, Codable, Sendable {
         offsetDays / 365.25
     }
 
+    /// Exact generation identity, with only enough tolerance for floating-point
+    /// and serialization round trips. Product-facing time bands and labels use
+    /// their own thresholds and must not use this comparison.
+    func hasSameExactTimeIdentity(asOffsetDays otherOffsetDays: Double) -> Bool {
+        let ownOffsetDays = offsetDays
+        guard ownOffsetDays.isFinite, otherOffsetDays.isFinite else { return false }
+        return abs(ownOffsetDays - otherOffsetDays) <= Self.exactIdentityToleranceDays
+    }
+
     func targetDate(from referenceDate: Date = .now, calendar: Calendar = .current) -> Date {
-        calendar.date(byAdding: .day, value: Int(offsetDays.rounded()), to: referenceDate) ?? referenceDate
+        let seconds = offsetDays * 24 * 60 * 60
+        guard seconds.isFinite else { return referenceDate }
+        return referenceDate.addingTimeInterval(seconds)
     }
 
     var compactLabel: String {
         let days = abs(offsetDays)
-        guard days >= 0.5 else { return "NOW" }
+        guard days >= 1.0 / 48.0 else { return "NOW" }
 
         let direction = offsetDays < 0 ? "前" : "后"
+        if days < 1 {
+            return "\(Int((days * 24).rounded())) 小时\(direction)"
+        }
         if days < 31 {
             return "\(Int(days.rounded())) 天\(direction)"
         }

@@ -24,45 +24,13 @@ struct CameraPermissionView: View {
         .preferredColorScheme(showPrompt ? .light : .dark)
     }
 
-    /// Permission can resolve faster than the viewfinder mounts. Hold the exact
-    /// destination silhouette during that short gap so entry never flashes a
-    /// white page or a one-pixel mask line.
+    /// Full-bleed blue bridge while permission / preview resolve. The viewfinder
+    /// card itself slides down from RootView — never pre-place that silhouette.
     private var cameraEntryHold: some View {
-        GeometryReader { proxy in
-            let layout = CameraCompositionGeometry.layout(
-                aspectRatio: model.cameraAspectRatio,
-                in: proxy.size
-            )
-            let shape = UnevenRoundedRectangle(
-                cornerRadii: RectangleCornerRadii(
-                    topLeading: 0,
-                    bottomLeading: layout.cornerRadius,
-                    bottomTrailing: layout.cornerRadius,
-                    topTrailing: 0
-                ),
-                style: .continuous
-            )
-
-            ZStack {
-                PosterPalette.cameraBody
-                    .ignoresSafeArea()
-
-                shape
-                    .fill(PosterPalette.sky)
-                    .frame(
-                        width: layout.heroFrame.width,
-                        height: layout.heroFrame.height
-                    )
-                    .position(
-                        x: layout.heroFrame.midX,
-                        y: layout.heroFrame.midY
-                    )
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-        }
-        .ignoresSafeArea()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("正在进入取景器")
+        PosterPalette.actionBlue
+            .ignoresSafeArea()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("正在进入取景器")
     }
 
     private var promptContent: some View {

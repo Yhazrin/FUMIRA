@@ -7,3 +7,11 @@ enum PosterSpacing {
     static let lg: CGFloat = 24
     static let xl: CGFloat = 32
 }
+
+enum PosterControlMetric {
+    /// Minimum interactive dimension required by the product accessibility contract.
+    static let minimumTouchTarget: CGFloat = 44
+
+    /// Standard compact circular control used beside a primary result action.
+    static let compactDiameter: CGFloat = 56
+}

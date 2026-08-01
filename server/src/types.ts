@@ -68,6 +68,8 @@ export interface LegacyGenerationBody {
   structuredContext?: never;
   aspectRatio?: AspectRatio;
   imageProvider?: ImageGenerationProvider;
+  /** Optional APIMart vendor model id (e.g. gpt-image-2). Ignored for MiniMax. */
+  imageModel?: string;
   requestId: string;
   useSubjectReference?: boolean;
 }
@@ -80,6 +82,8 @@ export interface StructuredGenerationBody {
   structuredContext: GenerationContext;
   aspectRatio?: AspectRatio;
   imageProvider?: ImageGenerationProvider;
+  /** Optional APIMart vendor model id (e.g. gpt-image-2). Ignored for MiniMax. */
+  imageModel?: string;
   requestId: string;
   useSubjectReference?: boolean;
 }
@@ -165,6 +169,8 @@ export interface MiniMaxGenerateInput {
   useSubjectReference: boolean;
   requestId: string;
   generationId: string;
+  /** APIMart vendor model; MiniMax adapters ignore this. */
+  modelName?: string;
 }
 
 export interface MiniMaxGenerateSuccess {

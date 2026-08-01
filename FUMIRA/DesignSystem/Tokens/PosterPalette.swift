@@ -40,19 +40,23 @@ enum PosterPalette {
     static let skyDeep = Color(red: 61 / 255, green: 139 / 255, blue: 181 / 255) // #3D8BB5
 
     /// 相机快门蓝 — 蓝白轻拟物快门外壳；仅用于拍摄主按钮
-    static let cameraShutterBlue = Color(red: 30 / 255, green: 156 / 255, blue: 224 / 255)
+    static let cameraShutterBlue = Color(red: 0 / 255, green: 153 / 255, blue: 255 / 255) // #0099FF
 
     /// 相机快门蓝暗面 — 快门底座与极短投影
-    static let cameraShutterBlueDeep = Color(red: 18 / 255, green: 105 / 255, blue: 168 / 255)
+    static let cameraShutterBlueDeep = Color(red: 0 / 255, green: 116 / 255, blue: 194 / 255) // #0074C2
 
-    /// 哆啦 A 梦蓝 — 所有可操作主按钮、进度与时间选中态
+    /// 取景器实体圆钮蓝 — 轻微深于快门面，保证白色 SF Symbol 超过 3:1
+    static let cameraChromeBlue = Color(red: 0 / 255, green: 150 / 255, blue: 250 / 255) // #0096FA
+
+    /// 主题蓝 — 所有可操作主按钮、进度与时间选中态
     static let actionBlue = cameraShutterBlue
 
-    /// 哆啦 A 梦蓝暗面 — 按压、描边与高对比文字
+    /// 主题蓝暗面 — 按压、描边与高对比文字
     static let actionBlueDeep = cameraShutterBlueDeep
 
-    /// 相机机身蓝 — 取景卡后方的实体底层与控制甲板
-    static let cameraBody = actionBlueDeep
+    /// 相机机身蓝 — 取景卡后方的实体底层与控制甲板。
+    /// 与首屏液体扩散终点统一为 ``actionBlue``，避免阶段切换色差。
+    static let cameraBody = actionBlue
 
     /// 相机机身亮面 — 快门、选中态与短促反馈
     static let cameraBodyAccent = actionBlue
@@ -63,8 +67,8 @@ enum PosterPalette {
     /// 铃铛黄 — 首屏启动镜头的温暖点睛色
     static let bellYellow = Color(red: 255 / 255, green: 211 / 255, blue: 58 / 255)
 
-    /// 亮蓝暗线 — 首屏圆形镜头的阴影与外描边
-    static let actionBlueShadow = Color(red: 7 / 255, green: 89 / 255, blue: 153 / 255)
+    /// 主题蓝暗线 — 首屏圆形镜头的阴影与外描边
+    static let actionBlueShadow = Color(red: 0 / 255, green: 92 / 255, blue: 153 / 255) // #005C99
 
     /// 草地浅绿 — 分层地形近层、浅色自然面
     static let grassLight = Color(red: 143 / 255, green: 203 / 255, blue: 126 / 255) // #8FCB7E

@@ -278,17 +278,17 @@ struct CameraLiveActivityWidget: Widget {
         case .capturing:
             "正在捕捉"
         case .captured:
-            "现实已定锚"
+            "已拍摄"
         case .understanding:
-            "正在拆开现实层"
+            "分析中"
         case .storyWriting:
-            "正在寻找时间因果"
+            "整理中"
         case .generating:
-            "正在聚合\(state.targetLabel)"
+            "生成\(state.targetLabel)"
         case .ready:
-            "\(state.targetLabel)已经抵达"
+            "\(state.targetLabel)已就绪"
         case .failed:
-            "时间生成需要处理"
+            "生成未完成"
         }
     }
 
@@ -340,7 +340,7 @@ private enum CameraActivityLink {
 }
 
 private enum CameraActivityStyle {
-    static let blue = Color(red: 30 / 255, green: 156 / 255, blue: 224 / 255)
+    static let blue = Color(red: 0 / 255, green: 153 / 255, blue: 255 / 255)
     static let paperWhite = Color(red: 250 / 255, green: 247 / 255, blue: 239 / 255)
     static let islandBlack = Color.black.opacity(0.96)
     static let yellow = Color(red: 255 / 255, green: 211 / 255, blue: 58 / 255)

@@ -16,7 +16,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
     }
 
     @MainActor
-    func testPinchInMovesTowardSquareComposition() throws {
+    func testSwipeUpMovesTowardSquareComposition() throws {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "viewfinder"
         app.launchEnvironment["FUMIRA_AUDIT_ASPECT"] = "3:4"
@@ -29,7 +29,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
         XCTAssertEqual(aspectControl.value as? String, "3:4")
         let initialWaveCenterY = waveControl.frame.midY
 
-        aspectControl.pinch(withScale: 0.55, velocity: -2)
+        dragAspectControl(aspectControl, from: 0.82, to: 0.48)
 
         let changed = NSPredicate(format: "value != %@", "3:4")
         expectation(for: changed, evaluatedWith: aspectControl)
@@ -40,7 +40,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
     }
 
     @MainActor
-    func testPinchOutMovesTowardFullScreenComposition() throws {
+    func testSwipeDownMovesTowardFullScreenComposition() throws {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "viewfinder"
         app.launchEnvironment["FUMIRA_AUDIT_ASPECT"] = "3:4"
@@ -52,7 +52,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
         XCTAssertTrue(waveControl.waitForExistence(timeout: 3))
         XCTAssertEqual(aspectControl.value as? String, "3:4")
 
-        aspectControl.pinch(withScale: 1.8, velocity: 2)
+        dragAspectControl(aspectControl, from: 0.72, to: 0.96)
 
         let changed = NSPredicate(format: "value != %@", "3:4")
         expectation(for: changed, evaluatedWith: aspectControl)
@@ -67,7 +67,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
     }
 
     @MainActor
-    func testTapSelectsNarrativeSubjectInsideViewfinder() {
+    func testTapDoesNotCreateManualNarrativeSubject() {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "viewfinder"
         app.launch()
@@ -80,17 +80,37 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
             .tap()
 
         let anchor = app.otherElements["viewfinder.subject-anchor"]
-        XCTAssertTrue(anchor.waitForExistence(timeout: 3))
-        XCTAssertEqual(anchor.label, "时间主体已选择")
+        XCTAssertFalse(anchor.waitForExistence(timeout: 0.6))
     }
 
     @MainActor
-    func testLiveActivityButtonProvidesImmediateSystemFeedback() {
+    func testVerticalWavePullEntersHourGranularity() {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "viewfinder"
         app.launch()
 
-        let button = app.buttons["显示实时相机状态"]
+        let wave = app.otherElements["viewfinder.shutter-wave"]
+        XCTAssertTrue(wave.waitForExistence(timeout: 3))
+        let start = wave.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.72, dy: 0.72)
+        )
+        let end = wave.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.78, dy: -0.55)
+        )
+        start.press(forDuration: 0.08, thenDragTo: end)
+
+        let hourFormat = NSPredicate(format: "value CONTAINS ':'")
+        expectation(for: hourFormat, evaluatedWith: wave)
+        waitForExpectations(timeout: 2)
+    }
+
+    @MainActor
+    func testFlipCameraButtonIsReachableInTopChrome() {
+        let app = XCUIApplication()
+        app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "viewfinder"
+        app.launch()
+
+        let button = app.buttons["翻转摄像头"]
         XCTAssertTrue(button.waitForExistence(timeout: 3))
         expectation(
             for: NSPredicate(format: "isHittable == true"),
@@ -98,16 +118,7 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
         )
         waitForExpectations(timeout: 2)
         button.tap()
-
-        let feedback = app.descendants(matching: .any)
-            .matching(identifier: "viewfinder.live-activity-feedback")
-            .firstMatch
-        XCTAssertTrue(feedback.waitForExistence(timeout: 2))
-        XCTAssertTrue(feedback.label.contains("灵动岛"))
-        XCTAssertGreaterThanOrEqual(
-            feedback.frame.minY,
-            button.frame.maxY + 7
-        )
+        XCTAssertTrue(button.exists)
     }
 
     @MainActor
@@ -117,18 +128,33 @@ final class ViewfinderAspectGestureUITests: XCTestCase {
         app.launch()
 
         let album = app.buttons["从相册导入"]
-        let liveActivity = app.buttons["显示实时相机状态"]
+        let flipCamera = app.buttons["翻转摄像头"]
         XCTAssertTrue(album.waitForExistence(timeout: 3))
-        XCTAssertTrue(liveActivity.waitForExistence(timeout: 3))
+        XCTAssertTrue(flipCamera.waitForExistence(timeout: 3))
 
         let window = app.windows.firstMatch.frame
         XCTAssertGreaterThanOrEqual(album.frame.width, 44)
         XCTAssertGreaterThanOrEqual(album.frame.height, 44)
-        XCTAssertGreaterThanOrEqual(liveActivity.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(liveActivity.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(flipCamera.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(flipCamera.frame.height, 44)
         XCTAssertEqual(album.frame.minX - window.minX, 16, accuracy: 1)
-        XCTAssertEqual(window.maxX - liveActivity.frame.maxX, 16, accuracy: 1)
-        XCTAssertEqual(album.frame.midY, liveActivity.frame.midY, accuracy: 1)
+        XCTAssertEqual(window.maxX - flipCamera.frame.maxX, 16, accuracy: 1)
+        XCTAssertEqual(album.frame.midY, flipCamera.frame.midY, accuracy: 1)
+    }
+
+    @MainActor
+    private func dragAspectControl(
+        _ element: XCUIElement,
+        from startY: CGFloat,
+        to endY: CGFloat
+    ) {
+        let start = element.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: startY)
+        )
+        let end = element.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: endY)
+        )
+        start.press(forDuration: 0.08, thenDragTo: end)
     }
 
     @MainActor

@@ -5,6 +5,10 @@ struct GeneratedFrame: Identifiable, Hashable, Sendable {
     let sessionID: UUID
     let time: TimePosition
     let storyBeatID: UUID?
+    /// Optional evidence-backed interpretation used for this exact-time frame.
+    /// This is presentation provenance, not another time coordinate.
+    let futureForkID: String?
+    let futureForkTitle: String?
     let prompt: String
     let modelOptionID: String
     let imageData: Data?
@@ -14,6 +18,8 @@ struct GeneratedFrame: Identifiable, Hashable, Sendable {
         sessionID: UUID,
         time: TimePosition,
         storyBeatID: UUID? = nil,
+        futureForkID: String? = nil,
+        futureForkTitle: String? = nil,
         prompt: String = "",
         modelOptionID: String = AIModelConfiguration.standard.imageOptionID,
         imageData: Data? = nil
@@ -22,6 +28,8 @@ struct GeneratedFrame: Identifiable, Hashable, Sendable {
         self.sessionID = sessionID
         self.time = time
         self.storyBeatID = storyBeatID
+        self.futureForkID = futureForkID
+        self.futureForkTitle = futureForkTitle
         self.prompt = prompt
         self.modelOptionID = modelOptionID
         self.imageData = imageData

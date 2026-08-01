@@ -25,9 +25,8 @@ struct ViewfinderView: View {
             )
 
             ZStack {
-                // The blue surface is the physical camera body. The preview is
-                // a separate top-anchored card whose lower edge moves as the
-                // user pinches between capture ratios.
+                // Body blue matches the connection liquid fill (`actionBlue`)
+                // so entry never flashes a deeper deck color under the card.
                 PosterPalette.cameraBody
                     .ignoresSafeArea()
 
@@ -90,6 +89,7 @@ struct ViewfinderChromeOverlay: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var controlsAreReady = false
+    @State private var railIntroProgress: CGFloat = 0
     @State private var albumPickerItem: PhotosPickerItem?
     @State private var captureOrientation: UIDeviceOrientation = .portrait
     @State private var aspectGestureStartRatio: CameraAspectRatio?
@@ -119,8 +119,9 @@ struct ViewfinderChromeOverlay: View {
                 + CameraChromeMetrics.compactFeedbackHeight * 0.5
 
             ZStack(alignment: .top) {
-                // The interaction surface now matches the visible camera card,
-                // so a pinch belongs to the viewfinder rather than the blue body.
+                // Interaction surface matches the visible camera card. Vertical
+                // aspect drags only arm when they begin in the lower band.
+                // Subject following comes from the camera service, not taps.
                 Color.clear
                     .frame(
                         width: compositionFrame.width,
@@ -143,26 +144,15 @@ struct ViewfinderChromeOverlay: View {
                         x: compositionFrame.midX,
                         y: compositionFrame.midY
                     )
-                    .simultaneousGesture(aspectRatioGesture)
                     .simultaneousGesture(
-                        subjectAnchorGesture(
-                            in: CGRect(origin: .zero, size: compositionFrame.size)
-                        )
+                        aspectRatioGesture(in: compositionFrame.size)
                     )
                     .accessibilityElement(children: .ignore)
                     .accessibilityIdentifier("viewfinder.aspect-control")
-                    .accessibilityLabel("取景画幅")
+                    .accessibilityLabel("取景画幅与自动主体跟焦")
                     .accessibilityValue(model.cameraAspectRatio.label)
-                    .accessibilityHint("双指捏合调整画幅；单指轻点选择时间主体")
+                    .accessibilityHint("在取景框下侧上下滑动调整画幅；相机会自动识别并跟随主体")
                     .accessibilityAdjustableAction(adjustAspectRatio)
-                    .accessibilityAction(named: Text("将画面中心设为时间主体")) {
-                        model.selectNarrativeSubject(
-                            at: CGPoint(x: 0.5, y: 0.5)
-                        )
-                    }
-                    .accessibilityAction(named: Text("清除时间主体")) {
-                        model.clearNarrativeSubject()
-                    }
 
                 VStack(spacing: 0) {
                     topChrome
@@ -176,6 +166,10 @@ struct ViewfinderChromeOverlay: View {
 
                 bottomChrome
                     .frame(width: proxy.size.width - PosterSpacing.md * 2)
+                    .waveRailFlatIntro(
+                        progress: railIntroProgress,
+                        reduceMotion: reduceMotion
+                    )
                     .position(
                         x: proxy.size.width * 0.5,
                         y: controlPlacement.centerY
@@ -187,36 +181,22 @@ struct ViewfinderChromeOverlay: View {
                         radius: PosterEffects.cameraFloatingWaveShadowRadius,
                         y: PosterEffects.cameraFloatingWaveShadowOffset
                     )
-                    .allowsHitTesting(controlsAreReady)
+                    .allowsHitTesting(controlsAreReady && railIntroProgress > 0.85)
 
-                TimeAnchorReticle(motion: model.captureMotion)
-                    .frame(
-                        width: compositionFrame.width,
-                        height: compositionFrame.height
+                if let subject = model.cameraTrackedSubject {
+                    let subjectFrame = trackedSubjectFrame(
+                        subject,
+                        in: compositionFrame
                     )
-                    .position(
-                        x: compositionFrame.midX,
-                        y: compositionFrame.midY
-                    )
-                    .allowsHitTesting(false)
-
-                if let anchor = model.narrativeSubjectAnchor {
-                    NarrativeAnchorMarker()
-                        .position(
-                            x: markerCoordinate(
-                                normalized: anchor.normalizedX,
-                                lowerBound: compositionFrame.minX,
-                                extent: compositionFrame.width
-                            ),
-                            y: markerCoordinate(
-                                normalized: anchor.normalizedY,
-                                lowerBound: compositionFrame.minY,
-                                extent: compositionFrame.height
-                            )
+                    SubjectTrackingReticle(confidence: subject.confidence)
+                        .frame(
+                            width: subjectFrame.width,
+                            height: subjectFrame.height
                         )
+                        .position(x: subjectFrame.midX, y: subjectFrame.midY)
                         .animation(
-                            reduceMotion ? nil : PosterMotion.interaction,
-                            value: anchor
+                            reduceMotion ? nil : PosterMotion.subjectTracking,
+                            value: subject.normalizedBounds
                         )
                 }
 
@@ -259,11 +239,10 @@ struct ViewfinderChromeOverlay: View {
         }
         .task {
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            model.beginCameraSubjectTracking()
             syncSystemSafeAreaInsets()
             updateCaptureOrientation(UIDevice.current.orientation)
-            try? await Task.sleep(for: PosterMotion.cameraInputGuard)
-            guard !Task.isCancelled else { return }
-            controlsAreReady = true
+            await playChromeEntrance()
             #if DEBUG
             await runDebugCompositionAuditIfNeeded()
             #endif
@@ -283,6 +262,7 @@ struct ViewfinderChromeOverlay: View {
         }
         .onDisappear {
             aspectBadgeDismissTask?.cancel()
+            model.endCameraSubjectTracking()
         }
         .animation(
             reduceMotion ? nil : PosterMotion.interaction,
@@ -296,22 +276,33 @@ struct ViewfinderChromeOverlay: View {
         )
     }
 
-    private var aspectRatioGesture: some Gesture {
-        MagnifyGesture(minimumScaleDelta: 0.01)
+    /// Lower fraction of the composition card that accepts vertical aspect
+    /// drags — matching “push the card's bottom edge” rather than a full-frame
+    /// pan that would fight subject taps higher up.
+    private static let aspectGestureBandFraction: CGFloat = 0.38
+
+    private func aspectRatioGesture(in compositionSize: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
             .onChanged { value in
-                let start = aspectGestureStartRatio ?? model.cameraAspectRatio
-                aspectGestureStartRatio = start
+                let lowerBandMinY = compositionSize.height
+                    * (1 - Self.aspectGestureBandFraction)
+                if aspectGestureStartRatio == nil {
+                    guard value.startLocation.y >= lowerBandMinY else { return }
+                    aspectGestureStartRatio = model.cameraAspectRatio
+                }
+                guard let start = aspectGestureStartRatio else { return }
+
                 aspectBadgeDismissTask?.cancel()
                 isAspectRatioBadgeVisible = true
-
                 model.selectCameraAspectRatio(
                     CameraAspectRatio.aspectRatio(
-                        afterPinchMagnification: value.magnification,
+                        afterVerticalTranslation: value.translation.height,
                         startingAt: start
                     )
                 )
             }
             .onEnded { _ in
+                guard aspectGestureStartRatio != nil else { return }
                 aspectGestureStartRatio = nil
                 scheduleAspectBadgeDismissal()
             }
@@ -326,39 +317,37 @@ struct ViewfinderChromeOverlay: View {
         }
     }
 
-    private func subjectAnchorGesture(in compositionFrame: CGRect) -> some Gesture {
-        SpatialTapGesture(coordinateSpace: .local)
-            .onEnded { value in
-                guard
-                    compositionFrame.width > 0,
-                    compositionFrame.height > 0,
-                    compositionFrame.contains(value.location)
-                else {
-                    return
-                }
-                model.selectNarrativeSubject(
-                    at: CGPoint(
-                        x: (value.location.x - compositionFrame.minX)
-                            / compositionFrame.width,
-                        y: (value.location.y - compositionFrame.minY)
-                            / compositionFrame.height
-                    )
-                )
-            }
-    }
-
-    private func markerCoordinate(
-        normalized: Double,
-        lowerBound: CGFloat,
-        extent: CGFloat
-    ) -> CGFloat {
-        let unclamped = lowerBound + CGFloat(normalized) * extent
-        return min(
-            max(unclamped, lowerBound + PosterSpacing.xl),
-            max(
-                lowerBound + extent - PosterSpacing.xl,
-                lowerBound + PosterSpacing.xl
-            )
+    private func trackedSubjectFrame(
+        _ subject: CameraTrackedSubject,
+        in compositionFrame: CGRect
+    ) -> CGRect {
+        let minimumExtent = PosterSpacing.lg + PosterSpacing.xs
+        let proposedWidth = CGFloat(subject.normalizedWidth)
+            * compositionFrame.width
+        let proposedHeight = CGFloat(subject.normalizedHeight)
+            * compositionFrame.height
+        // Compact 1:1 lock — smaller than the raw Vision core so corner marks
+        // read as a quiet focus accent, not a full-scene selection.
+        let proposedSide = max(proposedWidth, proposedHeight) * 0.54
+        let maxSide = min(compositionFrame.width, compositionFrame.height) * 0.28
+        let side = min(max(proposedSide, minimumExtent), maxSide)
+        let centerX = compositionFrame.minX
+            + subject.center.x * compositionFrame.width
+        let centerY = compositionFrame.minY
+            + subject.center.y * compositionFrame.height
+        let originX = min(
+            max(centerX - side * 0.5, compositionFrame.minX),
+            compositionFrame.maxX - side
+        )
+        let originY = min(
+            max(centerY - side * 0.5, compositionFrame.minY),
+            compositionFrame.maxY - side
+        )
+        return CGRect(
+            x: originX,
+            y: originY,
+            width: side,
+            height: side
         )
     }
 
@@ -403,38 +392,40 @@ struct ViewfinderChromeOverlay: View {
     }
 
     private func adjustAspectRatio(_ direction: AccessibilityAdjustmentDirection) {
-        let magnification: CGFloat
+        let translation: CGFloat
         switch direction {
         case .increment:
-            magnification = 1.16
+            // Expand toward full frame — same direction as dragging down.
+            translation = CameraAspectRatio.verticalAspectStepDistance
         case .decrement:
-            magnification = 1 / 1.16
+            // Tighten toward square — same direction as dragging up.
+            translation = -CameraAspectRatio.verticalAspectStepDistance
         @unknown default:
             return
         }
 
         model.selectCameraAspectRatio(
             CameraAspectRatio.aspectRatio(
-                afterPinchMagnification: magnification,
+                afterVerticalTranslation: translation,
                 startingAt: model.cameraAspectRatio
             )
         )
     }
 
-    /// Only in-app camera actions live in this row. Live camera state belongs
-    /// to the system Dynamic Island through the ActivityKit widget extension.
+    /// Only in-app camera actions live in this row.
     @ViewBuilder
     private var topChrome: some View {
         HStack {
             albumPickerButton
             Spacer(minLength: 0)
             CameraChromeButton(
-                systemImage: "dot.radiowaves.left.and.right",
+                systemImage: "arrow.triangle.2.circlepath",
+                isEnabled: model.canSwitchCamera && !model.isPipelineBusy,
                 rotation: chromeRotation,
-                accessibilityLabelText: "显示实时相机状态",
-                accessibilityHintText: "在系统灵动岛显示取景状态；长按可展开控制"
+                accessibilityLabelText: "翻转摄像头",
+                accessibilityHintText: "在前后摄像头之间切换"
             ) {
-                Task { await model.triggerCameraLiveActivity() }
+                Task { await model.switchCameraLens() }
             }
         }
         .padding(.horizontal, PosterSpacing.md)
@@ -500,8 +491,32 @@ struct ViewfinderChromeOverlay: View {
             },
             chromeRotation: chromeRotation
         )
-        .padding(.bottom, PosterSpacing.sm)
         .accessibilityIdentifier("viewfinder.shutter-wave")
+    }
+
+    /// Viewfinder card slides on its own. The rail stays in deck position and
+    /// constructs itself with a flat hairline → rise → settle beat.
+    private func playChromeEntrance() async {
+        railIntroProgress = 0
+        controlsAreReady = false
+
+        guard !reduceMotion else {
+            railIntroProgress = 1
+            try? await Task.sleep(for: PosterMotion.cameraInputGuard)
+            guard !Task.isCancelled else { return }
+            controlsAreReady = true
+            return
+        }
+
+        try? await Task.sleep(for: PosterMotion.cameraRailIntroDelay)
+        guard !Task.isCancelled else { return }
+        withAnimation(PosterMotion.cameraRailIntro) {
+            railIntroProgress = 1
+        }
+
+        try? await Task.sleep(for: PosterMotion.cameraInputGuard)
+        guard !Task.isCancelled else { return }
+        controlsAreReady = true
     }
 
     private var albumPickerButton: some View {

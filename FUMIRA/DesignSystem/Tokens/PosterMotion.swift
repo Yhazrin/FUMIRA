@@ -39,18 +39,26 @@ enum PosterMotion {
     /// Viewfinder still → paper landing. Long enough to read, without a bounce.
     static let photoDropDuration = 0.62
     /// One continuous connection lens → camera portal transition.
-    static let cameraEntryDuration = 0.58
-    static let cameraEntryResolveDuration = 0.24
+    /// Slow enough for irregular liquid lobes to read before the field solidifies.
+    static let cameraEntryDuration = 1.18
+    static let cameraEntryResolveDuration = 0.28
     static let cameraEntrySourceDiameter: CGFloat = 88
     static let cameraEntryMaximumScale: CGFloat = 1.55
+    /// Viewfinder card slides down from the top — Apple smooth, no bounce.
+    static let cameraViewfinderSlideDuration = 0.72
+    /// Flat-graphic wave-rail intro after the preview card is in motion.
+    static let cameraRailIntroDuration = 0.58
+    static let cameraRailIntroDelay = Duration.milliseconds(260)
     /// Capture has one principal timeline; the app may wait for the physical
     /// still image, but visual interpolation never uses separate delays.
     static let captureLiftDuration = 0.28
-    static let captureSettleDuration = 0.40
+    static let captureSettleDuration = 0.52
     /// Semantic hold for a physical still after capture. This is not a visual
     /// timeline; RootView's `captureProgress` owns the interpolation.
     static let capturePresentationHold = 0.28
     static let timeRevealDuration = 0.62
+    /// Interpolates bounded Vision updates without making the focus frame lag.
+    static let subjectTrackingDuration = 0.24
     /// The photo reaches one short spatial-print apex, then returns to its
     /// resting flat pose. These are transition tracks, never idle animation.
     static let spatialPeakDuration = 0.18
@@ -62,15 +70,6 @@ enum PosterMotion {
     static let resultSpatialPitchDegrees = -4.0
     static let resultSpatialYawDegrees = 5.5
     static let resultSpatialRollDegrees = -0.65
-    /// Result-door departure. The prompt is still one flat card, but the
-    /// shared reveal progress gives it a short paper-fold response before it
-    /// leaves the photo. This deliberately stays below a theatrical flip.
-    static let timeDoorDepartureStart: CGFloat = 0.08
-    static let timeDoorFadeStart: CGFloat = 0.48
-    static let timeDoorFadeEnd: CGFloat = 0.94
-    static let timeDoorMaximumFoldDegrees = 16.0
-    static let timeDoorHorizontalTravel = PosterSpacing.md
-    static let timeDoorVerticalTravel = PosterSpacing.xs
     static let lensSpatialPitchDegrees = -2.5
     static let lensSpatialYawDegrees = 3.5
     static let photoPaperUnderstandingRotation = -1.35
@@ -111,9 +110,9 @@ enum PosterMotion {
     static let spatialPeak = Animation.timingCurve(0.20, 0.90, 0.24, 1, duration: spatialPeakDuration)
     static let spatialSettle = Animation.timingCurve(0.22, 1, 0.36, 1, duration: spatialSettleDuration)
     static let cameraEntry = Animation.timingCurve(
-        0.22,
-        1,
-        0.36,
+        0.42,
+        0,
+        0.58,
         1,
         duration: cameraEntryDuration
     )
@@ -123,6 +122,19 @@ enum PosterMotion {
         0.30,
         1,
         duration: cameraEntryResolveDuration
+    )
+    /// System-native smooth curve (iOS 17+). Matches Apple sheet / card reveals.
+    static let cameraViewfinderSlide = Animation.smooth(
+        duration: cameraViewfinderSlideDuration,
+        extraBounce: 0
+    )
+    /// Crisp flat poster reveal — no bounce, geometric settle.
+    static let cameraRailIntro = Animation.timingCurve(
+        0.18,
+        0.88,
+        0.22,
+        1,
+        duration: cameraRailIntroDuration
     )
     static let captureLift = Animation.timingCurve(
         0.20,
@@ -144,6 +156,13 @@ enum PosterMotion {
         0.30,
         1,
         duration: timeRevealDuration
+    )
+    static let subjectTracking = Animation.timingCurve(
+        0.22,
+        1,
+        0.36,
+        1,
+        duration: subjectTrackingDuration
     )
     static let cameraShutterPressDown = Animation.timingCurve(
         0.20,

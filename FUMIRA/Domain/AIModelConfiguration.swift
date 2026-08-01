@@ -192,8 +192,44 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
                 role: .image,
                 provider: .apiMart,
                 modelID: "apimart/gpt-image-2",
-                displayName: "中转站 GPT-Image-2",
-                detail: "通过中转站生成，支持原图参考与 2K 输出",
+                displayName: "GPT-Image-2",
+                detail: "原图参考、多比例与 2K/4K 输出",
+                availability: .ready
+            ),
+            AIModelOption(
+                id: "apimart.image.gemini-3.1-flash",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/gemini-3.1-flash-image-preview",
+                displayName: "Nano Banana 2",
+                detail: "Gemini 3.1 Flash，图生图快且支持多参考图",
+                availability: .ready
+            ),
+            AIModelOption(
+                id: "apimart.image.gemini-3-pro",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/gemini-3-pro-image-preview",
+                displayName: "Nano Banana Pro",
+                detail: "Gemini 3 Pro，更高质量图生图",
+                availability: .ready
+            ),
+            AIModelOption(
+                id: "apimart.image.seedream-5-pro",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/doubao-seedream-5-0-pro",
+                displayName: "Seedream 5.0 Pro",
+                detail: "豆包 Seedream，单图/多参考图生图",
+                availability: .ready
+            ),
+            AIModelOption(
+                id: "apimart.image.flux-kontext-pro",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/flux-kontext-pro",
+                displayName: "FLUX Kontext Pro",
+                detail: "上下文感知编辑，适合改背景与局部调整",
                 availability: .ready
             ),
             AIModelOption(

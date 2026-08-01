@@ -23,6 +23,9 @@ struct ShutterWaveTimeRail: View {
     @State private var releaseImpact = 0.0
     @State private var releaseTask: Task<Void, Never>?
     @State private var dragStartValue: Double?
+    @State private var dragOriginPosition: TimePosition?
+    @State private var dragStartGranularity: WaveTimeGranularity?
+    @State private var granularity: WaveTimeGranularity = .year
     @State private var isDragging = false
     @State private var lastHapticYears: Double?
     @State private var lastModelPublication = Date.distantPast
@@ -57,9 +60,8 @@ struct ShutterWaveTimeRail: View {
         TimePosition(normalized: displayValue)
     }
 
-    private var yearLabel: String {
-        let year = Calendar.current.component(.year, from: timePosition.targetDate())
-        return "\(year)"
+    private var timeLabel: String {
+        granularity.compactValueLabel(for: timePosition)
     }
 
     private var continuousIndex: Double {
@@ -129,14 +131,21 @@ struct ShutterWaveTimeRail: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("时间轴与快门")
         .accessibilityValue(accessibilityValueText)
-        .accessibilityHint("左右拖动浏览过去与未来；轻点蓝白快门拍摄")
+        .accessibilityHint("左右拖动时间，向上拉进入月、日、小时精调；轻点蓝白快门拍摄")
         .accessibilityAdjustableAction { direction in
-            let adjusted = WaveTimeAccessibilityAdjustment.adjustedNormalized(
-                from: value,
-                direction: direction == .increment ? .increment : .decrement
+            let delta = granularity.snapIntervalDays
+                * (direction == .increment ? 1 : -1)
+            let adjusted = TimePosition(
+                offsetDays: TimePosition(normalized: value).offsetDays + delta
             )
-            onChange(adjusted)
-            emitAccessibilityDetent(from: value, to: adjusted)
+            onChange(adjusted.normalized)
+            emitAccessibilityDetent(from: value, to: adjusted.normalized)
+        }
+        .accessibilityAction(named: Text("更精细")) {
+            selectGranularity(granularity.finer)
+        }
+        .accessibilityAction(named: Text("更粗略")) {
+            selectGranularity(granularity.coarser)
         }
         .accessibilityAction(named: Text("拍摄")) {
             onCapture()
@@ -148,10 +157,10 @@ struct ShutterWaveTimeRail: View {
 
     private var accessibilityValueText: String {
         if abs(timePosition.offsetDays) < 0.5 {
-            return "现在，\(yearLabel) 年"
+            return "现在，\(timeLabel)"
         }
         let direction = timePosition.offsetDays < 0 ? "向过去" : "向未来"
-        return "\(timePosition.compactLabel)，目标 \(yearLabel) 年，\(direction)"
+        return "\(timePosition.compactLabel)，目标 \(timeLabel)，\(direction)"
     }
 
     /// "Year" capsule that floats above the wave rail while the user is
@@ -163,7 +172,7 @@ struct ShutterWaveTimeRail: View {
             Image(systemName: "calendar")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(PosterPalette.cameraShutterBlue)
-            Text(yearLabel)
+            Text(timeLabel)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(PosterPalette.paperWhite)
                 .monospacedDigit()
@@ -182,7 +191,7 @@ struct ShutterWaveTimeRail: View {
         .animation(
             reduceMotion
                 ? .linear(duration: PosterMotion.reduced)
-                : .spring(response: 0.34, dampingFraction: 0.86),
+                : PosterMotion.cameraShutterMorph,
             value: isDragging
         )
         .frame(maxWidth: .infinity, alignment: .center)
@@ -205,10 +214,23 @@ struct ShutterWaveTimeRail: View {
                     if touchBeganOnShutter {
                         onShutterPress()
                     }
-                    dragStartValue = xToNormalized(gesture.location.x, width: width)
+                    dragStartValue = value
+                    dragOriginPosition = TimePosition(normalized: value)
+                    dragStartGranularity = granularity
                 }
 
-                let travel = abs(gesture.translation.width)
+                let resolvedGranularity = (
+                    dragStartGranularity ?? granularity
+                ).offsetting(verticalTranslation: gesture.translation.height)
+                if granularity != resolvedGranularity {
+                    granularity = resolvedGranularity
+                    onDetent(.decade)
+                }
+
+                let travel = max(
+                    abs(gesture.translation.width),
+                    abs(gesture.translation.height)
+                )
                 if travel >= scrubMorphThreshold {
                     if !isDragging {
                         isDragging = true
@@ -218,25 +240,56 @@ struct ShutterWaveTimeRail: View {
                             morphProgress = 1
                         }
                     }
-                    let normalized = xToNormalized(gesture.location.x, width: width)
+                    let normalized = resolvedPosition(
+                        for: gesture,
+                        width: width,
+                        granularity: resolvedGranularity
+                    ).normalized
                     dragValue = normalized
                     publishModelValueIfNeeded(normalized)
                     updateHaptics(for: normalized)
                 }
             }
             .onEnded { gesture in
-                let normalized = xToNormalized(gesture.location.x, width: width)
-                let predicted = xToNormalized(gesture.predictedEndLocation.x, width: width)
-                let snapped = WaveTimeBrowseSnap.snap(TimePosition(normalized: normalized))
-                let didMove = isDragging
-                    || abs(gesture.translation.width) >= scrubMorphThreshold
-                    || abs(normalized - (dragStartValue ?? normalized)) > 0.001
+                let resolvedGranularity = (
+                    dragStartGranularity ?? granularity
+                ).offsetting(verticalTranslation: gesture.translation.height)
+                granularity = resolvedGranularity
+                let normalized = resolvedPosition(
+                    for: gesture,
+                    width: width,
+                    granularity: resolvedGranularity
+                ).normalized
+                let predicted = predictedPosition(
+                    for: gesture,
+                    width: width,
+                    granularity: resolvedGranularity
+                ).normalized
+                let snapped = resolvedGranularity.snap(
+                    TimePosition(normalized: normalized)
+                )
                 let startedOnShutter = touchBeganOnShutter
+                let translationX = abs(gesture.translation.width)
+                let translationY = abs(gesture.translation.height)
+                // Shutter taps must not depend on the mapped time delta: the
+                // finger can land anywhere inside the circle, which already
+                // differs from the model value by more than 0.001.
+                let isShutterTap = startedOnShutter
+                    && !isDragging
+                    && translationX < scrubMorphThreshold
+                    && translationY < scrubMorphThreshold
+                let didMove = isDragging
+                    || translationX >= scrubMorphThreshold
+                    || translationY >= scrubMorphThreshold
+                    || abs(normalized - (dragStartValue ?? normalized)) > 0.001
 
                 releaseTask?.cancel()
                 dragValue = nil
                 lastHapticYears = nil
+                let retainedStartValue = dragStartValue
                 dragStartValue = nil
+                dragOriginPosition = nil
+                dragStartGranularity = nil
                 touchBeganOnShutter = false
 
                 // Expand first with spring, then settle the date kick.
@@ -245,11 +298,14 @@ struct ShutterWaveTimeRail: View {
                     morphProgress = 0
                 }
 
+                if isShutterTap {
+                    publishModelValue(retainedStartValue ?? value)
+                    onCapture()
+                    return
+                }
+
                 if !didMove {
                     publishModelValue(snapped.normalized)
-                    if startedOnShutter {
-                        onCapture()
-                    }
                     return
                 }
 
@@ -294,6 +350,43 @@ struct ShutterWaveTimeRail: View {
             }
     }
 
+    private func resolvedPosition(
+        for gesture: DragGesture.Value,
+        width: CGFloat,
+        granularity: WaveTimeGranularity
+    ) -> TimePosition {
+        if granularity == .year, dragStartGranularity == .year {
+            return TimePosition(
+                normalized: xToNormalized(gesture.location.x, width: width)
+            )
+        }
+        return granularity.position(
+            from: dragOriginPosition ?? TimePosition(normalized: value),
+            horizontalTranslation: gesture.translation.width,
+            usableWidth: width - thumbInset * 2
+        )
+    }
+
+    private func predictedPosition(
+        for gesture: DragGesture.Value,
+        width: CGFloat,
+        granularity: WaveTimeGranularity
+    ) -> TimePosition {
+        if granularity == .year, dragStartGranularity == .year {
+            return TimePosition(
+                normalized: xToNormalized(
+                    gesture.predictedEndLocation.x,
+                    width: width
+                )
+            )
+        }
+        return granularity.position(
+            from: dragOriginPosition ?? TimePosition(normalized: value),
+            horizontalTranslation: gesture.predictedEndTranslation.width,
+            usableWidth: width - thumbInset * 2
+        )
+    }
+
     private func emitReleaseDetent(for snapped: TimePosition) {
         onDetent(abs(snapped.offsetDays) < 0.5 ? .now : .decade)
     }
@@ -313,6 +406,14 @@ struct ShutterWaveTimeRail: View {
     private func publishModelValue(_ normalized: Double) {
         lastModelPublication = Date.now
         onChange(normalized)
+    }
+
+    /// Granularity is a local browsing precision. VoiceOver can change it
+    /// without publishing a new time or invoking the shutter/generation path.
+    private func selectGranularity(_ selection: WaveTimeGranularity) {
+        guard selection != granularity else { return }
+        granularity = selection
+        onDetent(.decade)
     }
 
     private func updateHaptics(for normalized: Double) {

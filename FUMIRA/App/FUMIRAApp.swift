@@ -17,13 +17,16 @@ struct FUMIRAApp: App {
         if let phase = DebugAuditPhase.current {
             let auditModel = PreviewFixtures.model(
                 phase: phase,
-                time: 0.35,
+                time: DebugAuditTargetTime.current,
                 progress: 0.62,
                 photoAspectRatio: DebugAuditAspectRatio.current,
                 photoIsLandscape: DebugAuditPhotoOrientation.isLandscape
             )
             auditModel.isModelSettingsPresented =
                 ProcessInfo.processInfo.environment["FUMIRA_AUDIT_SETTINGS"] == "1"
+            if let browsedTime = DebugAuditBrowseTime.current {
+                auditModel.updateTime(normalized: browsedTime)
+            }
             _model = State(initialValue: auditModel)
             return
         }
@@ -114,9 +117,30 @@ private enum DebugAuditAspectRatio {
     }
 }
 
+private enum DebugAuditTargetTime {
+    static var current: Double {
+        switch ProcessInfo.processInfo.environment["FUMIRA_AUDIT_TARGET_TIME"] {
+        case "past": -0.35
+        case "now": 0
+        default: 0.35
+        }
+    }
+}
+
 private enum DebugAuditPhotoOrientation {
     static var isLandscape: Bool {
         ProcessInfo.processInfo.environment["FUMIRA_AUDIT_PHOTO_ORIENTATION"] == "landscape"
+    }
+}
+
+private enum DebugAuditBrowseTime {
+    static var current: Double? {
+        switch ProcessInfo.processInfo.environment["FUMIRA_AUDIT_BROWSE_TIME"] {
+        case "past": -0.72
+        case "now": 0
+        case "future": 0.72
+        default: nil
+        }
     }
 }
 #endif

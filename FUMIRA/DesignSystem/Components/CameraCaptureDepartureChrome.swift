@@ -31,7 +31,7 @@ struct CameraCaptureDepartureChrome: View {
                     CameraChromeGlyph(systemImage: "photo.on.rectangle")
                     Spacer(minLength: 0)
                     CameraChromeGlyph(
-                        systemImage: "dot.radiowaves.left.and.right"
+                        systemImage: "arrow.triangle.2.circlepath"
                     )
                 }
                 .padding(.horizontal, PosterSpacing.md)

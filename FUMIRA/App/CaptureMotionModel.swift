@@ -41,6 +41,10 @@ final class CaptureMotionModel {
                 ingest(sample)
             }
             await service.stop()
+            if !Task.isCancelled {
+                isActive = false
+                consumeTask = nil
+            }
         }
     }
 

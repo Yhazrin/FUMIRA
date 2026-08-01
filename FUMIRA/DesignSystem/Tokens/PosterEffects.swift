@@ -20,8 +20,8 @@ enum PosterEffects {
     static let cameraChromeStroke = PosterPalette.paperWhite.opacity(0.28)
     /// Doraemon-blue camera actions with white system glyphs. These sit on the
     /// sky/photo card; the wave-shutter keeps its separate white face because
-    /// it lives on the dark-blue camera body.
-    static let cameraActionFill = PosterPalette.actionBlue
+    /// it lives on the blue camera body.
+    static let cameraActionFill = PosterPalette.cameraChromeBlue
     static let cameraActionForeground = PosterPalette.paperWhite
     static let cameraActionStroke = PosterPalette.actionBlueDeep.opacity(0.28)
 
@@ -51,7 +51,6 @@ enum PosterEffects {
     static let photoPaperFiber = PosterPalette.ink.opacity(0.055)
     static let photoPaperFooterMark = PosterPalette.ink.opacity(0.32)
     static let photoPaperShadow = PosterPalette.ink.opacity(0.28)
-    static let timeDoorEdge = PosterPalette.paperWhite.opacity(0.22)
     static let photoPaperLandingShadowRadius: CGFloat = 20
     static let photoPaperLandingShadowOffset: CGFloat = 13
 }

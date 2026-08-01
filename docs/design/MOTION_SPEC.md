@@ -38,16 +38,19 @@ Geometry is deterministic: for each normalized value `s`, ordinary bars use
 the active capsule at continuous thumb X is the unique tallest bar, centered on
 the rail midline with symmetric ±Y extent.
 
-On finger-up, snap only to browse date granularity (day / week / month / year by
-distance from NOW). When motion is enabled, the presentation rail makes one
-bounded 70ms directional impulse (at most 1.8% of the rail range), gives the
-selected peak a deterministic local resonance, then returns to the snapped date
-in 200ms. The date model itself snaps immediately; this never changes date
-semantics or crosses ±100 years. Selected wave morph and year label use this
-firm settle; while dragging, follow the finger with no lag animation.
+Vertical movement changes the active rail precision in 28pt detents:
+year → month → day → hour when pulling up, and the reverse when pulling down.
+Horizontal movement follows the finger at that precision. On finger-up, snap
+only to the active precision. When motion is enabled, the presentation rail
+makes one bounded 70ms directional impulse (at most 1.8% of the rail range),
+gives the selected peak a deterministic local resonance, then returns to the
+snapped date in 200ms. The date model itself snaps immediately; this never
+changes date semantics or crosses ±100 years. Selected wave morph and date
+label use this firm settle; while dragging, follow the finger with no lag
+animation.
 
-VoiceOver adjustable actions step in offset-day space: at NOW, increment/decrement
-moves ±1 day instead of snapping back to zero.
+VoiceOver adjustable actions step in offset-day space using the active precision:
+±1 year, ±1 month, ±1 day, or ±1 hour.
 
 Selected bar / cursor / year emphasis uses `PosterPalette.actionBlue`.
 
@@ -61,11 +64,13 @@ state when the transition completes.
 
 - Decorative CoreMotion remains limited to the existing 2.5D print planes.
   A separate, functional capture-motion stream may drive the time-anchor
-  reticle, freeze a bounded shutter context, and open the result time door.
+  reticle and freeze a bounded shutter context. Result reveal uses short-lived
+  microphone level input instead of device rotation.
   Functional motion always has a visible button/touch fallback and never blocks
   capture, generation, or result access. Do not add idle floating, glass,
-  realistic lighting, photorealistic 3D, neon gradients, particles, or simulated
-  depth of field.
+  realistic lighting, photorealistic 3D, neon gradients, or simulated depth of
+  field. The result reveal may emit a bounded paper-fleck field only while the
+  user is actively blowing; it disappears at completion.
 - Controls, camera grid/chrome, shutter, headlines, body copy, CTA, numeric date,
   waveform/time rail, and export layout stay flat. The only viewfinder exception
   is the user-driven aspect morph: the full-width card changes height and the
@@ -87,11 +92,11 @@ state when the transition completes.
    same matched element through flash/exposure and into interpretation. It may
    make one shallow perspective pass to imply a print passing through the lens,
    then settles flat before controls become interactive again.
-3. **Interpretation reveal track — generated result.** The temporal photo develops
-   continuously from the captured frame into its generated treatment. The photo
-   may briefly recede/return in perspective while the result is revealed, then
-   locks into the flat poster composition; surrounding copy and controls do not
-   move.
+3. **Interpretation reveal track — generated result.** Microphone dB is reduced
+   immediately to a normalized gust; no audio is recorded or retained. The
+   captured photo lifts and erodes from its lower edge while bounded paper flecks
+   travel upward, revealing the already-generated target photo below. Surrounding
+   copy and controls do not move, and the final composition is flat.
 
 Tracks are interruptible and never queue stale values. They are not active while
 the corresponding screen is idle, while the app is backgrounded, or after the
@@ -109,8 +114,12 @@ transition template.
 
 - `cameraEntryProgress` drives the 88pt connection aperture into
   `CameraEntryPortal`. The portal holds a composited preview while permission is
-  being resolved, then releases to the real viewfinder; there is no closing-iris
-  sleep chain.
+  being resolved, then releases to the real viewfinder. It mounts at the exact
+  88pt source geometry for one frame before progress begins, so the first
+  visible frame cannot pop in as a large disc. Its early scale is deliberately
+  slow while the first 18% retains the button's press acknowledgement, then
+  accelerates to coverage with a non-bouncy ease-in-out curve rather than
+  stacking two ease-out curves; there is no closing-iris sleep chain.
 - While an already-authorized permission check resolves, CameraPermissionView
   holds the destination's blue body and full-width sky card silhouette. It never
   inserts a white frame between the connection lens and live preview. A real
@@ -128,6 +137,24 @@ transition template.
 paper rim, directional thin edges, motion-aware specular highlight, and a
 shadow derived from lift/yaw/pitch. It remains a SwiftUI 2.5D surface; no
 SceneKit, RealityKit, or idle 3D treatment is used.
+
+### Silent developing reflection
+
+Understanding, story writing, and image generation share one quiet waiting
+stage. There is no visible percentage, progress bar, queue label, or looping
+loading ornament. The shared captured print is the only interactive hero:
+
+1. A vertical drag gives the print the existing bounded held pose.
+2. A committed horizontal drag turns the same print exactly 180 degrees to its
+   paper reverse. The reverse varies its local medium: a future guess, past
+   time-imprint stamps, or a NOW written note; it remains available while phases
+   advance.
+3. A second horizontal turn returns to the photo. The front carries no extra
+   flip control, and reduced motion swaps faces without perspective travel.
+
+The turn uses `PosterMotion.photoHandSettle`, has no bounce, and does not block
+the pipeline. It is an intentional interaction, not an idle animation. Outside
+the print, the existing bounded temporal-slice scrub remains available.
 
 ### Shared depth planes
 
@@ -150,13 +177,44 @@ serious/critical thermal state, and inactive scenes disable the field.
 - A horizontal inspection selects the slice continuously while the finger moves,
   then holds the selected slit for 2.2 seconds after release. The hold is a
   readability window, not a pipeline delay; a new gesture cancels it immediately.
-- On result entry, the initial yaw becomes the local baseline. Turning the phone
-  along the shortest angular arc continuously maps 0...0.23 radians to the
-  generated-image reveal. A 44pt “直接打开” button completes the same progress,
-  and Reduce Motion uses that button path without spatial rotation.
+
+## Result reveal
+
+- On result entry, a short-lived `AVAudioEngine` input tap publishes only RMS/dB
+  levels. A noise gate and attack/release smoothing map blow strength to the same
+  continuous generated-image reveal progress. Raw buffers are never recorded,
+  retained, encoded, or written to storage. A 44pt “直接显影” button is always
+  available for denied permission, unavailable input, VoiceOver, and preference.
+  Reduce Motion keeps the microphone gesture but replaces paper travel and
+  particles with a bottom-up mask and opacity fade.
+- During silent development, the persistent print can also turn to a single
+  time-specific reflection question. Horizontal drag rotates the same card in
+  place; with Reduce Motion the same horizontal gesture swaps faces directly.
 - Motion sampling is active only for viewfinder, capture/developing, and result
   phases while the scene is foregrounded. Anchor haptics are enabled only in the
   viewfinder.
+
+## Future-fork shake
+
+- Future results with at least two Scene Bible evidence paths may offer a
+  bounded “同一年，另一种可能” selector. Past, NOW, missing evidence, and a
+  mismatched browse time expose no branch interaction.
+- UIKit's discrete `motionEnded(_:with:)` shake event is bridged through a
+  result-only responder controller. It never creates another `CMMotionManager`;
+  the bridge resigns first responder on disappearance or backgrounding and the
+  default listening window ends after eight seconds.
+- A shake advances exactly one deterministic branch and emits one selection
+  haptic. It never changes `selectedTime`, writes a prompt, starts network work,
+  or automatically spends a generation request. A 44pt “换一种可能” action feeds
+  the same reducer for Simulator, Reduce Motion, VoiceOver, expired listening,
+  or unavailable responder delivery.
+- “显影这一可能” is the only action that starts branch generation. It reuses the
+  original captured JPEG, the completed frame's exact target, the same Beat ID,
+  `exactTarget`, and complete render plan; only the evidence-backed narrative and
+  visual directive vary. One-level undo restores the previous generated frame.
+- Branch selection uses stable identifiers and opacity-only reduced motion. No
+  looping shake prompt, random seed shuffle, prediction probability, certainty
+  score, history library, or editing destination is introduced.
 
 ## Device tilt (decorative 2.5D)
 
@@ -189,9 +247,10 @@ serious/critical thermal state, and inactive scenes disable the field.
 - Add a restrained paper-white flash wash (`PosterEffects.cameraFlashWash`) on
   shutter press (Micro duration); AppModel plays `.shutter` before camera capture
   starts so the physical response is immediate.
-- RootView owns the temporal-exposure and interpretation-reveal progress values;
-  the matched temporal photo renders those values while phase views publish only
-  chrome and destination geometry. The live chrome's capture afterimage uses the
+- RootView owns temporal-exposure geometry; `AppModel` owns interpretation-reveal
+  progress, while `BlowRevealModel` publishes only normalized gust/progress from
+  aggregate microphone levels. The matched temporal photo renders those values.
+  The live chrome's capture afterimage uses the
   same two buttons, wave-shutter position, aspect frame, and blue body; it fades
   before the photo settles rather than swapping to unrelated legacy controls.
 - Live chrome and its capture afterimage resolve the same active-window safe
@@ -246,9 +305,9 @@ serious/critical thermal state, and inactive scenes disable the field.
   aspect label changes without directly mutating app state.
 - Confirm time anchoring is advisory, the micro time slice is optional, and the
   pipeline succeeds when functional motion is unavailable.
-- On result, confirm both a physical yaw change and “直接打开” can complete the
-  same reveal progress. The fallback button must remain above the draggable
-  result sheet in both rendering and hit testing.
+- On a physical iPhone, confirm sustained blow strength advances one continuous
+  reveal and silence releases the gust. Confirm microphone denial and “直接显影”
+  complete the same progress without blocking the generated result.
 - During all three tracks, confirm controls, text, shutter, camera grid/chrome,
   numeric date, and WaveTimeRail do not translate, rotate, scale, or change
   layout. The rail remains continuous and interruptible while scrubbing.

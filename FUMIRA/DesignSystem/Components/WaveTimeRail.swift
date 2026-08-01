@@ -13,6 +13,10 @@ enum WaveTimeRailChrome {
 struct WaveTimeRail: View {
     let value: Double
     var chrome: WaveTimeRailChrome = .paper
+    /// When an external continuous input (for example device tilt) owns
+    /// `value`, render each publication directly instead of retargeting the
+    /// rail's implicit settle animation. Local drag/release motion is unchanged.
+    var isExternalValueDirectDriven = false
     var onDetent: (WaveTimeDetent) -> Void = { _ in }
     let onChange: (Double) -> Void
 
@@ -22,8 +26,12 @@ struct WaveTimeRail: View {
     @State private var releaseImpact = 0.0
     @State private var releaseTask: Task<Void, Never>?
     @State private var dragStartValue: Double?
+    @State private var dragOriginPosition: TimePosition?
+    @State private var dragStartGranularity: WaveTimeGranularity?
+    @State private var granularity: WaveTimeGranularity = .year
     @State private var isDragging = false
     @State private var lastHapticYears: Double?
+    @State private var lastModelPublication = Date.distantPast
 
     private let horizontalInset: CGFloat = 20
     private let barMaxHeight: CGFloat = 40
@@ -75,13 +83,21 @@ struct WaveTimeRail: View {
         TimePosition(normalized: displayValue)
     }
 
-    private var yearLabel: String {
-        let year = Calendar.current.component(.year, from: timePosition.targetDate())
-        return "\(year)"
+    private var timeLabel: String {
+        granularity.compactValueLabel(for: timePosition)
     }
 
     private var continuousIndex: Double {
         WaveformGeometry.continuousIndex(normalized: displayValue, barCount: barCount)
+    }
+
+    private var animatesPresentedValueChanges: Bool {
+        WaveTimeRailValueAnimationPolicy.shouldAnimate(
+            isDragging: isDragging,
+            reduceMotion: reduceMotion,
+            isExternalValueDirectDriven: isExternalValueDirectDriven,
+            isReleasePresentationActive: releaseValue != nil
+        )
     }
 
     var body: some View {
@@ -94,7 +110,7 @@ struct WaveTimeRail: View {
                     waveCanvas(width: width, height: proxy.size.height, thumbX: thumbX)
                         .allowsHitTesting(false)
 
-                    yearBadge(at: thumbX, height: proxy.size.height)
+                    timeBadge(at: thumbX, height: proxy.size.height)
                         .allowsHitTesting(false)
                 }
                 .contentShape(Rectangle())
@@ -108,14 +124,21 @@ struct WaveTimeRail: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("时间轴")
         .accessibilityValue(accessibilityValueText)
-        .accessibilityHint("左右拖动浏览过去与未来，或使用调高减低手势微调")
+        .accessibilityHint("左右拖动时间；向上拉依次进入月、日、小时精调，向下拉回到更粗粒度")
         .accessibilityAdjustableAction { direction in
-            let adjusted = WaveTimeAccessibilityAdjustment.adjustedNormalized(
-                from: value,
-                direction: direction == .increment ? .increment : .decrement
+            let delta = granularity.snapIntervalDays
+                * (direction == .increment ? 1 : -1)
+            let adjusted = TimePosition(
+                offsetDays: TimePosition(normalized: value).offsetDays + delta
             )
-            onChange(adjusted)
-            emitAccessibilityDetent(from: value, to: adjusted)
+            onChange(adjusted.normalized)
+            emitAccessibilityDetent(from: value, to: adjusted.normalized)
+        }
+        .accessibilityAction(named: Text("更精细")) {
+            selectGranularity(granularity.finer)
+        }
+        .accessibilityAction(named: Text("更粗略")) {
+            selectGranularity(granularity.coarser)
         }
         .onDisappear {
             releaseTask?.cancel()
@@ -124,10 +147,10 @@ struct WaveTimeRail: View {
 
     private var accessibilityValueText: String {
         if abs(timePosition.offsetDays) < 0.5 {
-            return "现在，\(yearLabel) 年"
+            return "现在，\(timeLabel)"
         }
         let direction = timePosition.offsetDays < 0 ? "向过去" : "向未来"
-        return "\(timePosition.compactLabel)，目标 \(yearLabel) 年，\(direction)"
+        return "\(timePosition.compactLabel)，目标 \(timeLabel)，\(direction)"
     }
 
     private func waveCanvas(width: CGFloat, height: CGFloat, thumbX: CGFloat) -> some View {
@@ -180,14 +203,17 @@ struct WaveTimeRail: View {
             context.fill(activePath, with: .color(PosterPalette.actionBlue))
         }
         .frame(width: width, height: height)
-        .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: displayValue)
+        .animation(
+            animatesPresentedValueChanges ? PosterMotion.timeRailSettle : nil,
+            value: displayValue
+        )
         .animation(reduceMotion ? nil : PosterMotion.timeRailKick, value: releaseImpact)
     }
 
-    private func yearBadge(at x: CGFloat, height: CGFloat) -> some View {
+    private func timeBadge(at x: CGFloat, height: CGFloat) -> some View {
         let centerY = height - 6 - barMaxHeight / 2
 
-        return Text(yearLabel)
+        return Text(timeLabel)
             .font(.caption.weight(.semibold).monospacedDigit())
             .foregroundStyle(yearLabelForeground)
             .padding(.horizontal, PosterSpacing.sm)
@@ -202,8 +228,13 @@ struct WaveTimeRail: View {
             }
             .position(x: x, y: max(12, centerY - barMaxHeight / 2 - 11))
             .offset(y: -3 * releaseImpact)
-            .contentTransition(reduceMotion ? .identity : .numericText())
-            .animation(isDragging || reduceMotion ? nil : PosterMotion.timeRailSettle, value: yearLabel)
+            .contentTransition(
+                animatesPresentedValueChanges ? .numericText() : .identity
+            )
+            .animation(
+                animatesPresentedValueChanges ? PosterMotion.timeRailSettle : nil,
+                value: timeLabel
+            )
             .animation(reduceMotion ? nil : PosterMotion.timeRailKick, value: releaseImpact)
     }
 
@@ -235,20 +266,49 @@ struct WaveTimeRail: View {
                     releaseImpact = 0
                     isDragging = true
                     lastHapticYears = nil
+                    lastModelPublication = .distantPast
+                    dragOriginPosition = TimePosition(normalized: value)
+                    dragStartGranularity = granularity
                 }
-                let normalized = xToNormalized(gesture.location.x, width: width)
                 if dragStartValue == nil {
-                    dragStartValue = normalized
+                    dragStartValue = value
                 }
+                let resolvedGranularity = (
+                    dragStartGranularity ?? granularity
+                ).offsetting(verticalTranslation: gesture.translation.height)
+                if granularity != resolvedGranularity {
+                    granularity = resolvedGranularity
+                    onDetent(.decade)
+                }
+                let normalized = resolvedPosition(
+                    for: gesture,
+                    width: width,
+                    granularity: resolvedGranularity
+                ).normalized
                 dragValue = normalized
-                onChange(normalized)
+                publishModelValueIfNeeded(normalized)
                 updateHaptics(for: normalized)
             }
             .onEnded { gesture in
-                let normalized = xToNormalized(gesture.location.x, width: width)
-                let predicted = xToNormalized(gesture.predictedEndLocation.x, width: width)
-                let snapped = WaveTimeBrowseSnap.snap(TimePosition(normalized: normalized))
+                let resolvedGranularity = (
+                    dragStartGranularity ?? granularity
+                ).offsetting(verticalTranslation: gesture.translation.height)
+                granularity = resolvedGranularity
+                let normalized = resolvedPosition(
+                    for: gesture,
+                    width: width,
+                    granularity: resolvedGranularity
+                ).normalized
+                let predicted = predictedPosition(
+                    for: gesture,
+                    width: width,
+                    granularity: resolvedGranularity
+                ).normalized
+                let snapped = resolvedGranularity.snap(
+                    TimePosition(normalized: normalized)
+                )
                 let didMove = abs(normalized - (dragStartValue ?? normalized)) > 0.001
+                    || resolvedGranularity != dragStartGranularity
                 let direction = WaveTimeRollPhysics.releaseDirection(
                     current: normalized,
                     predicted: predicted
@@ -260,11 +320,13 @@ struct WaveTimeRail: View {
                 isDragging = false
                 lastHapticYears = nil
                 dragStartValue = nil
+                dragOriginPosition = nil
+                dragStartGranularity = nil
 
                 guard didMove, !reduceMotion, direction != 0, kick > 0 else {
                     releaseValue = nil
                     releaseImpact = 0
-                    onChange(snapped.normalized)
+                    publishModelValue(snapped.normalized)
                     if didMove {
                         emitReleaseDetent(for: snapped)
                     }
@@ -283,7 +345,7 @@ struct WaveTimeRail: View {
                     )
                     releaseImpact = WaveTimeRollPhysics.impact(for: kick)
                 }
-                onChange(snapped.normalized)
+                publishModelValue(snapped.normalized)
                 emitReleaseDetent(for: snapped)
 
                 releaseTask = Task { @MainActor in
@@ -300,6 +362,69 @@ struct WaveTimeRail: View {
                     releaseTask = nil
                 }
             }
+    }
+
+    private func resolvedPosition(
+        for gesture: DragGesture.Value,
+        width: CGFloat,
+        granularity: WaveTimeGranularity
+    ) -> TimePosition {
+        if granularity == .year, dragStartGranularity == .year {
+            return TimePosition(
+                normalized: xToNormalized(gesture.location.x, width: width)
+            )
+        }
+        return granularity.position(
+            from: dragOriginPosition ?? TimePosition(normalized: value),
+            horizontalTranslation: gesture.translation.width,
+            usableWidth: width - horizontalInset * 2
+        )
+    }
+
+    private func predictedPosition(
+        for gesture: DragGesture.Value,
+        width: CGFloat,
+        granularity: WaveTimeGranularity
+    ) -> TimePosition {
+        if granularity == .year, dragStartGranularity == .year {
+            return TimePosition(
+                normalized: xToNormalized(
+                    gesture.predictedEndLocation.x,
+                    width: width
+                )
+            )
+        }
+        return granularity.position(
+            from: dragOriginPosition ?? TimePosition(normalized: value),
+            horizontalTranslation: gesture.predictedEndTranslation.width,
+            usableWidth: width - horizontalInset * 2
+        )
+    }
+
+    private func publishModelValueIfNeeded(_ normalized: Double) {
+        let now = Date.now
+        guard WaveTimeModelPublicationGate.shouldPublish(
+            lastPublishedAt: lastModelPublication,
+            now: now
+        ) else {
+            return
+        }
+        lastModelPublication = now
+        onChange(normalized)
+    }
+
+    private func publishModelValue(_ normalized: Double) {
+        lastModelPublication = Date.now
+        onChange(normalized)
+    }
+
+    /// VoiceOver granularity changes are local presentation state. Keeping
+    /// them separate from `onChange` preserves the selected target time and
+    /// cannot enter the generation path.
+    private func selectGranularity(_ selection: WaveTimeGranularity) {
+        guard selection != granularity else { return }
+        granularity = selection
+        onDetent(.decade)
     }
 
     private func emitReleaseDetent(for snapped: TimePosition) {
@@ -347,6 +472,20 @@ struct WaveTimeRail: View {
     }
 }
 
+/// Keeps the external direct-drive contract independently testable without
+/// exposing SwiftUI transaction details to feature code.
+enum WaveTimeRailValueAnimationPolicy {
+    static func shouldAnimate(
+        isDragging: Bool,
+        reduceMotion: Bool,
+        isExternalValueDirectDriven: Bool,
+        isReleasePresentationActive: Bool
+    ) -> Bool {
+        guard !isDragging, !reduceMotion else { return false }
+        return !isExternalValueDirectDriven || isReleasePresentationActive
+    }
+}
+
 /// Release / accessibility snap to browse-friendly date granularity.
 /// Does **not** snap to landmark anchors (−100 / −30 / NOW / +30 / +100).
 enum WaveTimeBrowseSnap {
@@ -366,6 +505,13 @@ enum WaveTimeBrowseSnap {
             snappedDays = (days / 365.25).rounded() * 365.25
         }
         return TimePosition(offsetDays: snappedDays)
+    }
+
+    static func snap(
+        _ position: TimePosition,
+        granularity: WaveTimeGranularity
+    ) -> TimePosition {
+        granularity.snap(position)
     }
 }
 

@@ -9,6 +9,19 @@ struct PosterExportCard: View {
     let title: String
     let narrative: String
     var sceneImage: UIImage?
+    var interpretationTrace: TemporalInterpretationTrace?
+
+    private var resolvedTrace: TemporalInterpretationTrace {
+        interpretationTrace ?? .resolve(
+            story: nil,
+            understanding: nil,
+            at: time
+        )
+    }
+
+    private var displayedNarrative: String {
+        narrative
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,32 +30,45 @@ struct PosterExportCard: View {
                 .frame(height: 340)
 
             VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                Text(yearLabel)
-                    .font(PosterTypography.display(36))
-                    .foregroundStyle(PosterPalette.skyDeep)
-                    .accessibilityAddTraits(.isHeader)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: PosterSpacing.md) {
+                        selectedTimeLabel
+                        Spacer(minLength: PosterSpacing.sm)
+                        interpretationLabel
+                    }
+
+                    VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+                        interpretationLabel
+                        selectedTimeLabel
+                    }
+                }
 
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font(PosterTypography.cardTitle)
                     .foregroundStyle(PosterPalette.ink)
                     .lineLimit(2)
 
-                Text(narrative)
-                    .font(.subheadline)
+                Text(displayedNarrative)
+                    .font(PosterTypography.supporting)
                     .foregroundStyle(PosterPalette.mutedInk)
-                    .lineLimit(6)
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: PosterSpacing.sm)
 
-                HStack(alignment: .lastTextBaseline) {
+                HStack(alignment: .bottom, spacing: PosterSpacing.md) {
+                    TemporalFingerprintMark(
+                        markers: resolvedTrace.markers,
+                        selectedTime: time,
+                        size: .poster
+                    )
+
+                    Spacer(minLength: PosterSpacing.sm)
+
                     Text("FUMIRA")
                         .font(PosterTypography.script(22))
                         .foregroundStyle(PosterPalette.skyDeep)
-                    Spacer()
-                    Text("时间相机")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(PosterPalette.skyDeep.opacity(0.72))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -51,13 +77,25 @@ struct PosterExportCard: View {
         }
         .background(PosterPalette.paper)
         .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                .stroke(PosterPalette.skyDeep.opacity(0.22), lineWidth: 1.5)
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("时间海报")
-        .accessibilityValue("\(yearLabel)，\(title)，\(narrative)")
+        .accessibilityValue(
+            "\(yearLabel)，一种可能的时间解释，\(title)，\(displayedNarrative)，确定性时间指纹"
+        )
+    }
+
+    private var selectedTimeLabel: some View {
+        Text(yearLabel)
+            .font(PosterTypography.display(36))
+            .foregroundStyle(PosterPalette.skyDeep)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private var interpretationLabel: some View {
+        Text("一种可能的时间解释")
+            .font(PosterTypography.caption)
+            .foregroundStyle(PosterPalette.actionBlueDeep)
+            .multilineTextAlignment(.leading)
     }
 
     @ViewBuilder

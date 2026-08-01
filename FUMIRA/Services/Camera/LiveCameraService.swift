@@ -4,6 +4,7 @@ import Foundation
 import ImageIO
 import SwiftUI
 import UIKit
+import Vision
 
 enum LiveCameraError: LocalizedError, Sendable {
     case accessDenied
@@ -31,7 +32,7 @@ enum LiveCameraError: LocalizedError, Sendable {
     }
 }
 
-final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraZoomProviding, CameraPreviewFactory, TemporalCameraSampling, CameraOpticalContextProviding, @unchecked Sendable {
+final class LiveCameraService: NSObject, CameraService, CameraControlProviding, CameraZoomProviding, CameraPreviewFactory, TemporalCameraSampling, CameraOpticalContextProviding, CameraPreviewPrewarming, CameraSubjectTrackingProviding, @unchecked Sendable {
     let isLive = true
 
     private let session = AVCaptureSession()
@@ -77,6 +78,7 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                     if !session.isRunning {
                         session.startRunning()
                     }
+                    publishZoomSnapshot(makeZoomSnapshot())
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -94,6 +96,20 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                 continuation.resume()
             }
         }
+    }
+
+    func prewarmPreviewIfAuthorized() async {
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
+            return
+        }
+        try? await startPreview()
+    }
+
+    @MainActor
+    func setSubjectTrackingObserver(
+        _ observer: (@MainActor @Sendable (CameraTrackedSubject?) -> Void)?
+    ) {
+        temporalFrameSampler.setSubjectTrackingObserver(observer)
     }
 
     func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto {
@@ -246,6 +262,9 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                     try installInput(position: nextPosition)
                     configureSystemZoomControlIfAvailable()
                     currentPosition = nextPosition
+                    temporalFrameSampler.resetSubjectTracking(
+                        cameraPosition: nextPosition
+                    )
                     publishZoomSnapshot(makeZoomSnapshot())
                     continuation.resume(returning: makeSnapshot())
                 } catch {
@@ -303,6 +322,7 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
                 queue: temporalFrameQueue
             )
             session.addOutput(videoOutput)
+            temporalFrameSampler.resetSubjectTracking(cameraPosition: .back)
         }
         currentPosition = .back
         isConfigured = true
@@ -326,6 +346,35 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
         session.addInput(input)
         videoDeviceInput = input
         currentPosition = position
+        try applyDefaultWideAngleZoom(on: device)
+    }
+
+    /// Dual-wide / triple cameras open at the ultra-wide end (UI 0.5×). Jump to
+    /// the first virtual-device switch-over so the default read is Camera's 1×.
+    private func applyDefaultWideAngleZoom(on device: AVCaptureDevice) throws {
+        let switchOvers = device.virtualDeviceSwitchOverVideoZoomFactors
+        let target: CGFloat
+        if let first = switchOvers.first {
+            target = CGFloat(truncating: first)
+        } else if #available(iOS 18.0, *) {
+            let multiplier = device.displayVideoZoomFactorMultiplier
+            if multiplier > 0, multiplier < 0.999 {
+                target = 1 / multiplier
+            } else {
+                target = max(device.minAvailableVideoZoomFactor, 1)
+            }
+        } else {
+            target = max(device.minAvailableVideoZoomFactor, 1)
+        }
+
+        let clamped = min(
+            max(target, device.minAvailableVideoZoomFactor),
+            device.maxAvailableVideoZoomFactor
+        )
+        guard abs(device.videoZoomFactor - clamped) > 0.01 else { return }
+        try device.lockForConfiguration()
+        device.videoZoomFactor = clamped
+        device.unlockForConfiguration()
     }
 
     private func makeSnapshot() -> CameraControlSnapshot {
@@ -432,9 +481,12 @@ final class LiveCameraService: NSObject, CameraService, CameraControlProviding, 
     /// at the shutter keeps the JPEG's pixel axes aligned to how the person is
     /// holding the phone, including a landscape capture.
     private static func captureRotationAngle(for orientation: UIDeviceOrientation) -> CGFloat {
+        // Match previewRotationAngle / Apple AVCam mapping. Landscape left/right
+        // were previously swapped, which wrote upside-down JPEGs for horizontal
+        // captures while the live preview looked correct.
         switch orientation {
-        case .landscapeLeft: 180
-        case .landscapeRight: 0
+        case .landscapeLeft: 0
+        case .landscapeRight: 180
         case .portraitUpsideDown: 270
         case .portrait, .faceUp, .faceDown, .unknown: 90
         @unknown default: 90
@@ -481,8 +533,24 @@ private final class TemporalFrameSampler: NSObject, AVCaptureVideoDataOutputSamp
     private let lock = NSLock()
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
+    private let subjectTracker = LiveSubjectTracker()
+    private let subjectObserverLock = NSLock()
+    private var subjectObserver: (@MainActor @Sendable (CameraTrackedSubject?) -> Void)?
     private var frames: [BufferedFrame] = []
     private var lastEncodedAt = Date.distantPast
+
+    func setSubjectTrackingObserver(
+        _ observer: (@MainActor @Sendable (CameraTrackedSubject?) -> Void)?
+    ) {
+        subjectObserverLock.lock()
+        subjectObserver = observer
+        subjectObserverLock.unlock()
+        subjectTracker.setEnabled(observer != nil)
+    }
+
+    func resetSubjectTracking(cameraPosition: AVCaptureDevice.Position) {
+        subjectTracker.reset(cameraPosition: cameraPosition)
+    }
 
     func captureOutput(
         _ output: AVCaptureOutput,
@@ -490,6 +558,10 @@ private final class TemporalFrameSampler: NSObject, AVCaptureVideoDataOutputSamp
         from connection: AVCaptureConnection
     ) {
         let now = Date()
+        if let update = subjectTracker.process(sampleBuffer: sampleBuffer, at: now) {
+            publishTrackedSubject(update.subject)
+        }
+
         guard now.timeIntervalSince(lastEncodedAt) >= 0.12 else { return }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
@@ -525,6 +597,16 @@ private final class TemporalFrameSampler: NSObject, AVCaptureVideoDataOutputSamp
         lock.unlock()
     }
 
+    private func publishTrackedSubject(_ subject: CameraTrackedSubject?) {
+        subjectObserverLock.lock()
+        let observer = subjectObserver
+        subjectObserverLock.unlock()
+        guard let observer else { return }
+        Task { @MainActor in
+            observer(subject)
+        }
+    }
+
     func snapshot(around shutterDate: Date) -> MicroTimeSlice {
         lock.lock()
         let selected = frames.filter {
@@ -546,6 +628,266 @@ private final class TemporalFrameSampler: NSObject, AVCaptureVideoDataOutputSamp
             duration: max(last.timeIntervalSince(first), 0),
             frames: samples
         )
+    }
+}
+
+private struct LiveSubjectTrackingUpdate {
+    let subject: CameraTrackedSubject?
+}
+
+/// Camera-queue Vision tracker. Saliency periodically nominates a semantic
+/// subject; a fast sequence request follows that same region between discovery
+/// passes. UI receives a smoothed box at a bounded cadence.
+private final class LiveSubjectTracker: @unchecked Sendable {
+    private let lock = NSLock()
+    // Vision samples fast enough to follow a real camera subject, while the
+    // persistent reticle receives only filtered geometry and never remounts.
+    private let minimumProcessingInterval: TimeInterval = 1.0 / 12.0
+    private let minimumDetectionInterval: TimeInterval = 2.0
+    private let redetectionFrameInterval = 216
+    private let minimumTrackingConfidence: VNConfidence = 0.38
+    private let missingFrameTolerance = 15
+
+    private var isEnabled = false
+    private var cameraPosition: AVCaptureDevice.Position = .back
+    private var lastProcessedAt = Date.distantPast
+    private var lastDetectionAt = Date.distantPast
+    private var framesSinceDetection = 0
+    private var missingFrameCount = 0
+    private var sequenceHandler = VNSequenceRequestHandler()
+    private var trackingRequest: VNTrackObjectRequest?
+    private var smoothedSubject: CameraTrackedSubject?
+    private var lastDeliveredSubject: CameraTrackedSubject?
+
+    func setEnabled(_ enabled: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        isEnabled = enabled
+        if !enabled {
+            clearTracking()
+        }
+    }
+
+    func reset(cameraPosition: AVCaptureDevice.Position) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.cameraPosition = cameraPosition
+        clearTracking()
+    }
+
+    func process(
+        sampleBuffer: CMSampleBuffer,
+        at date: Date
+    ) -> LiveSubjectTrackingUpdate? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard isEnabled else { return nil }
+        guard date.timeIntervalSince(lastProcessedAt) >= minimumProcessingInterval else {
+            return nil
+        }
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            return recordMissingFrame()
+        }
+        lastProcessedAt = date
+
+        let orientation: CGImagePropertyOrientation =
+            cameraPosition == .front ? .leftMirrored : .right
+
+        if trackingRequest == nil {
+            guard date.timeIntervalSince(lastDetectionAt) >= minimumDetectionInterval else {
+                return nil
+            }
+            lastDetectionAt = date
+            return detectSubject(in: pixelBuffer, orientation: orientation)
+        }
+        if framesSinceDetection >= redetectionFrameInterval {
+            lastDetectionAt = date
+            return detectSubject(in: pixelBuffer, orientation: orientation)
+        }
+        return trackSubject(in: pixelBuffer, orientation: orientation)
+    }
+
+    private func detectSubject(
+        in pixelBuffer: CVPixelBuffer,
+        orientation: CGImagePropertyOrientation
+    ) -> LiveSubjectTrackingUpdate? {
+        let request = VNGenerateAttentionBasedSaliencyImageRequest()
+        let handler = VNImageRequestHandler(
+            cvPixelBuffer: pixelBuffer,
+            orientation: orientation
+        )
+        do {
+            try handler.perform([request])
+        } catch {
+            framesSinceDetection = 0
+            return nil
+        }
+
+        guard
+            let candidates = request.results?.first?.salientObjects,
+            let observation = candidates.max(by: {
+                candidateScore($0) < candidateScore($1)
+            })
+        else {
+            framesSinceDetection = 0
+            return nil
+        }
+
+        sequenceHandler = VNSequenceRequestHandler()
+        let seed = VNDetectedObjectObservation(boundingBox: observation.boundingBox)
+        let tracker = VNTrackObjectRequest(detectedObjectObservation: seed)
+        tracker.trackingLevel = .fast
+        trackingRequest = tracker
+        framesSinceDetection = 0
+        return accept(
+            boundingBox: observation.boundingBox,
+            confidence: Double(observation.confidence)
+        )
+    }
+
+    private func trackSubject(
+        in pixelBuffer: CVPixelBuffer,
+        orientation: CGImagePropertyOrientation
+    ) -> LiveSubjectTrackingUpdate? {
+        guard let trackingRequest else {
+            return recordMissingFrame()
+        }
+        do {
+            try sequenceHandler.perform(
+                [trackingRequest],
+                on: pixelBuffer,
+                orientation: orientation
+            )
+        } catch {
+            self.trackingRequest = nil
+            return recordMissingFrame()
+        }
+
+        guard
+            let observation = trackingRequest.results?.first
+                as? VNDetectedObjectObservation,
+            observation.confidence >= minimumTrackingConfidence
+        else {
+            self.trackingRequest = nil
+            return recordMissingFrame()
+        }
+
+        trackingRequest.inputObservation = observation
+        framesSinceDetection += 1
+        return accept(
+            boundingBox: observation.boundingBox,
+            confidence: Double(observation.confidence)
+        )
+    }
+
+    private func accept(
+        boundingBox: CGRect,
+        confidence: Double
+    ) -> LiveSubjectTrackingUpdate? {
+        missingFrameCount = 0
+
+        let candidate = CameraTrackedSubject(
+            normalizedX: boundingBox.minX,
+            normalizedY: 1 - boundingBox.maxY,
+            normalizedWidth: boundingBox.width,
+            normalizedHeight: boundingBox.height,
+            confidence: confidence
+        ).focused(
+            horizontalScale: 0.36,
+            verticalScale: 0.40,
+            maximumWidth: 0.24,
+            maximumHeight: 0.28
+        )
+
+        let resolved: CameraTrackedSubject
+        if let previous = smoothedSubject {
+            let dx = previous.center.x - candidate.center.x
+            let dy = previous.center.y - candidate.center.y
+            let distance = hypot(dx, dy)
+            resolved = previous.smoothed(
+                toward: candidate,
+                response: CameraTrackedSubject.trackingResponse(
+                    forCenterDistance: distance
+                )
+            )
+        } else {
+            resolved = candidate
+        }
+        smoothedSubject = resolved
+
+        if let lastDeliveredSubject,
+           !hasMeaningfulGeometryChange(
+               from: lastDeliveredSubject,
+               to: resolved
+           ) {
+            return nil
+        }
+        lastDeliveredSubject = resolved
+        return LiveSubjectTrackingUpdate(subject: resolved)
+    }
+
+    private func recordMissingFrame() -> LiveSubjectTrackingUpdate? {
+        missingFrameCount += 1
+        guard missingFrameCount >= missingFrameTolerance else { return nil }
+        trackingRequest = nil
+        framesSinceDetection = 0
+        // Keep the last accepted subject visible while Vision reacquires. A
+        // temporary miss should look like a held camera lock, not a new flash.
+        return nil
+    }
+
+    private func clearTracking() {
+        lastProcessedAt = .distantPast
+        lastDetectionAt = .distantPast
+        framesSinceDetection = 0
+        missingFrameCount = 0
+        sequenceHandler = VNSequenceRequestHandler()
+        trackingRequest = nil
+        smoothedSubject = nil
+        lastDeliveredSubject = nil
+    }
+
+    private func candidateScore(_ observation: VNRectangleObservation) -> Double {
+        let box = observation.boundingBox
+        let area = box.width * box.height
+        let centerDistance = hypot(box.midX - 0.5, box.midY - 0.5)
+        let preferredArea = 0.18
+        let areaFit = max(0, 1 - abs(area - preferredArea) / preferredArea)
+
+        let continuity: Double
+        if let current = smoothedSubject {
+            let currentVisionCenter = CGPoint(
+                x: current.center.x,
+                y: 1 - current.center.y
+            )
+            let distance = hypot(
+                box.midX - currentVisionCenter.x,
+                box.midY - currentVisionCenter.y
+            )
+            continuity = max(0, 1 - distance / 0.36)
+        } else {
+            continuity = max(0, 1 - centerDistance / 0.7)
+        }
+
+        return Double(observation.confidence) * 0.20
+            + continuity * 0.74
+            + areaFit * 0.06
+    }
+
+    private func hasMeaningfulGeometryChange(
+        from previous: CameraTrackedSubject,
+        to current: CameraTrackedSubject
+    ) -> Bool {
+        let centerDistance = hypot(
+            previous.center.x - current.center.x,
+            previous.center.y - current.center.y
+        )
+        let sizeDelta = max(
+            abs(previous.normalizedWidth - current.normalizedWidth),
+            abs(previous.normalizedHeight - current.normalizedHeight)
+        )
+        return centerDistance >= 0.010 || sizeDelta >= 0.018
     }
 }
 

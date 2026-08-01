@@ -15,7 +15,7 @@ final class CameraControlTests: XCTestCase {
         XCTAssertEqual(compactFeedback.alpha, 1, accuracy: 0.001)
         XCTAssertGreaterThanOrEqual(
             contrastRatio(action, actionGlyph),
-            3,
+            3.05,
             "White system glyphs need non-text contrast against the blue action circle"
         )
         XCTAssertGreaterThanOrEqual(
@@ -89,6 +89,38 @@ final class CameraControlTests: XCTestCase {
         )
     }
 
+    func testVerticalDragMapsFromTheRatioHeldAtGestureStart() {
+        let step = CameraAspectRatio.verticalAspectStepDistance
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: step * 1.2,
+                startingAt: .classic
+            ),
+            .widescreen
+        )
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: -step * 1.2,
+                startingAt: .classic
+            ),
+            .square
+        )
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: step * 2.4,
+                startingAt: .classic
+            ),
+            .fullScreen
+        )
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: step * 0.4,
+                startingAt: .classic
+            ),
+            .classic
+        )
+    }
+
     func testPinchAspectMappingClampsAndRejectsInvalidMagnification() {
         XCTAssertEqual(
             CameraAspectRatio.aspectRatio(
@@ -110,6 +142,20 @@ final class CameraControlTests: XCTestCase {
                 startingAt: .classic
             ),
             .classic
+        )
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: .nan,
+                startingAt: .classic
+            ),
+            .classic
+        )
+        XCTAssertEqual(
+            CameraAspectRatio.aspectRatio(
+                afterVerticalTranslation: 10_000,
+                startingAt: .square
+            ),
+            .fullScreen
         )
     }
 

@@ -99,26 +99,46 @@ enum CameraCompositionGeometry {
     }
 
     /// Places the wave-shutter in the optical center of the exposed blue body
-    /// when it fits. If that body is too shallow (16:9 and full screen), the
-    /// same control floats above the home indicator instead.
+    /// when that deck can hold the rail. Full screen (and any ratio that leaves
+    /// almost no blue) floats the same control above the home indicator.
     static func controlPlacement(
         below compositionFrame: CGRect,
         in size: CGSize,
         bottomSafeAreaInset: CGFloat
     ) -> ControlPlacement {
-        let deckBottom = size.height
-            - max(bottomSafeAreaInset + PosterSpacing.sm, PosterSpacing.xl)
         let controlHeight = CameraChromeMetrics.waveRailHeight
-        let exposedHeight = deckBottom - compositionFrame.maxY
-        let requiredDeckHeight = controlHeight + PosterSpacing.md
-        let overlaysPreview = exposedHeight < requiredDeckHeight
-        let overlayCenter = deckBottom - controlHeight * 0.5
-        let exposedCenter = (compositionFrame.maxY + deckBottom) * 0.5
+        let safeDeckBottom = size.height
+            - max(bottomSafeAreaInset + PosterSpacing.sm, PosterSpacing.xl)
+        // Measure the full blue body to the screen edge. 16:9 already exposes
+        // enough deck to host the rail; only compare against the rail height
+        // itself, not an extra padding cushion that forced a false float.
+        let visualExposedHeight = size.height - compositionFrame.maxY
+        let overlaysPreview = visualExposedHeight < controlHeight
+
+        let overlayCenter = safeDeckBottom - controlHeight * 0.5
+        let rawExposedCenter = (compositionFrame.maxY + size.height) * 0.5
+            + Self.waveOpticalCenterBias
+        // Keep the rail inside the blue deck so a shallow-but-usable body
+        // (portrait 16:9) still reads as centered, never clipped into the card.
+        let minExposedCenter = compositionFrame.maxY + controlHeight * 0.5
+        let maxExposedCenter = size.height - controlHeight * 0.5
+        let exposedCenter = min(
+            max(rawExposedCenter, minExposedCenter),
+            max(maxExposedCenter, minExposedCenter)
+        )
 
         return ControlPlacement(
             centerY: overlaysPreview ? overlayCenter : exposedCenter,
             overlaysPreview: overlaysPreview
         )
+    }
+
+    /// The shutter sits above the rail frame's geometric mid (stage then year
+    /// capsule). Bias the placement down so the shutter reads as centered.
+    private static var waveOpticalCenterBias: CGFloat {
+        let shutterFromTop = CameraChromeMetrics.waveRailStageHeight * 0.58
+        let frameMidFromTop = CameraChromeMetrics.waveRailHeight * 0.5
+        return frameMidFromTop - shutterFromTop
     }
 
     static func controlDeckCenterY(

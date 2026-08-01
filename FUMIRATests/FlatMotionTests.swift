@@ -68,6 +68,36 @@ final class FlatMotionTests: XCTestCase {
         }
     }
 
+    func testCameraEntryPortalKeepsTheEarlyExpansionNearTheSourceButton() {
+        XCTAssertEqual(
+            CameraEntryPortalGeometry.expansionProgress(for: 0),
+            0,
+            accuracy: 0.000_001
+        )
+        XCTAssertLessThan(
+            CameraEntryPortalGeometry.expansionProgress(for: 0.20),
+            0.01
+        )
+        XCTAssertLessThan(
+            CameraEntryPortalGeometry.expansionProgress(for: 0.40),
+            0.10
+        )
+        XCTAssertEqual(
+            CameraEntryPortalGeometry.expansionProgress(for: 1),
+            1,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testDevelopingPhotoUsesTheAvailableVerticalCenter() {
+        let frame = RealityDevelopingGeometry.photoFrame(
+            in: CGSize(width: 390, height: 844),
+            aspectRatio: 3.0 / 4.0
+        )
+
+        XCTAssertEqual(frame.midY, 422, accuracy: 0.000_001)
+    }
+
     func testTimeModelPublicationIsBoundedToFrameFriendlyCadence() {
         let start = Date(timeIntervalSinceReferenceDate: 1_000)
 

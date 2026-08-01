@@ -1,0 +1,159 @@
+{
+  "version": 2,
+  "frameSize": {
+    "width": 384,
+    "height": 384
+  },
+  "sequences": [
+    {
+      "id": "inspiration-camera",
+      "displayName": "灵感时光相机",
+      "playbackMode": "oneShot",
+      "baseClipID": null,
+      "actionProbability": 0.0,
+      "minimumBaseLoops": 0,
+      "reduceMotionClipID": "aim-shoot",
+      "reduceMotionFrameIndex": 5,
+      "clips": [
+        {
+          "id": "calm-breathe",
+          "kind": "linear",
+          "frameDurationMilliseconds": 180,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_inspiration_camera_calm_breathe_00.png",
+            "doraemon_inspiration_camera_calm_breathe_01.png",
+            "doraemon_inspiration_camera_calm_breathe_02.png",
+            "doraemon_inspiration_camera_calm_breathe_03.png",
+            "doraemon_inspiration_camera_calm_breathe_04.png",
+            "doraemon_inspiration_camera_calm_breathe_05.png"
+          ]
+        },
+        {
+          "id": "idea-bloom",
+          "kind": "linear",
+          "frameDurationMilliseconds": 145,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_inspiration_camera_idea_bloom_00.png",
+            "doraemon_inspiration_camera_idea_bloom_01.png",
+            "doraemon_inspiration_camera_idea_bloom_02.png",
+            "doraemon_inspiration_camera_idea_bloom_03.png",
+            "doraemon_inspiration_camera_idea_bloom_04.png",
+            "doraemon_inspiration_camera_idea_bloom_05.png"
+          ]
+        },
+        {
+          "id": "pocket-pull",
+          "kind": "linear",
+          "frameDurationMilliseconds": 125,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_inspiration_camera_pocket_pull_00.png",
+            "doraemon_inspiration_camera_pocket_pull_01.png",
+            "doraemon_inspiration_camera_pocket_pull_02.png",
+            "doraemon_inspiration_camera_pocket_pull_03.png",
+            "doraemon_inspiration_camera_pocket_pull_04.png",
+            "doraemon_inspiration_camera_pocket_pull_05.png"
+          ]
+        },
+        {
+          "id": "aim-shoot",
+          "kind": "linear",
+          "frameDurationMilliseconds": 115,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_inspiration_camera_aim_shoot_00.png",
+            "doraemon_inspiration_camera_aim_shoot_01.png",
+            "doraemon_inspiration_camera_aim_shoot_02.png",
+            "doraemon_inspiration_camera_aim_shoot_03.png",
+            "doraemon_inspiration_camera_aim_shoot_04.png",
+            "doraemon_inspiration_camera_aim_shoot_05.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "time-machine-travel",
+      "displayName": "时光机长期穿梭",
+      "playbackMode": "randomLoop",
+      "baseClipID": "cruise",
+      "actionProbability": 0.38,
+      "minimumBaseLoops": 2,
+      "reduceMotionClipID": "cruise",
+      "reduceMotionFrameIndex": 0,
+      "clips": [
+        {
+          "id": "cruise",
+          "kind": "base",
+          "frameDurationMilliseconds": 125,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_time_machine_travel_cruise_00.png",
+            "doraemon_time_machine_travel_cruise_01.png",
+            "doraemon_time_machine_travel_cruise_02.png",
+            "doraemon_time_machine_travel_cruise_03.png",
+            "doraemon_time_machine_travel_cruise_04.png",
+            "doraemon_time_machine_travel_cruise_05.png"
+          ]
+        },
+        {
+          "id": "nobita-points",
+          "kind": "action",
+          "frameDurationMilliseconds": 135,
+          "weight": 1.0,
+          "frames": [
+            "doraemon_time_machine_travel_nobita_points_00.png",
+            "doraemon_time_machine_travel_nobita_points_01.png",
+            "doraemon_time_machine_travel_nobita_points_02.png",
+            "doraemon_time_machine_travel_nobita_points_03.png",
+            "doraemon_time_machine_travel_nobita_points_04.png",
+            "doraemon_time_machine_travel_nobita_points_05.png"
+          ]
+        },
+        {
+          "id": "doraemon-controls",
+          "kind": "action",
+          "frameDurationMilliseconds": 125,
+          "weight": 1.1,
+          "frames": [
+            "doraemon_time_machine_travel_doraemon_controls_00.png",
+            "doraemon_time_machine_travel_doraemon_controls_01.png",
+            "doraemon_time_machine_travel_doraemon_controls_02.png",
+            "doraemon_time_machine_travel_doraemon_controls_03.png",
+            "doraemon_time_machine_travel_doraemon_controls_04.png",
+            "doraemon_time_machine_travel_doraemon_controls_05.png"
+          ]
+        },
+        {
+          "id": "turbulence",
+          "kind": "action",
+          "frameDurationMilliseconds": 105,
+          "weight": 0.8,
+          "frames": [
+            "doraemon_time_machine_travel_turbulence_00.png",
+            "doraemon_time_machine_travel_turbulence_01.png",
+            "doraemon_time_machine_travel_turbulence_02.png",
+            "doraemon_time_machine_travel_turbulence_03.png",
+            "doraemon_time_machine_travel_turbulence_04.png",
+            "doraemon_time_machine_travel_turbulence_05.png"
+          ]
+        },
+        {
+          "id": "shared-delight",
+          "kind": "action",
+          "frameDurationMilliseconds": 145,
+          "weight": 0.9,
+          "frames": [
+            "doraemon_time_machine_travel_shared_delight_00.png",
+            "doraemon_time_machine_travel_shared_delight_01.png",
+            "doraemon_time_machine_travel_shared_delight_02.png",
+            "doraemon_time_machine_travel_shared_delight_03.png",
+            "doraemon_time_machine_travel_shared_delight_04.png",
+            "doraemon_time_machine_travel_shared_delight_05.png"
+          ]
+        }
+      ]
+    }
+  ]
+}

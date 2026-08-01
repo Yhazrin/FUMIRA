@@ -19,7 +19,10 @@ actor LiveCameraLiveActivityService: CameraLiveActivityService {
     private var activity: CameraActivityHandle?
 
     func trigger(with state: CameraLiveActivityAttributes.ContentState) async throws {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+        let enabled = await MainActor.run {
+            ActivityAuthorizationInfo().areActivitiesEnabled
+        }
+        guard enabled else {
             throw CameraLiveActivityError.disabled
         }
 
@@ -31,16 +34,18 @@ actor LiveCameraLiveActivityService: CameraLiveActivityService {
             staleDate: Date().addingTimeInterval(20 * 60)
         )
 
-        // This activity deliberately survives shutter capture so the user can
-        // put the phone down while the temporal pipeline continues. A
-        // transient activity would disappear at exactly the wrong moment.
-        activity = CameraActivityHandle(
-            try Activity.request(
-                attributes: attributes,
-                content: content,
-                pushType: nil
+        // ActivityKit must start on the main actor; requesting off-main can
+        // create an activity that never renders in the Dynamic Island.
+        let requested = try await MainActor.run {
+            CameraActivityHandle(
+                try Activity.request(
+                    attributes: attributes,
+                    content: content,
+                    pushType: nil
+                )
             )
-        )
+        }
+        activity = requested
     }
 
     func update(with state: CameraLiveActivityAttributes.ContentState) async {
@@ -72,8 +77,11 @@ actor LiveCameraLiveActivityService: CameraLiveActivityService {
     }
 
     func dismissAll() async {
-        for current in Activity<CameraLiveActivityAttributes>.activities {
-            await current.end(nil, dismissalPolicy: .immediate)
+        let activities = await MainActor.run {
+            Activity<CameraLiveActivityAttributes>.activities.map(CameraActivityHandle.init)
+        }
+        for current in activities {
+            await current.value.end(nil, dismissalPolicy: .immediate)
         }
         activity = nil
     }
@@ -101,11 +109,14 @@ private final class CameraActivityHandle: @unchecked Sendable {
 
 enum CameraLiveActivityError: LocalizedError {
     case disabled
+    case requestFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .disabled:
             "请先在系统设置中允许 FUMIRA 显示实时活动。"
+        case let .requestFailed(message):
+            message
         }
     }
 }

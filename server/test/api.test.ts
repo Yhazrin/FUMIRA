@@ -10,6 +10,17 @@ const TINY_JPEG = Buffer.from(
   "base64"
 );
 
+const MAXIMUM_TIME_OFFSET_DAYS = 36_525;
+const TIME_POSITION_CURVE_EXPONENT = 2.35;
+
+function normalizedForOffsetDays(offsetDays: number): number {
+  if (offsetDays === 0) return 0;
+  return Math.sign(offsetDays) * Math.pow(
+    Math.abs(offsetDays) / MAXIMUM_TIME_OFFSET_DAYS,
+    1 / TIME_POSITION_CURVE_EXPONENT
+  );
+}
+
 function multipartBody(
   fields: Record<string, string>,
   file?: { name: string; contentType: string; bytes: Buffer }
@@ -39,6 +50,54 @@ function multipartBody(
   return {
     payload: Buffer.concat(chunks),
     contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
+function structuredGenerationPayload(
+  sourceAssetId: string,
+  requestId: string,
+  timePosition: Record<string, unknown>
+) {
+  const offsetYears = typeof timePosition.offsetYears === "number"
+    ? timePosition.offsetYears
+    : 0;
+  return {
+    contextVersion: "generation.v2",
+    sourceAssetId,
+    requestId,
+    aspectRatio: "3:4",
+    timePosition,
+    structuredContext: {
+      schemaVersion: "generation-context.v2",
+      understanding: {
+        summary: "公园",
+        locationType: "城市公园",
+        visualMood: "安静",
+        timeClues: [],
+        changeDrivers: ["自然生长"],
+        subjects: [],
+      },
+      story: {
+        schemaVersion: "temporal-story.v2",
+        title: "时间回声",
+        logline: "同一机位的连续变化",
+        presentTruth: "一座城市公园",
+        identityRules: ["保持主体与构图"],
+        beats: [-100, -30, -10, 0, 10, 30, 100].map((anchorYears) => ({
+          anchorYears,
+          title: `${anchorYears} 年`,
+          narrative: "场景随时间变化",
+          visualPrompt: "保持同一机位与主体",
+        })),
+        targetBeat: {
+          anchorYears: offsetYears,
+          title: "精确目标",
+          narrative: "精确目标时间的变化",
+          visualPrompt: "保持同一机位，生成精确目标时间",
+        },
+      },
+      generationMode: "captured_target",
+    },
   };
 }
 
@@ -148,9 +207,9 @@ describe("fumira-server", () => {
         aspectRatio: "3:4",
         prompt: "Edit this exact source photo into the same place 25 years later.",
         timePosition: {
-          normalized: 0.5,
+          normalized: normalizedForOffsetDays(9000),
           offsetDays: 9000,
-          offsetYears: 25,
+          offsetYears: 9000 / 365.25,
           compactLabel: "25 年后",
         },
       },
@@ -195,7 +254,7 @@ describe("fumira-server", () => {
         aspectRatio: "3:4",
         prompt: "Keep this exact place and camera continuous while time advances.",
         timePosition: {
-          normalized: 0.35,
+          normalized: normalizedForOffsetDays(7305),
           offsetDays: 7305,
           offsetYears: 20,
           compactLabel: "20 年后",
@@ -282,10 +341,10 @@ describe("fumira-server", () => {
         aspectRatio: "3:4",
         prompt: "__FORCE_TIMEOUT__",
         timePosition: {
-          normalized: 0.2,
+          normalized: normalizedForOffsetDays(100),
           offsetDays: 100,
-          offsetYears: 0.3,
-          compactLabel: "100 天后",
+          offsetYears: 100 / 365.25,
+          compactLabel: "3.3 个月后",
         },
       },
     });
@@ -320,7 +379,7 @@ describe("fumira-server", () => {
       template: "Render {{timeLabel}} at {{aspectRatio}}.",
       corePrompt: "CORE_IDENTITY_AND_TIMELINE",
       timePosition: {
-        normalized: 0.35,
+        normalized: normalizedForOffsetDays(7_305),
         offsetDays: 7_305,
         offsetYears: 20,
         compactLabel: "20 年后",
@@ -356,7 +415,7 @@ describe("fumira-server", () => {
         requestId: "req-structured-1",
         aspectRatio: "3:4",
         timePosition: {
-          normalized: 0.5,
+          normalized: normalizedForOffsetDays(9131),
           offsetDays: 9131,
           offsetYears: 25,
           compactLabel: "25 年后",
@@ -472,6 +531,134 @@ describe("fumira-server", () => {
     assert.match(body.resultUrl, /\/v1\/results\//);
   });
 
+  it("accepts both exact ±100 year generation boundaries", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+    const { assetId } = upload.json();
+
+    for (const [index, direction] of [-1, 1].entries()) {
+      const create = await app.inject({
+        method: "POST",
+        url: "/v1/generations",
+        payload: structuredGenerationPayload(
+          assetId,
+          `req-time-boundary-${index}`,
+          {
+            normalized: direction,
+            offsetDays: direction * 36_525,
+            offsetYears: direction * 100,
+            compactLabel: direction < 0 ? "100 年前" : "100 年后",
+          }
+        ),
+      });
+
+      assert.equal(create.statusCode, 202);
+    }
+  });
+
+  it("rejects malformed, out-of-range, and internally inconsistent times", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+    const { assetId } = upload.json();
+    const invalidTimes = [
+      { normalized: 1.01, offsetDays: 0, offsetYears: 0, compactLabel: "NOW" },
+      { normalized: 1, offsetDays: 36_525.01, offsetYears: 100, compactLabel: "100 年后" },
+      { normalized: 0.2, offsetDays: 365.25, offsetYears: 2, compactLabel: "1 年后" },
+      { normalized: 0, offsetDays: 36_525, offsetYears: 100, compactLabel: "100 年后" },
+      { normalized: 1, offsetDays: 0, offsetYears: 0, compactLabel: "NOW" },
+      { normalized: 1, offsetDays: 36_525, offsetYears: 100, compactLabel: "NOW" },
+      { normalized: 0, offsetDays: null, offsetYears: 0, compactLabel: "NOW" },
+      { normalized: 0, offsetDays: 0, offsetYears: 0, compactLabel: "   " },
+    ];
+
+    for (const [index, timePosition] of invalidTimes.entries()) {
+      const create = await app.inject({
+        method: "POST",
+        url: "/v1/generations",
+        payload: structuredGenerationPayload(
+          assetId,
+          `req-invalid-time-${index}`,
+          timePosition
+        ),
+      });
+
+      assert.equal(create.statusCode, 400);
+      assert.equal(create.json().errorCode, "invalid_time_position");
+    }
+  });
+
+  it("target-beats rejects out-of-range and contradictory exact times", async () => {
+    const basePayload = {
+      understanding: {
+        summary: "公园",
+        locationType: "城市公园",
+        visualMood: "安静",
+        timeClues: [],
+        changeDrivers: ["自然生长"],
+        subjects: [],
+      },
+      storyContext: {
+        title: "时间回声",
+        presentTruth: "一座城市公园",
+        identityRules: ["保持主体与构图"],
+        canonicalBeats: [],
+      },
+    };
+    const invalidTargets = [
+      { offsetDays: 36_525.01, compactLabel: "100 年后" },
+      { offsetDays: 100, compactLabel: "NOW" },
+      { offsetDays: 100, offsetYears: 2, compactLabel: "3.3 个月后" },
+      { offsetDays: 100, normalized: 0, compactLabel: "3.3 个月后" },
+    ];
+
+    for (const [index, target] of invalidTargets.entries()) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/target-beats",
+        payload: {
+          ...basePayload,
+          target,
+          requestId: `req-invalid-target-beat-${index}`,
+        },
+      });
+
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().errorCode, "invalid_time_position");
+    }
+
+    const story = await app.inject({
+      method: "POST",
+      url: "/v1/stories",
+      payload: {
+        understanding: basePayload.understanding,
+        targetTime: {
+          offsetDays: 100,
+          offsetYears: 2,
+          compactLabel: "3.3 个月后",
+        },
+        requestId: "req-invalid-story-time",
+      },
+    });
+    assert.equal(story.statusCode, 400);
+    assert.equal(story.json().errorCode, "invalid_time_position");
+  });
+
   it("rejects V2 structured context with missing targetBeat", async () => {
     const { payload, contentType } = multipartBody(
       {},
@@ -544,7 +731,7 @@ describe("fumira-server", () => {
         requestId: "req-targetbeat-1",
         aspectRatio: "3:4",
         timePosition: {
-          normalized: 0.5,
+          normalized: normalizedForOffsetDays(9131),
           offsetDays: 9131,
           offsetYears: 25,
           compactLabel: "25 年后",
@@ -770,7 +957,11 @@ describe("fumira-server", () => {
         url: "/v1/stories",
         payload: {
           understanding: understandBody.understanding,
-          targetTime: { offsetYears: 25, compactLabel: "25 年后" },
+          targetTime: {
+            offsetDays: 25 * 365.25,
+            offsetYears: 25,
+            compactLabel: "25 年后",
+          },
           copyConstraints: {
             title: 8,
             logline: 24,
@@ -798,6 +989,35 @@ describe("fumira-server", () => {
       assert.ok(Array.from(storyBody.story.beats[0].visualPrompt).length <= 44);
       assert.equal(storyBody.story.schemaVersion, "temporal-story.v3");
       assert.ok(storyBody.story.targetBeat.renderPlan);
+
+      const targetBeat = await intelligenceApp.inject({
+        method: "POST",
+        url: "/v1/target-beats",
+        payload: {
+          understanding: understandBody.understanding,
+          storyContext: {
+            title: storyBody.story.title,
+            presentTruth: storyBody.story.presentTruth,
+            identityRules: storyBody.story.identityRules,
+            canonicalBeats: storyBody.story.beats,
+          },
+          target: {
+            offsetDays: 100,
+            targetDateISO: "1900-01-01",
+            compactLabel: "3.3 个月后",
+          },
+          requestId: "req-exact-target",
+        },
+      });
+      assert.equal(targetBeat.statusCode, 200);
+      assert.equal(targetBeat.json().target.offsetDays, 100);
+      assert.equal(targetBeat.json().target.compactLabel, "3.3 个月后");
+      assert.notEqual(targetBeat.json().target.targetDateISO, "1900-01-01");
+      assert.match(targetBeat.json().target.targetDateISO, /^\d{4}-\d{2}-\d{2}$/);
+      assert.deepEqual(
+        targetBeat.json().targetBeat.exactTarget,
+        targetBeat.json().target
+      );
     } finally {
       await intelligenceApp.close();
     }

@@ -26,6 +26,10 @@ targets:
           - Info.plist
           - Fonts/**
         buildPhase: resources
+      - path: FUMIRA/Resources/Fonts/CaveatBrush/CaveatBrush-Regular.ttf
+        buildPhase: resources
+      - path: FUMIRA/Resources/Fonts/LXGWMarkerGothic/LXGWMarkerGothic-Regular.ttf
+        buildPhase: resources
       - path: FUMIRA-icon.icon
         buildPhase: resources
     info:
@@ -35,6 +39,7 @@ targets:
         UILaunchScreen:
           UIColorName: Paper
         NSCameraUsageDescription: 用于实时取景、拍照并生成过去与未来的场景。
+        NSMicrophoneUsageDescription: 仅用于感知吹气强弱，让照片像纸片一样显影；声音不会被录制或保存。
         NSMotionUsageDescription: 用于让海报装饰随设备轻微倾斜；开启“减少动态效果”或低电量模式时会自动停用。
         NSBluetoothAlwaysUsageDescription: 用于连接 FutureCam 的实体快门与连续时间旋钮。
         NSPhotoLibraryUsageDescription: 用于导入一张照片体验时间相机。
@@ -51,6 +56,9 @@ targets:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         NSSupportsLiveActivities: true
+        UIAppFonts:
+          - CaveatBrush-Regular.ttf
+          - LXGWMarkerGothic-Regular.ttf
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         # Build-setting expanded. Debug defaults to local backend; Release stays empty = Mock.
@@ -61,7 +69,7 @@ targets:
           # Debug relay runs on the developer Mac over private LAN HTTP.
           # Production must replace this with HTTPS before distribution.
           NSExceptionDomains:
-            192.168.31.62:
+            10.220.32.125:
               NSExceptionAllowsInsecureHTTPLoads: true
               NSIncludesSubdomains: false
     settings:
@@ -76,7 +84,7 @@ targets:
         Debug:
           # Current developer Mac relay. This works on both the simulator and
           # the paired iPhone; change it when the Mac's LAN address changes.
-          FUMIRA_API_BASE_URL: "http://192.168.31.62:8787"
+          FUMIRA_API_BASE_URL: "http://10.220.32.125:8787"
         Release:
           FUMIRA_API_BASE_URL: ""
     dependencies:
@@ -97,6 +105,7 @@ targets:
         CFBundleDisplayName: FUMIRA Camera
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        NSSupportsLiveActivities: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fumira.timecamera.liveactivity

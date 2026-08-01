@@ -25,9 +25,10 @@ Raw hex values live only in `PosterPalette`. Features must use semantic tokens.
 | `sky` | `#7BC8EB` | 天空青蓝 — Connection 基准、相机叠层、时间强调 |
 | `skySoft` | `#B8E0F5` | 天空近地 / 底部渐变 |
 | `skyDeep` | `#3D8BB5` | 深青蓝 — 叠层、理解页大色块 |
-| `actionBlue` | `#1E9CE0` | 哆啦 A 梦蓝 — 主按钮、进度、时间选中态 |
-| `actionBlueDeep` | `#1269A8` | 按压暗面、描边与高对比蓝色文字 |
-| `actionBlueShadow` | `#075999` | 时间光圈暗面、光学阴影与外描边 |
+| `actionBlue` | `#0099FF` | 主题蓝 — 主按钮、进度、时间选中态 |
+| `cameraChromeBlue` | `#0096FA` | 取景器实体圆钮 — 白色符号对比度 3.11:1 |
+| `actionBlueDeep` | `#0074C2` | 按压暗面、描边与高对比蓝色文字 |
+| `actionBlueShadow` | `#005C99` | 时间光圈暗面、光学阴影与外描边 |
 | `toyRed` | `#E82A34` | 首屏镜头与入口按钮的小面积红色点睛 |
 | `bellYellow` | `#FFD33A` | 首屏状态点与镜头标记的小面积黄色点睛 |
 | `grassLight` | `#8FCB7E` | 草地浅绿 — 分层地形近层 |
@@ -90,8 +91,12 @@ Used by `TemporalParkScene` interpolation — do not hardcode in Features.
 - Drag maps rail X linearly to `TimePosition.normalized` (−1…1). Day/year mapping
   stays nonlinear via `TimePosition` (finer near NOW). Never snaps to historic
   five-point landmarks while dragging.
-- On release (and VoiceOver adjust), snaps to browse granularity: day → week →
-  month → year by distance from NOW — not to landmark anchors.
+- Horizontal drag stays continuous and bounded. Pulling vertically changes the
+  same rail's active precision: year → month → day → hour; pulling down returns
+  to coarser precision. The date badge changes format with the active precision,
+  without adding a separate mode label or settings control.
+- On release (and VoiceOver adjust), snaps to the active precision — never to
+  landmark anchors.
 - Touch target ≥ 44pt; VoiceOver exposes target date / year and adjustable actions.
 - `TimeRail` remains a thin compatibility wrapper → `WaveTimeRail`.
 
@@ -163,6 +168,18 @@ from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
 - The wave-shutter stays visually centered in the exposed blue camera body for
   every card height. Ratio feedback appears briefly inside the card near its
   lower edge; there is no persistent instruction paragraph.
+- The center focus treatment is driven by Vision attention saliency plus
+  sequence tracking. It follows one compact subject-core rectangle and holds the
+  last lock during brief misses. Vision samples at about 12Hz; geometry delivery
+  is throttled and the existing reticle interpolates to the next lock, so it
+  moves rather than repeatedly fading in. Small motion is conservative, while a
+  real subject move catches up promptly; there is no manual tap focus or shader
+  field.
+- LiDAR is not part of the live-focus path. Depth output does not identify
+  semantic subjects and requires an additional synchronized capture stream on
+  supported hardware, so it would add heat and session cost without improving
+  the MVP's 2D subject lock. The existing post-capture foreground analysis
+  remains the optional depth-like visual input.
 
 ### Chrome screens（权限 / 生成 / 理解 / 故事 / 结果 / 设置 / 失败）
 
@@ -171,6 +188,22 @@ from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
   remains part of landscape illustration only and is not an action color.
 - Generation, generated-image understanding, story writing, and result all use
   a white page stage so the sealed/revealed photo remains the visual hero.
+- The developing stage is intentionally quiet: it never displays a percentage,
+  progress bar, queue state, or bottom console. It keeps a pure-white canvas,
+  a platform-native exit control, and a quiet target-time status label—no
+  tinted pill or backdrop gradient asks the person to watch the work.
+- During understanding, story writing, and generation, the captured print can
+  be held vertically or turned horizontally. Its reverse is a paper-white
+  reflection card with one time-specific question. Future uses a concise guess,
+  the past uses three selectable time-imprint stamps, and NOW accepts one short
+  written note. Every response is local and present-tense only; it must not
+  claim to rewrite a generation request that has already been sent. The front
+  stays visually clean: the horizontal turn itself is the affordance.
+- The photo exterior is the hero, the reverse question is the interaction, and
+  the existing off-photo drag remains a temporal-slice exploration. Do not add
+  a carousel, stepper, or several competing waiting activities.
+- The developing print uses the available vertical center beneath the floating
+  top chrome. It has no scanning line or looping analysis ornament.
 - Narrative / status cards on white use `canvas` fill + `line` stroke.
 - Share poster **caption block** may use local `paper` for mild paper feel;
   the page chrome around it stays white.

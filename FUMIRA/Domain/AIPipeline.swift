@@ -709,13 +709,14 @@ struct TemporalStory: Identifiable, Hashable, Codable, Sendable {
     }
 
     /// The beat to use for image generation. Uses `targetBeat` only when its
-    /// exact target identity matches the requested time (within 0.5 days).
+    /// exact target identity matches the requested time (within round-trip
+    /// floating-point tolerance).
     /// This prevents a locked 100-day target beat from being used for a
     /// 250-day generation, or a 25-year target for a 25.6-year request.
     func generationBeat(for time: TimePosition) -> StoryBeat? {
         if let targetBeat,
            let exact = targetBeat.exactTarget,
-           abs(exact.offsetDays - time.offsetDays) < 0.5 {
+           time.hasSameExactTimeIdentity(asOffsetDays: exact.offsetDays) {
             return targetBeat
         }
         return beats.min {

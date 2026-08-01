@@ -41,7 +41,8 @@ actor RemoteStoryProvider: StoryProvider {
         urlRequest.httpBody = try JSONEncoder().encode(TargetBeatRequest(
             understanding: SceneUnderstandingRelayDTO(understanding),
             storyContext: StoryContextMinimalRelayDTO(story),
-            target: TargetTimeRelayDTO(target)
+            target: TargetTimeRelayDTO(target),
+            requestId: UUID().uuidString
         ))
 
         let (data, response) = try await session.data(for: urlRequest)
@@ -275,6 +276,7 @@ private struct TargetBeatRequest: Encodable {
     let understanding: SceneUnderstandingRelayDTO
     let storyContext: StoryContextMinimalRelayDTO
     let target: TargetTimeRelayDTO
+    let requestId: String
 }
 
 private struct StoryContextMinimalRelayDTO: Encodable {

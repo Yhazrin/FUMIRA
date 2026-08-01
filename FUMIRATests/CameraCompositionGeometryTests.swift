@@ -149,6 +149,12 @@ final class CameraCompositionGeometryTests: XCTestCase {
                 in: size
             ).cropFrame
         )
+        let square = try XCTUnwrap(
+            CameraCompositionGeometry.layout(
+                aspectRatio: .square,
+                in: size
+            ).cropFrame
+        )
         let fullPlacement = CameraCompositionGeometry.controlPlacement(
             below: fullScreen,
             in: size,
@@ -164,17 +170,47 @@ final class CameraCompositionGeometryTests: XCTestCase {
             in: size,
             bottomSafeAreaInset: bottomSafeArea
         )
+        let squarePlacement = CameraCompositionGeometry.controlPlacement(
+            below: square,
+            in: size,
+            bottomSafeAreaInset: bottomSafeArea
+        )
 
         XCTAssertTrue(fullPlacement.overlaysPreview)
-        XCTAssertTrue(widescreenPlacement.overlaysPreview)
+        // Portrait 16:9 still exposes a usable blue deck — center there, do
+        // not float over the preview the way full screen must.
+        XCTAssertFalse(widescreenPlacement.overlaysPreview)
         XCTAssertFalse(classicPlacement.overlaysPreview)
+        XCTAssertFalse(squarePlacement.overlaysPreview)
         XCTAssertLessThan(fullPlacement.centerY, fullScreen.maxY)
+        XCTAssertGreaterThan(widescreenPlacement.centerY, widescreen.maxY)
+        // Deeper blue decks lift the optical center; shallow 16:9 sits lower.
+        XCTAssertLessThan(squarePlacement.centerY, classicPlacement.centerY)
+        XCTAssertLessThan(classicPlacement.centerY, widescreenPlacement.centerY)
+
+        let opticalBias =
+            CameraChromeMetrics.waveRailHeight * 0.5
+            - CameraChromeMetrics.waveRailStageHeight * 0.58
+        let expectedWidescreenCenter = min(
+            max(
+                (widescreen.maxY + size.height) * 0.5 + opticalBias,
+                widescreen.maxY + CameraChromeMetrics.waveRailHeight * 0.5
+            ),
+            size.height - CameraChromeMetrics.waveRailHeight * 0.5
+        )
         XCTAssertEqual(
-            fullPlacement.centerY,
             widescreenPlacement.centerY,
+            expectedWidescreenCenter,
             accuracy: 0.001
         )
-        XCTAssertLessThan(classicPlacement.centerY, fullPlacement.centerY)
+
+        let expectedClassicCenter =
+            (classic.maxY + size.height) * 0.5 + opticalBias
+        XCTAssertEqual(
+            classicPlacement.centerY,
+            expectedClassicCenter,
+            accuracy: 0.001
+        )
     }
 
     func testLandscapeRatiosFollowPhysicalOrientation() throws {

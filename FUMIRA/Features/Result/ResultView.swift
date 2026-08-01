@@ -6,21 +6,98 @@ struct ResultView: View {
     var namespace: Namespace.ID
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// One continuous source of truth for the sheet. The old split between a
-    /// detent and `@GestureState` could briefly resolve to two offsets when a
-    /// drag ended, which made the sheet flash rather than follow the finger.
-    @State private var panelProgress: CGFloat = 0
-    @State private var panelDragOrigin: CGFloat?
-    @State private var revealBaselineYaw: Double?
+    @State private var isTiltTimeActive = false
+    @State private var tiltBaselineRoll: Double?
+    @State private var tiltLastSampleTime: TimeInterval?
+    @State private var tiltLastHapticYears: Double?
+    @State private var tiltStructureTime: TimePosition?
+    @State private var selectedFutureForkIndex = 0
+    @State private var futureForkShakeFeedbackTrigger: Int?
+    @State private var showsInterpretationEvidence = false
 
     private var generatedTime: TimePosition {
         model.generatedFrame?.time ?? model.generationTargetTime
     }
 
+    private var isBrowseTimeGenerated: Bool {
+        ResultBrowseFrameIdentity.isGenerated(
+            browsedTime: structureTime,
+            generatedTime: generatedTime
+        )
+    }
+
+    /// High-frequency device tilt may move the rail continuously, but it must
+    /// not rebuild the rest of the page thirty times per second. Text, actions,
+    /// and future branches commit once when tilt browsing stops.
+    private var structureTime: TimePosition {
+        tiltStructureTime ?? model.selectedTime
+    }
+
+    private var resultTitle: String {
+        generatedTime == .now ? "此刻的回信" : "\(generatedTime.compactLabel)的回信"
+    }
+
+    private var frameProvenanceText: String {
+        if isBrowseTimeGenerated {
+            if let forkTitle = model.generatedFrame?.futureForkTitle {
+                return "已生成 · \(generatedTime.compactLabel) · \(forkTitle)"
+            }
+            return "已生成 · \(generatedTime.compactLabel)"
+        }
+        return "浏览 \(structureTime.compactLabel) · 当前照片 \(generatedTime.compactLabel)"
+    }
+
     private var generatedImage: UIImage? {
         model.decodedGeneratedImage
             ?? model.generatedFrame?.imageData.flatMap(UIImage.init(data:))
+    }
+
+    private var blowGust: CGFloat {
+        #if DEBUG
+        if let rawValue = ProcessInfo.processInfo.environment["FUMIRA_AUDIT_BLOW_GUST"],
+           let value = Double(rawValue) {
+            return FUMIRASpatialMotion.clamp(CGFloat(value))
+        }
+        #endif
+        return CGFloat(model.blowReveal.snapshot.gust)
+    }
+
+    private var futureForkResult: TemporalFutureForkResult {
+        TemporalFutureForkEngine.resolve(
+            understanding: model.sceneUnderstanding,
+            target: generatedTime
+        )
+    }
+
+    private var futureForkBranches: [TemporalFutureForkBranch] {
+        futureForkResult.branches
+    }
+
+    private var canOfferFutureForks: Bool {
+        generatedTime.offsetDays > 0
+            && isBrowseTimeGenerated
+            && futureForkBranches.count >= 2
+    }
+
+    /// Read-only context for the current browse position. The witness layer
+    /// explains the selected time without becoming another time control or
+    /// changing which frame was generated.
+    private var interpretationTrace: TemporalInterpretationTrace {
+        TemporalInterpretationTrace.resolve(
+            story: model.temporalStory,
+            understanding: model.sceneUnderstanding,
+            at: structureTime
+        )
+    }
+
+    private var displayedNarrative: String {
+        guard let narrative = model.temporalStory?.narrative(for: structureTime) else {
+            return "同一处现实，抵达另一个时间。"
+        }
+        return StoryCopyPolicy.removingRepeatedTimePrefix(
+            from: narrative,
+            time: structureTime
+        )
     }
 
     /// The generated result owns its own geometry. Never force it back into the
@@ -39,20 +116,20 @@ struct ResultView: View {
     }
 
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                accessibleResult
-            } else {
-                immersiveResult
+        resultPage
+        .background(Color.clear)
+        .overlay(alignment: .topLeading) {
+            if model.temporalShake.isMonitoring,
+               let service = model.temporalShakeResponderService {
+                TemporalShakeResponderBridge(service: service)
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
-        .background(Color.clear)
         .onAppear {
-            revealBaselineYaw = model.captureMotion.yaw
+            alignFutureForkSelection()
             #if DEBUG
-            if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_RESULT_PANEL"] == "photo" {
-                panelProgress = 1
-            }
             if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_RESULT_REVEAL"] == "1" {
                 model.completeResultReveal()
             }
@@ -64,325 +141,151 @@ struct ResultView: View {
             }
             if ProcessInfo.processInfo.environment["FUMIRA_AUDIT_REALITY_ALIGNMENT"] == "1" {
                 model.completeResultReveal()
-                model.isRealityAlignmentPresented = true
+                presentRealityComparison(animated: false)
             }
             #endif
+            if model.resultRevealProgress < 0.999 {
+                model.blowReveal.activate()
+            }
         }
-        .onChange(of: model.captureMotion.yaw) { _, yaw in
-            updateRevealFromDeviceYaw(yaw)
+        .onChange(of: model.blowReveal.snapshot) { _, snapshot in
+            model.updateResultRevealProgress(CGFloat(snapshot.revealProgress))
+        }
+        .onChange(of: model.captureMotion.roll) { _, roll in
+            advanceTiltTime(using: roll)
+        }
+        .onChange(of: model.temporalShake.latestEvent) { previous, event in
+            guard event != nil, event != previous else { return }
+            advanceFutureForkFromShake()
+        }
+        .onChange(of: model.isRealityAlignmentPresented) { _, isPresented in
+            if isPresented {
+                stopTiltTime()
+            }
+        }
+        .onChange(of: reduceMotion) { _, isEnabled in
+            if isEnabled {
+                stopTiltTime()
+            }
+        }
+        .onDisappear {
+            stopTiltTime()
+            model.blowReveal.deactivate()
+            model.temporalShake.deactivate()
         }
     }
 
-    private var immersiveResult: some View {
-        GeometryReader { proxy in
-            let layout = ResultLayoutGeometry.layout(
-                in: proxy.size,
-                safeAreaTop: proxy.safeAreaInsets.top,
-                safeAreaBottom: proxy.safeAreaInsets.bottom,
-                aspectRatio: photoAspectRatio
-            )
-            let panelOffset = currentPanelOffset(maximum: layout.maximumPanelPull)
-            let revealProgress = layout.maximumPanelPull > 0
-                ? panelOffset / layout.maximumPanelPull
-                : 0
-            let photoFrame = CGRect(
-                x: (layout.viewportWidth - layout.photoSize.width) / 2,
-                y: layout.photoTop,
-                width: layout.photoSize.width,
-                height: layout.photoSize.height
-            )
-
-            ZStack(alignment: .top) {
-                // The generated photo remains mounted in RootView from the
-                // capture pipeline. This page publishes its destination frame
-                // rather than rebuilding a second image card above it.
-                Color.clear
-
-                resultHeader(width: layout.viewportWidth, revealProgress: revealProgress)
-                    .zIndex(1)
-
-                HeroPhotoSlot(
-                    owner: .result,
-                    aspectRatio: photoAspectRatio,
-                    cornerRadius: PosterRadius.card,
-                    fixedFrame: photoFrame
+    private var resultPage: some View {
+        PosterScreenContainer(background: .clear) {
+            VStack(alignment: .leading, spacing: PosterSpacing.lg) {
+                ResultPageHeading(
+                    title: resultTitle,
+                    interpretation: "一种可能的时间解释"
                 )
-                    .zIndex(0)
+
+                ZStack {
+                    HeroPhotoSlot(
+                        owner: .result,
+                        aspectRatio: photoAspectRatio,
+                        maximumHeight: ResultLayoutGeometry.accessiblePhotoMaximumHeight,
+                        cornerRadius: PosterRadius.photoPaper
+                    )
+
+                    TemporalBlowRevealSurface(
+                        original: model.decodedCapturedImage,
+                        progress: model.resultRevealProgress,
+                        gust: blowGust,
+                        reduceMotion: reduceMotion,
+                        targetLabel: generatedTime.compactLabel,
+                        handwrittenTitle: model.temporalStory?.title
+                            ?? "风把时间吹开"
+                    )
+
+                    if model.isRealityAlignmentPresented {
+                        RealityComparisonSurface(
+                            original: model.decodedCapturedImage,
+                            generated: generatedImage,
+                            target: generatedTime,
+                            close: dismissRealityComparison
+                        )
+                        .transition(.opacity)
+                    }
+                }
 
                 if model.resultRevealProgress < 0.999 {
-                    TimeDoorPrompt(
+                    BlowRevealPrompt(
                         target: generatedTime,
                         progress: model.resultRevealProgress
                     ) {
-                        withAnimation(
-                            reduceMotion
-                                ? .linear(duration: PosterMotion.reduced)
-                                : PosterMotion.timeReveal
-                        ) {
-                            model.completeResultReveal()
-                        }
+                        completeBlowReveal()
                     }
-                    .frame(width: photoFrame.width, height: photoFrame.height)
-                    .position(x: photoFrame.midX, y: photoFrame.midY)
-                    // The draggable result sheet is inserted later in this
-                    // ZStack. Keep the time door above it for both rendering
-                    // and hit testing; equal z-indices let the sheet's clear
-                    // region steal the fallback button tap.
-                    .zIndex(3)
+                } else {
+                    resultActionDock
                 }
 
-                if model.isRealityAlignmentPresented {
-                    RealityAlignmentOverlay(
-                        model: model,
-                        generated: generatedImage,
-                        target: generatedTime
-                    ) {
-                        withAnimation(PosterMotion.interaction) {
-                            model.isRealityAlignmentPresented = false
-                        }
-                    }
-                    .frame(
-                        width: layout.viewportWidth,
-                        height: proxy.size.height
-                    )
-                    .zIndex(4)
+                narrativeSection
+
+                TimeRail(
+                    value: model.selectedTime.normalized,
+                    isExternalValueDirectDriven: isTiltTimeActive,
+                    onDetent: model.playTimeDetent
+                ) { normalized in
+                    stopTiltTime()
+                    model.updateTime(normalized: normalized)
                 }
 
-                bottomChrome(
-                    width: layout.viewportWidth,
-                    height: layout.panelHeight,
-                    safeAreaBottom: layout.safeAreaBottom,
-                    maximumPull: layout.maximumPanelPull
-                )
-                .offset(y: layout.panelTop + panelOffset)
-                .zIndex(2)
-            }
-            .frame(width: layout.viewportWidth, height: proxy.size.height)
-            .clipped()
-        }
-    }
-
-    private var accessibleResult: some View {
-        ZStack {
-            PosterScreenContainer(background: .clear) {
-                VStack(alignment: .leading, spacing: PosterSpacing.lg) {
-                    Text("时间的回信")
-                        .font(PosterTypography.screenTitle)
-                        .foregroundStyle(PosterPalette.ink)
-                        .accessibilityAddTraits(.isHeader)
-
-                    ZStack {
-                        HeroPhotoSlot(
-                            owner: .result,
-                            aspectRatio: photoAspectRatio,
-                            maximumHeight: ResultLayoutGeometry.accessiblePhotoMaximumHeight,
-                            cornerRadius: PosterRadius.card
-                        )
-
-                        if model.resultRevealProgress < 0.999 {
-                            TimeDoorPrompt(
-                                target: generatedTime,
-                                progress: model.resultRevealProgress
-                            ) {
-                                withAnimation(
-                                    reduceMotion
-                                        ? .linear(duration: PosterMotion.reduced)
-                                        : PosterMotion.timeReveal
-                                ) {
-                                    model.completeResultReveal()
-                                }
-                            }
-                        }
-                    }
-
-                    narrativeSection
-
-                    TimeRail(
-                        value: model.selectedTime.normalized,
-                        onDetent: model.playTimeDetent
-                    ) { normalized in
-                        model.updateTime(normalized: normalized)
-                    }
-
-                    accessibleActions
+                if canOfferFutureForks {
+                    futureForkSection
                 }
-            }
-
-            if model.isRealityAlignmentPresented {
-                RealityAlignmentOverlay(
-                    model: model,
-                    generated: generatedImage,
-                    target: generatedTime
-                ) {
-                    withAnimation(PosterMotion.interaction) {
-                        model.isRealityAlignmentPresented = false
-                    }
-                }
-                .zIndex(4)
-            }
-        }
-    }
-
-    private var accessibleActions: some View {
-        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-            saveButton
-
-            if model.resultRevealProgress >= 0.999 {
-                quietAction(
-                    title: "对准现实",
-                    systemImage: "viewfinder"
-                ) {
-                    withAnimation(PosterMotion.interaction) {
-                        model.isRealityAlignmentPresented = true
-                    }
-                }
-            }
-
-            moreActionsMenu
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func resultHeader(width: CGFloat, revealProgress: CGFloat) -> some View {
-        VStack(alignment: .leading) {
-            Text("时间的回信")
-                .font(PosterTypography.sectionTitle)
-                .foregroundStyle(PosterPalette.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(
-            width: max(width - PosterSpacing.md * 2 - 60, 1),
-            alignment: .leading
-        )
-        .padding(.horizontal, PosterSpacing.md)
-        .padding(.top, PosterSpacing.xs)
-        .frame(width: width, alignment: .leading)
-        .offset(y: -4 * revealProgress)
-        .opacity(1 - 0.28 * revealProgress)
-    }
-
-    private func bottomChrome(
-        width: CGFloat,
-        height: CGFloat,
-        safeAreaBottom: CGFloat,
-        maximumPull: CGFloat
-    ) -> some View {
-        let contentWidth = ResultLayoutGeometry.contentWidth(in: width)
-
-        return VStack(spacing: 0) {
-            panelHandle(maximumPull: maximumPull)
-
-            // Keep the decision to keep the poster immediately reachable.
-            // Narrative and time browsing can scroll below it; the principal
-            // action must not be buried beneath a second gesture surface.
-            resultActionShelf(width: contentWidth)
-                .padding(.horizontal, PosterSpacing.md)
-                .padding(.bottom, PosterSpacing.sm)
-
-            ScrollView(.vertical) {
-                VStack(spacing: PosterSpacing.md) {
-                    narrativeSection
-                        .frame(width: contentWidth)
-
-                    Divider()
-                        .frame(width: contentWidth)
-
-                    TimeRail(
-                        value: model.selectedTime.normalized,
-                        onDetent: model.playTimeDetent
-                    ) { normalized in
-                        model.updateTime(normalized: normalized)
-                    }
-                    .frame(width: contentWidth)
-                }
-                .padding(.bottom, max(safeAreaBottom, PosterSpacing.lg))
-            }
-            .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
-        }
-        .frame(width: width, height: height, alignment: .top)
-        .background {
-            UnevenRoundedRectangle(
-                topLeadingRadius: PosterRadius.card,
-                topTrailingRadius: PosterRadius.card
-            )
-            .fill(PosterPalette.canvas)
-            .overlay {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: PosterRadius.card,
-                    topTrailingRadius: PosterRadius.card
-                )
-            .stroke(PosterEffects.cardStroke, lineWidth: 1)
-            }
-            .shadow(color: PosterEffects.cardShadow, radius: 10, y: -2)
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .background(alignment: .bottom) {
-            PosterPalette.canvas
-                .frame(width: width, height: maximumPull + safeAreaBottom + 4)
-                .offset(y: maximumPull)
-                .ignoresSafeArea(edges: .bottom)
-        }
-    }
-
-    private func panelHandle(maximumPull: CGFloat) -> some View {
-        VStack(spacing: PosterSpacing.xs) {
-            Capsule()
-                .fill(PosterPalette.actionBlue.opacity(0.35))
-                .frame(width: 42, height: 5)
-
-            Image(systemName: panelProgress < 0.5 ? "chevron.down" : "chevron.up")
-                .font(PosterTypography.caption)
-                .foregroundStyle(PosterPalette.actionBlueDeep)
-        }
-        .frame(maxWidth: .infinity, minHeight: 56)
-        .contentShape(Rectangle())
-        .gesture(panelDragGesture(maximumPull: maximumPull))
-        .onTapGesture {
-            setPanelProgress(panelProgress < 0.5 ? 1 : 0)
-        }
-        .accessibilityElement()
-        .accessibilityIdentifier("result.panel-handle")
-        .accessibilityLabel(panelProgress < 0.5 ? "展开照片" : "恢复操作面板")
-        .accessibilityValue(panelProgress < 0.5 ? "操作" : "照片")
-        .accessibilityHint("上下拖动或轻点切换照片与操作区域")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction {
-            setPanelProgress(panelProgress < 0.5 ? 1 : 0)
-        }
-    }
-
-    private func resultActionShelf(width: CGFloat) -> some View {
-        VStack(spacing: PosterSpacing.sm) {
-            // Leaving with the poster is the one primary result action. Every
-            // other operation is contextual or destructive, so it should not
-            // visually compete with saving.
-            saveButton
-
-            HStack(spacing: PosterSpacing.md) {
-                if model.resultRevealProgress >= 0.999 {
-                    quietAction(
-                        title: "对准现实",
-                        systemImage: "viewfinder"
-                    ) {
-                        withAnimation(PosterMotion.interaction) {
-                            model.isRealityAlignmentPresented = true
-                        }
-                    }
-                }
-
-                moreActionsMenu
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: width)
+    }
+
+    private var resultActionDock: some View {
+        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+            if !isBrowseTimeGenerated {
+                generateBrowsedFrameButton
+            }
+
+            saveButton
+
+            HStack(spacing: PosterSpacing.sm) {
+                Spacer(minLength: PosterSpacing.sm)
+
+                compactAction(
+                    title: "对准现实",
+                    systemImage: "viewfinder"
+                ) {
+                    presentRealityComparison()
+                }
+                .opacity(canPresentRealityComparison ? 1 : 0)
+                .allowsHitTesting(canPresentRealityComparison)
+                .accessibilityHidden(!canPresentRealityComparison)
+
+                compactTiltTimeAction
+                    .opacity(canOfferTiltTime ? 1 : 0)
+                    .allowsHitTesting(canOfferTiltTime)
+                    .accessibilityHidden(!canOfferTiltTime)
+
+                compactMoreActionsMenu
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("result.action-dock")
+    }
+
+    private var canPresentRealityComparison: Bool {
+        model.resultRevealProgress >= 0.999
+            && !model.isRealityAlignmentPresented
     }
 
     private var saveButton: some View {
-        PosterCapsuleButton(
+        TemporalSaveCapsule(
             title: "保存海报",
-            accessibilityHint: "打开海报预览，可保存到相册或系统分享"
+            revealProgress: model.resultRevealProgress,
+            reduceMotion: reduceMotion
         ) {
             model.openShare()
         }
@@ -392,30 +295,62 @@ struct ResultView: View {
         )
     }
 
-    private func quietAction(
+    private func compactAction(
         title: String,
         systemImage: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(PosterTypography.label)
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
                 .foregroundStyle(PosterPalette.actionBlueDeep)
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+                .frame(
+                    width: PosterControlMetric.compactDiameter,
+                    height: PosterControlMetric.compactDiameter
+                )
+                .contentShape(Circle())
         }
         .buttonStyle(PosterPressStyle())
         .accessibilityLabel(title)
     }
 
-    private var moreActionsMenu: some View {
-        Menu {
-            Button {
-                Task { await model.generateAtStoryPreviewTime() }
-            } label: {
-                Label("生成这一帧", systemImage: "clock.arrow.circlepath")
-            }
+    private var compactTiltTimeAction: some View {
+        Button(action: toggleTiltTime) {
+            Image(systemName: isTiltTimeActive ? "pause.circle" : "gyroscope")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(
+                    isTiltTimeActive
+                        ? PosterPalette.paperWhite
+                        : PosterPalette.actionBlueDeep
+                )
+                .frame(
+                    width: PosterControlMetric.compactDiameter,
+                    height: PosterControlMetric.compactDiameter
+                )
+                .background(
+                    isTiltTimeActive
+                        ? PosterPalette.actionBlueDeep
+                        : Color.clear,
+                    in: Circle()
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(PosterPressStyle())
+        .disabled(model.isPreparingBrowsedTimeGeneration)
+        .posterSensoryFeedback(trigger: isTiltTimeActive, .selection)
+        .accessibilityIdentifier("result.tilt-time")
+        .accessibilityLabel(isTiltTimeActive ? "停止倾斜穿越" : "开启倾斜穿越")
+        .accessibilityValue(isTiltTimeActive ? "已开启" : "已关闭")
+        .accessibilityHint(
+            isTiltTimeActive
+                ? "停止使用设备倾斜浏览时间"
+                : "开启后，向左倾斜浏览过去，向右倾斜浏览未来，回正时停止"
+        )
+        .accessibilityAddTraits(isTiltTimeActive ? .isSelected : [])
+    }
 
+    private var compactMoreActionsMenu: some View {
+        Menu {
             Button {
                 Task { await model.regenerateResult() }
             } label: {
@@ -430,6 +365,12 @@ struct ResultView: View {
                 }
             }
 
+            Button {
+                model.openSettings()
+            } label: {
+                Label("设置", systemImage: "gearshape")
+            }
+
             Divider()
 
             Button(role: .destructive) {
@@ -438,184 +379,385 @@ struct ResultView: View {
                 Label("重拍", systemImage: "camera.rotate")
             }
         } label: {
-            Label("更多", systemImage: "ellipsis.circle")
-                .font(PosterTypography.label)
-                .foregroundStyle(PosterPalette.ink.opacity(0.66))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(PosterPalette.mutedInk)
+                .frame(
+                    width: PosterControlMetric.compactDiameter,
+                    height: PosterControlMetric.compactDiameter
+                )
+                .contentShape(Circle())
         }
         .buttonStyle(PosterPressStyle())
         .accessibilityIdentifier("result.more-actions")
-        .accessibilityHint("生成、重新生成和重拍")
+        .accessibilityLabel("更多")
+        .accessibilityHint("重新生成、撤销、设置和重拍")
+    }
+
+    private var generateBrowsedFrameButton: some View {
+        PosterCapsuleButton(
+            title: model.isPreparingBrowsedTimeGeneration ? "正在对齐这一帧…" : "生成这一帧",
+            accessibilityHint: "使用当前浏览的 \(model.selectedTime.compactLabel) 重新生成照片"
+        ) {
+            stopTiltTime()
+            Task { await model.generateAtStoryPreviewTime() }
+        }
+        .disabled(model.isPreparingBrowsedTimeGeneration)
+        .accessibilityIdentifier("result.generate-browsed-frame")
     }
 
     private var narrativeSection: some View {
-        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-            Text(model.temporalStory?.title ?? "这一刻的时间故事")
-                .font(PosterTypography.cardTitle)
-                .foregroundStyle(PosterPalette.ink)
-                .lineLimit(2)
+        let trace = interpretationTrace
 
-            Text(model.currentNarrative)
-                .font(PosterTypography.body)
-                .foregroundStyle(PosterPalette.ink)
-                .lineLimit(3)
+        return VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+            Text(displayedNarrative)
+                .font(PosterTypography.supporting)
+                .foregroundStyle(PosterPalette.mutedInk)
+                .lineLimit(showsInterpretationEvidence ? nil : 1)
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
+
+            DisclosureGroup(isExpanded: $showsInterpretationEvidence) {
+                TemporalWitnessRibbon(trace: trace)
+                    .padding(.top, PosterSpacing.sm)
+            } label: {
+                Text("画面线索")
+                    .font(PosterTypography.label)
+                    .foregroundStyle(PosterPalette.mutedInk)
+                    .frame(minHeight: PosterControlMetric.minimumTouchTarget, alignment: .leading)
+            }
+            .tint(PosterPalette.mutedInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("result.temporal-interpretation")
+        .accessibilityValue(frameProvenanceText)
     }
 
-    private func currentPanelOffset(maximum: CGFloat) -> CGFloat {
-        min(max(panelProgress, 0), 1) * maximum
+    private var selectedFutureFork: TemporalFutureForkBranch? {
+        guard !futureForkBranches.isEmpty else { return nil }
+        let index = min(max(selectedFutureForkIndex, 0), futureForkBranches.count - 1)
+        return futureForkBranches[index]
     }
 
-    private func panelDragGesture(maximumPull: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 6)
-            .onChanged { value in
-                guard abs(value.translation.height) > abs(value.translation.width) else {
-                    return
-                }
-                if panelDragOrigin == nil {
-                    panelDragOrigin = panelProgress
-                }
-                let origin = panelDragOrigin ?? panelProgress
-                let progressDelta = value.translation.height / max(maximumPull, 1)
-                var transaction = Transaction()
-                transaction.animation = nil
-                withTransaction(transaction) {
-                    panelProgress = min(max(origin + progressDelta, 0), 1)
+    private var futureForkPresentationItems: [TemporalFutureForkView.PresentationItem] {
+        futureForkBranches.map { branch in
+            TemporalFutureForkView.PresentationItem(
+                id: branch.id,
+                title: branch.title,
+                rationale: branch.rationale,
+                evidence: branch.evidence
+                    .map(\.observedEvidence)
+                    .joined(separator: " · ")
+            )
+        }
+    }
+
+    private var futureForkSection: some View {
+        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+            TemporalFutureForkView(
+                items: futureForkPresentationItems,
+                selectedIndex: selectedFutureForkIndex,
+                reduceMotion: reduceMotion,
+                shakeFeedbackTrigger: futureForkShakeFeedbackTrigger
+            ) { index in
+                selectedFutureForkIndex = index
+                futureForkShakeFeedbackTrigger = nil
+                model.playFutureForkDetent()
+            }
+
+            if let selectedFutureFork {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: PosterSpacing.md) {
+                        futureForkAdvanceAction
+
+                        Spacer(minLength: PosterSpacing.sm)
+
+                        futureForkGenerateAction(selectedFutureFork)
+                    }
+
+                    VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+                        futureForkGenerateAction(selectedFutureFork)
+                        futureForkAdvanceAction
+                    }
                 }
             }
-            .onEnded { value in
-                guard abs(value.translation.height) > abs(value.translation.width) else {
-                    panelDragOrigin = nil
-                    return
-                }
-                let origin = panelDragOrigin ?? panelProgress
-                panelDragOrigin = nil
-                let predictedProgress = origin
-                    + value.predictedEndTranslation.height / max(maximumPull, 1)
-                setPanelProgress(predictedProgress >= 0.42 ? 1 : 0)
-            }
+        }
+        .accessibilityElement(children: .contain)
     }
 
-    private func setPanelProgress(_ progress: CGFloat) {
+    private var futureForkAdvanceAction: some View {
+        Button {
+            model.temporalShake.requestFallbackAdvance()
+        } label: {
+            Label(
+                "下一种",
+                systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
+            )
+            .font(PosterTypography.label)
+            .foregroundStyle(PosterPalette.mutedInk)
+            .frame(minHeight: PosterControlMetric.minimumTouchTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PosterPressStyle())
+        .accessibilityLabel("换一种可能")
+        .accessibilityIdentifier("result.future-fork.advance")
+    }
+
+    private func futureForkGenerateAction(
+        _ branch: TemporalFutureForkBranch
+    ) -> some View {
+        let isCurrent = model.generatedFrame?.futureForkID == branch.id
+
+        return Button {
+            Task {
+                await model.generateFutureFork(branch)
+            }
+        } label: {
+            Text(isCurrent ? "已经显影" : "显影这一可能")
+                .font(PosterTypography.label)
+                .foregroundStyle(
+                    isCurrent
+                        ? PosterPalette.mutedInk
+                        : PosterPalette.paperWhite
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .padding(.horizontal, PosterSpacing.md)
+                .frame(minHeight: PosterControlMetric.minimumTouchTarget)
+                .background(
+                    isCurrent
+                        ? PosterPalette.cardLight
+                        : PosterPalette.actionBlue,
+                    in: Capsule()
+                )
+                .overlay {
+                    if isCurrent {
+                        Capsule()
+                            .stroke(PosterPalette.line, lineWidth: 1)
+                    }
+                }
+        }
+        .buttonStyle(PosterPressStyle())
+        .disabled(isCurrent)
+        .accessibilityHint(
+            "保持 \(generatedTime.compactLabel) 不变，从原始照片生成所选未来分支"
+        )
+        .accessibilityIdentifier("result.future-fork.generate")
+    }
+
+    private func alignFutureForkSelection() {
+        guard !futureForkBranches.isEmpty else {
+            selectedFutureForkIndex = 0
+            futureForkShakeFeedbackTrigger = nil
+            return
+        }
+        if let currentID = model.generatedFrame?.futureForkID,
+           let index = futureForkBranches.firstIndex(where: { $0.id == currentID }) {
+            selectedFutureForkIndex = index
+        } else {
+            selectedFutureForkIndex = 0
+        }
+        futureForkShakeFeedbackTrigger = nil
+    }
+
+    private func advanceFutureForkFromShake() {
+        guard canOfferFutureForks, futureForkBranches.count > 1 else { return }
+        let current = min(max(selectedFutureForkIndex, 0), futureForkBranches.count - 1)
+        selectedFutureForkIndex = (current + 1) % futureForkBranches.count
+        futureForkShakeFeedbackTrigger = (futureForkShakeFeedbackTrigger ?? 0) + 1
+        model.playFutureForkDetent()
+    }
+
+    private func toggleTiltTime() {
+        if isTiltTimeActive {
+            stopTiltTime()
+            return
+        }
+
+        guard canOfferTiltTime else { return }
+
+        isTiltTimeActive = true
+        tiltStructureTime = model.selectedTime
+        // The first sensor sample after opt-in establishes a real baseline.
+        // Reusing the observable's initial zero can otherwise jump time on
+        // hardware whose current attitude has not been published yet.
+        tiltBaselineRoll = nil
+        tiltLastSampleTime = nil
+        tiltLastHapticYears = model.selectedTime.offsetYears
+    }
+
+    private func stopTiltTime() {
+        isTiltTimeActive = false
+        tiltStructureTime = nil
+        tiltBaselineRoll = nil
+        tiltLastSampleTime = nil
+        tiltLastHapticYears = nil
+    }
+
+    private func advanceTiltTime(using currentRoll: Double) {
+        guard
+            isTiltTimeActive,
+            canOfferTiltTime,
+            !model.isPreparingBrowsedTimeGeneration,
+            currentRoll.isFinite
+        else {
+            return
+        }
+
+        let now = ProcessInfo.processInfo.systemUptime
+        guard let baselineRoll = tiltBaselineRoll,
+              let lastSampleTime = tiltLastSampleTime else {
+            tiltBaselineRoll = currentRoll
+            tiltLastSampleTime = now
+            return
+        }
+        tiltLastSampleTime = now
+
+        let next = TiltTimeNavigator.standard.advance(
+            model.selectedTime,
+            rollRadians: signedAngularDelta(currentRoll, baselineRoll),
+            frameDelta: now - lastSampleTime
+        )
+        guard next != model.selectedTime else { return }
+
+        let previousYears = tiltLastHapticYears ?? model.selectedTime.offsetYears
+        model.updateTime(normalized: next.normalized)
+        if WaveTimeHapticCrossing.shouldTick(
+            previousYears: previousYears,
+            currentYears: next.offsetYears
+        ) {
+            model.playTimeDetent(
+                WaveTimeHapticCrossing.crossedNow(
+                    previousYears: previousYears,
+                    currentYears: next.offsetYears
+                ) ? .now : .decade
+            )
+        }
+        tiltLastHapticYears = next.offsetYears
+    }
+
+    private var canOfferTiltTime: Bool {
+        !reduceMotion
+            && model.resultRevealProgress >= 0.999
+            && model.captureMotion.isActive
+            && !model.isRealityAlignmentPresented
+    }
+
+    private func signedAngularDelta(_ current: Double, _ baseline: Double) -> Double {
+        var delta = current - baseline
+        while delta > .pi { delta -= .pi * 2 }
+        while delta < -.pi { delta += .pi * 2 }
+        return delta
+    }
+
+    /// Present original ↔ generated comparison in the same bounded hero frame.
+    private func presentRealityComparison(animated: Bool = true) {
+        let apply = {
+            model.isRealityAlignmentPresented = true
+        }
+        if animated {
+            withAnimation(
+                reduceMotion
+                    ? .linear(duration: PosterMotion.reduced)
+                    : PosterMotion.resultPanelSettle
+            ) {
+                apply()
+            }
+        } else {
+            apply()
+        }
+    }
+
+    private func dismissRealityComparison() {
         withAnimation(
             reduceMotion
                 ? .linear(duration: PosterMotion.reduced)
                 : PosterMotion.resultPanelSettle
         ) {
-            panelProgress = min(max(progress, 0), 1)
+            model.isRealityAlignmentPresented = false
         }
     }
 
-    private func updateRevealFromDeviceYaw(_ yaw: Double) {
-        guard !reduceMotion, model.resultRevealProgress < 1 else { return }
-        guard let baseline = revealBaselineYaw else {
-            revealBaselineYaw = yaw
-            return
+    private func completeBlowReveal() {
+        withAnimation(
+            reduceMotion
+                ? .linear(duration: PosterMotion.reduced)
+                : PosterMotion.timeReveal
+        ) {
+            model.completeResultReveal()
         }
-        model.updateResultRevealProgress(
-            Self.revealProgress(yaw: yaw, baseline: baseline)
-        )
     }
 
-    static func revealProgress(yaw: Double, baseline: Double) -> CGFloat {
-        let delta = normalizedAngle(yaw - baseline)
-        return CGFloat(min(abs(delta) / 0.23, 1))
-    }
+}
 
-    static func normalizedAngle(_ value: Double) -> Double {
-        var angle = value
-        while angle > .pi { angle -= .pi * 2 }
-        while angle < -.pi { angle += .pi * 2 }
-        return angle
+enum ResultBrowseFrameIdentity {
+    static func isGenerated(
+        browsedTime: TimePosition,
+        generatedTime: TimePosition
+    ) -> Bool {
+        browsedTime.hasSameExactTimeIdentity(asOffsetDays: generatedTime.offsetDays)
     }
 }
 
-private struct TimeDoorPrompt: View {
+private struct ResultPageHeading: View {
+    let title: String
+    let interpretation: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+            Text(interpretation)
+                .font(PosterTypography.caption)
+                .foregroundStyle(PosterPalette.mutedInk)
+
+            Text(title)
+                .font(PosterTypography.screenTitle)
+                .foregroundStyle(PosterPalette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct BlowRevealPrompt: View {
     let target: TimePosition
     let progress: CGFloat
     let complete: () -> Void
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         let clampedProgress = FUMIRASpatialMotion.clamp(progress)
-        let departure = reduceMotion
-            ? CGFloat.zero
-            : FUMIRASpatialMotion.timeDoorDepartureProgress(clampedProgress)
-        let fade = reduceMotion
-            ? clampedProgress
-            : FUMIRASpatialMotion.timeDoorFadeProgress(clampedProgress)
-        let edge = FUMIRASpatialMotion.spatialPulse(departure)
 
-        VStack {
-            Spacer(minLength: 0)
+        HStack(spacing: PosterSpacing.sm) {
+            Label("吹一口气", systemImage: "wind")
+                .font(PosterTypography.label)
+                .foregroundStyle(PosterPalette.actionBlueDeep)
 
-            VStack(spacing: PosterSpacing.sm) {
-                ZStack {
-                    Circle()
-                        .stroke(PosterPalette.paperWhite.opacity(0.22), lineWidth: 2)
-                    Circle()
-                        .trim(from: 0, to: min(max(progress, 0), 1))
-                        .stroke(
-                            PosterPalette.bellYellow,
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                    Image(systemName: "iphone.gen3.radiowaves.left.and.right")
-                        .font(PosterTypography.label)
-                        .foregroundStyle(PosterPalette.paperWhite)
-                }
-                .frame(width: 44, height: 44)
+            Spacer(minLength: PosterSpacing.xs)
 
-                Text("转动，打开\(target.compactLabel)")
-                    .font(PosterTypography.cardTitle)
-                    .foregroundStyle(PosterPalette.paperWhite)
-
-                Button(action: complete) {
-                    Text("直接打开")
-                        .font(PosterTypography.label)
-                        .foregroundStyle(PosterPalette.ink)
-                        .frame(minWidth: 132, minHeight: 44)
-                        .background(PosterPalette.bellYellow, in: Capsule())
-                }
-                .buttonStyle(PosterPressStyle())
-                .accessibilityIdentifier("result.reveal-now")
-                .accessibilityHint("不转动设备，直接显示生成的目标时间照片")
+            Button(action: complete) {
+                Text("直接显影")
+                    .font(PosterTypography.label)
+                    .foregroundStyle(PosterPalette.ink)
+                    .padding(.horizontal, PosterSpacing.md)
+                    .frame(minHeight: PosterControlMetric.minimumTouchTarget)
+                    .background(PosterPalette.bellYellow, in: Capsule())
             }
-            .padding(PosterSpacing.md)
-            .background(PosterPalette.cardDark)
-            .clipShape(RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                    .stroke(PosterPalette.paperWhite.opacity(0.18), lineWidth: 1)
-            }
-            .overlay(alignment: .trailing) {
-                Capsule()
-                    .fill(PosterEffects.timeDoorEdge)
-                    .frame(width: PosterSpacing.xs)
-                    .padding(.vertical, PosterSpacing.sm)
-                    .opacity(edge)
-            }
-            .rotation3DEffect(
-                .degrees(-PosterMotion.timeDoorMaximumFoldDegrees * Double(departure)),
-                axis: (x: 0, y: 1, z: 0),
-                anchor: .leading,
-                perspective: PosterMotion.spatialPerspective
-            )
-            .offset(
-                x: -PosterMotion.timeDoorHorizontalTravel * departure,
-                y: PosterMotion.timeDoorVerticalTravel * departure
-            )
-            .opacity(1 - fade)
-            .padding(PosterSpacing.md)
+            .buttonStyle(PosterPressStyle())
+            .accessibilityIdentifier("result.reveal-now")
+            .accessibilityHint("不使用麦克风，直接显示\(target.compactLabel)的照片")
         }
+        .padding(.leading, PosterSpacing.md)
+        .padding(.trailing, PosterSpacing.xs)
+        .padding(.vertical, PosterSpacing.xs)
+        .background(PosterPalette.paperWhite, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(PosterPalette.line, lineWidth: 1)
+        }
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("时间门尚未完全打开")
+        .accessibilityLabel("照片尚未完全显影")
         .accessibilityValue("\(Int(clampedProgress * 100))%")
         // This prompt lives inside a bounded photo frame. Keep it legible at
         // accessibility sizes without letting it cover the photo completely.
@@ -623,286 +765,207 @@ private struct TimeDoorPrompt: View {
     }
 }
 
-private struct RealityAlignmentOverlay: View {
-    let model: AppModel
+/// Inline original ↔ generated comparison on the hero photo frame.
+/// Presented by sliding the result panel down — never as a separate page.
+private struct RealityComparisonSurface: View {
+    let original: UIImage?
     let generated: UIImage?
     let target: TimePosition
     let close: () -> Void
 
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var position: CGFloat = 0.5
-    @State private var previewState: PreviewState = .loading
-    @State private var showsOriginalGhost = true
-    @State private var didLockAlignment = false
-
-    private var shutterAttitude: CaptureMotionSample? {
-        model.temporalCapturePacket?.motion.samples.last
-    }
-
-    private var alignmentProgress: CGFloat? {
-        guard let shutterAttitude else { return nil }
-        return RealityAlignmentGeometry.progress(
-            currentRoll: model.captureMotion.roll,
-            currentPitch: model.captureMotion.pitch,
-            currentYaw: model.captureMotion.yaw,
-            captured: shutterAttitude
-        )
-    }
+    @State private var showsGrid = true
+    @State private var comparisonMode = RealityComparisonMode.auditInitial
 
     var body: some View {
         GeometryReader { proxy in
             let boundary = proxy.size.width * min(max(position, 0), 1)
 
             ZStack(alignment: .topLeading) {
-                realitySurface
+                if comparisonMode == .split {
+                    splitComparison(
+                        size: proxy.size,
+                        boundary: boundary
+                    )
+                } else {
+                    TemporalBlinkComparator(
+                        originalImage: original,
+                        generatedImage: generated,
+                        targetTime: target
+                    )
                     .frame(width: proxy.size.width, height: proxy.size.height)
-                    .clipped()
-
-                if previewState == .live,
-                   showsOriginalGhost,
-                   let original = model.decodedCapturedImage {
-                    Image(uiImage: original)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
-                        .saturation(0)
-                        .contrast(1.7)
-                        .blendMode(.screen)
-                        .opacity(0.14)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
                 }
 
-                comparisonImage(generated)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .mask {
-                        HStack(spacing: 0) {
-                            Color.clear
-                                .frame(width: boundary)
-                            Rectangle()
-                                .fill(Color.white)
-                        }
+                comparisonChrome
+            }
+            // Both comparison modes replace pixels in one exact crop. Parent
+            // phase animations must never turn the switch into a crossfade.
+            .transaction { transaction in
+                transaction.disablesAnimations = true
+            }
+            .clipShape(
+                RoundedRectangle(cornerRadius: PosterRadius.photoPaper, style: .continuous)
+            )
+        }
+    }
+
+    private func splitComparison(
+        size: CGSize,
+        boundary: CGFloat
+    ) -> some View {
+        ZStack(alignment: .topLeading) {
+            comparisonImage(original)
+                .frame(width: size.width, height: size.height)
+                .clipped()
+
+            if showsGrid {
+                RealityComparisonGrid()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+
+            comparisonImage(generated)
+                .frame(width: size.width, height: size.height)
+                .mask {
+                    HStack(spacing: 0) {
+                        Color.clear
+                            .frame(width: boundary)
+                        Rectangle()
+                            .fill(Color.white)
                     }
-                    .allowsHitTesting(false)
-
-                boundaryHandle(at: boundary, height: proxy.size.height)
-                    .allowsHitTesting(false)
-
-                HStack {
-                    Text(previewState == .live ? "现实 · NOW" : "原片 · NOW")
-                    Spacer()
-                    Text(target.compactLabel)
                 }
-                .font(PosterTypography.caption)
-                .foregroundStyle(PosterPalette.paperWhite)
-                .padding(.horizontal, PosterSpacing.lg)
-                .padding(
-                    .top,
-                    PosterSpacing.xl + CameraChromeMetrics.topRowHeight
-                )
-                .safeAreaPadding(.top)
-                .shadow(color: PosterPalette.ink.opacity(0.65), radius: 4)
                 .allowsHitTesting(false)
-                .zIndex(4)
 
-                HStack(spacing: PosterSpacing.sm) {
-                    Button(action: close) {
-                        Image(systemName: "xmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PosterPalette.paperWhite)
-                            .frame(
-                                width: CameraChromeMetrics.controlDiameter,
-                                height: CameraChromeMetrics.controlDiameter
-                            )
-                            .background(PosterEffects.cameraChromeFill, in: Circle())
-                    }
-                    .buttonStyle(PosterPressStyle())
-                    .accessibilityLabel("关闭现实对照")
+            boundaryHandle(at: boundary, height: size.height)
+                .allowsHitTesting(false)
 
-                    Spacer(minLength: 0)
-
-                    if previewState == .live,
-                       model.decodedCapturedImage != nil {
-                        Button {
-                            showsOriginalGhost.toggle()
-                        } label: {
-                            Image(
-                                systemName: showsOriginalGhost
-                                    ? "square.dashed.inset.filled"
-                                    : "square.dashed"
-                            )
-                            .font(PosterTypography.label)
-                            .foregroundStyle(PosterPalette.paperWhite)
-                            .frame(
-                                width: CameraChromeMetrics.controlDiameter,
-                                height: CameraChromeMetrics.controlDiameter
-                            )
-                            .background(PosterEffects.cameraChromeFill, in: Circle())
-                        }
-                        .buttonStyle(PosterPressStyle())
-                        .accessibilityLabel(
-                            showsOriginalGhost ? "隐藏原机位轮廓" : "显示原机位轮廓"
-                        )
-                    }
-                }
-                .padding(.horizontal, PosterSpacing.md)
-                .padding(.top, PosterSpacing.sm)
-                .safeAreaPadding(.top)
-                .zIndex(5)
-
-                alignmentConsole
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.horizontal, PosterSpacing.md)
-                    .padding(.bottom, PosterSpacing.lg)
-                    .safeAreaPadding(.bottom)
-                    .zIndex(5)
-
-                Color.clear
-                    .contentShape(Rectangle())
-                    .gesture(boundaryGesture(width: proxy.size.width))
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityIdentifier("result.reality-boundary")
-                    .accessibilityLabel("现实与目标时间边界")
-                    .accessibilityValue("现实占 \(Int(position * 100))%")
-                    .accessibilityHint("左右拖动比较现实与目标时间；上下滑动可逐级调整")
-                    .accessibilityAdjustableAction(adjustBoundary)
-                    .zIndex(3)
-            }
-        }
-        .background(PosterPalette.ink)
-        .task(id: scenePhase) {
-            if scenePhase == .active {
-                previewState = .loading
-                let didStart = await model.startRealityAlignment()
-                guard !Task.isCancelled else { return }
-                previewState = didStart ? .live : .stillFallback
-            } else {
-                await model.stopRealityAlignment()
-            }
-        }
-        .onDisappear {
-            Task {
-                await model.stopRealityAlignment()
-            }
-        }
-        .onChange(of: alignmentProgress) { _, progress in
-            updateAlignmentLock(progress)
-        }
-    }
-
-    @ViewBuilder
-    private var realitySurface: some View {
-        switch previewState {
-        case .loading:
-            ZStack {
-                comparisonImage(model.decodedCapturedImage)
-                PosterPalette.ink.opacity(0.32)
-                ProgressView()
-                    .tint(PosterPalette.paperWhite)
-            }
-        case .live:
-            model.cameraPreview
-        case .stillFallback:
-            comparisonImage(model.decodedCapturedImage)
-        }
-    }
-
-    private var alignmentConsole: some View {
-        HStack(spacing: PosterSpacing.md) {
-            alignmentReticle
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(alignmentTitle)
-                    .font(PosterTypography.cardTitle)
+            HStack {
+                Text("原片 · NOW")
+                    .foregroundStyle(PosterPalette.actionBlueDeep)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(PosterPalette.paperWhite.opacity(0.94), in: Capsule())
+                Spacer()
+                Text(target.compactLabel)
                     .foregroundStyle(PosterPalette.paperWhite)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-
-                Text("NOW  ↔  \(target.compactLabel)")
-                    .font(PosterTypography.caption)
-                    .foregroundStyle(PosterPalette.bellYellow)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(PosterPalette.actionBlue, in: Capsule())
             }
+            .font(PosterTypography.caption.weight(.semibold))
+            .padding(.horizontal, PosterSpacing.md)
+            .padding(.top, PosterSpacing.lg + CameraChromeMetrics.controlDiameter)
+            .allowsHitTesting(false)
+            .zIndex(4)
 
+            PosterGlassCard(cornerRadius: PosterRadius.card) {
+                Text("拖动，看时间差")
+                    .font(PosterTypography.cardTitle)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, PosterSpacing.md)
+            .padding(.bottom, PosterSpacing.md)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .allowsHitTesting(false)
+            .zIndex(4)
+
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(boundaryGesture(width: size.width))
+                .accessibilityElement(children: .ignore)
+                .accessibilityIdentifier("result.reality-boundary")
+                .accessibilityLabel("现实与目标时间边界")
+                .accessibilityValue("原片占 \(Int(position * 100))%")
+                .accessibilityHint("左右拖动比较原片与目标时间；上下滑动可逐级调整")
+                .accessibilityAdjustableAction(adjustBoundary)
+                .zIndex(3)
+        }
+    }
+
+    private var comparisonChrome: some View {
+        HStack(spacing: PosterSpacing.sm) {
             Spacer(minLength: 0)
-        }
-        .padding(PosterSpacing.lg)
-        .background(PosterPalette.cardDark)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: PosterRadius.card,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: PosterRadius.card,
-                style: .continuous
-            )
-            .stroke(PosterPalette.paperWhite.opacity(0.18), lineWidth: 1)
-        }
-    }
 
-    private var alignmentReticle: some View {
-        ZStack {
-            Circle()
-                .stroke(PosterPalette.paperWhite.opacity(0.24), lineWidth: 2)
-            Circle()
-                .trim(from: 0, to: alignmentProgress ?? 0)
-                .stroke(
-                    didLockAlignment
-                        ? PosterPalette.bellYellow
-                        : PosterPalette.paperWhite,
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-            Image(systemName: didLockAlignment ? "scope" : "viewfinder")
-                .font(PosterTypography.caption)
-                .foregroundStyle(
-                    didLockAlignment
-                        ? PosterPalette.bellYellow
-                        : PosterPalette.paperWhite
-                )
-        }
-        .frame(width: 44, height: 44)
-        .animation(
-            reduceMotion ? nil : PosterMotion.interaction,
-            value: didLockAlignment
-        )
-        .accessibilityHidden(true)
-    }
-
-    private var alignmentTitle: String {
-        switch previewState {
-        case .loading:
-            return "正在打开现实"
-        case .stillFallback:
-            return "拖动，看时间差"
-        case .live:
-            if didLockAlignment {
-                return "机位已对齐"
+            comparisonControl(
+                systemImage: comparisonMode == .split
+                    ? "circle.lefthalf.filled"
+                    : "arrow.left.and.right",
+                accessibilityLabel: comparisonMode == .split
+                    ? "切换到眨眼对照"
+                    : "切换到拖动对照",
+                identifier: "result.comparison-mode"
+            ) {
+                comparisonMode = comparisonMode == .split ? .blink : .split
             }
-            return "拖动，看时间差"
+
+            if comparisonMode == .split {
+                comparisonControl(
+                    systemImage: showsGrid ? "grid" : "grid.circle",
+                    accessibilityLabel: showsGrid ? "隐藏对照栅格" : "显示对照栅格",
+                    identifier: "result.comparison-grid"
+                ) {
+                    showsGrid.toggle()
+                }
+            }
+
+            comparisonControl(
+                systemImage: "xmark",
+                accessibilityLabel: "关闭现实对照",
+                identifier: "result.comparison-close",
+                action: close
+            )
         }
+        .padding(.horizontal, PosterSpacing.md)
+        .padding(.top, PosterSpacing.sm)
+        .zIndex(5)
+    }
+
+    private func comparisonControl(
+        systemImage: String,
+        accessibilityLabel: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(PosterTypography.label)
+                .foregroundStyle(PosterPalette.actionBlueDeep)
+                .frame(
+                    width: CameraChromeMetrics.controlDiameter,
+                    height: CameraChromeMetrics.controlDiameter
+                )
+                .background(PosterPalette.paperWhite.opacity(0.94), in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(PosterPalette.actionBlue.opacity(0.22), lineWidth: 1)
+                }
+        }
+        .buttonStyle(PosterPressStyle())
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func boundaryHandle(at x: CGFloat, height: CGFloat) -> some View {
         ZStack {
-            Rectangle()
-                .fill(PosterPalette.paperWhite)
-                .frame(width: 2, height: height)
-                .shadow(color: PosterPalette.ink.opacity(0.34), radius: 5)
+            Capsule(style: .continuous)
+                .fill(PosterPalette.paperWhite.opacity(0.92))
+                .frame(width: 3, height: height)
+                .shadow(color: PosterPalette.actionBlue.opacity(0.22), radius: 6)
 
-            Capsule()
+            Capsule(style: .continuous)
                 .fill(PosterPalette.paperWhite)
-                .frame(width: 28, height: 52)
+                .frame(width: 34, height: 56)
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(PosterPalette.actionBlue.opacity(0.28), lineWidth: 1)
+                }
                 .overlay {
                     Image(systemName: "arrow.left.and.right")
                         .font(PosterTypography.caption)
-                        .foregroundStyle(PosterPalette.ink)
+                        .foregroundStyle(PosterPalette.actionBlueDeep)
                 }
-                .shadow(color: PosterPalette.ink.opacity(0.28), radius: 6, y: 2)
+                .shadow(color: PosterPalette.actionBlue.opacity(0.18), radius: 10, y: 3)
         }
         .position(x: x, y: height * 0.5)
     }
@@ -925,16 +988,6 @@ private struct RealityAlignmentOverlay: View {
         }
     }
 
-    private func updateAlignmentLock(_ progress: CGFloat?) {
-        let value = progress ?? 0
-        if value >= 0.9, !didLockAlignment {
-            didLockAlignment = true
-            model.playRealityAlignmentLockHaptic()
-        } else if value < 0.68 {
-            didLockAlignment = false
-        }
-    }
-
     @ViewBuilder
     private func comparisonImage(_ image: UIImage?) -> some View {
         if let image {
@@ -945,11 +998,43 @@ private struct RealityAlignmentOverlay: View {
             PosterPalette.skySoft
         }
     }
+}
 
-    private enum PreviewState: Equatable {
-        case loading
-        case live
-        case stillFallback
+private enum RealityComparisonMode: Equatable {
+    case split
+    case blink
+
+    static var auditInitial: Self {
+        #if DEBUG
+        ProcessInfo.processInfo.environment["FUMIRA_AUDIT_COMPARISON_MODE"] == "blink"
+            ? .blink
+            : .split
+        #else
+        .split
+        #endif
+    }
+}
+
+/// Rule-of-thirds grid for still original ↔ generated comparison.
+private struct RealityComparisonGrid: View {
+    var body: some View {
+        Canvas { context, size in
+            let color = PosterPalette.paperWhite.opacity(0.38)
+            let thirdsX = [size.width / 3, size.width * 2 / 3]
+            let thirdsY = [size.height / 3, size.height * 2 / 3]
+            for x in thirdsX {
+                var path = Path()
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+                context.stroke(path, with: .color(color), lineWidth: 1)
+            }
+            for y in thirdsY {
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+                context.stroke(path, with: .color(color), lineWidth: 1)
+            }
+        }
     }
 }
 
@@ -1008,20 +1093,19 @@ enum ResultLayoutGeometry {
         aspectRatio: CGFloat
     ) -> Layout {
         let viewportWidth = max(container.width, 1)
-        // RootView keeps result content inside the system safe area already.
-        // GeometryReader still reports the window inset here, so adding it a
-        // second time leaves an oversized gap between the header and photo.
-        let photoTop = headerHeight
+        // Root is full-bleed; consume the reported top inset exactly once so the
+        // header clears the status region without a second reserved band.
+        let photoTop = safeAreaTop + headerHeight
         let photoSize = photoSize(
             in: container,
             safeAreaTop: photoTop,
             aspectRatio: aspectRatio
         )
-        let preferredTop = container.height - preferredPanelHeight
+        let preferredTop = container.height - preferredPanelHeight - safeAreaBottom
         let photoDrivenTop = photoTop + photoSize.height * 0.62
-        let maximumTop = max(container.height - minimumVisiblePanelHeight, 0)
+        let maximumTop = max(container.height - minimumVisiblePanelHeight - safeAreaBottom, 0)
         let panelTop = min(
-            max(max(preferredTop, photoDrivenTop), headerHeight + 120),
+            max(max(preferredTop, photoDrivenTop), photoTop + 120),
             maximumTop
         )
         let panelHeight = max(container.height - panelTop, minimumVisiblePanelHeight)
@@ -1029,7 +1113,7 @@ enum ResultLayoutGeometry {
         let desiredReveal = max(photoBottom - panelTop + PosterSpacing.md, 96)
         let maximumPanelPull = min(
             desiredReveal,
-            max(panelHeight - minimumVisiblePanelHeight, 0)
+            max(panelHeight - minimumVisiblePanelHeight - safeAreaBottom, 0)
         )
 
         return Layout(
@@ -1109,7 +1193,7 @@ private struct ResultTextAction: View {
             Label(title, systemImage: systemImage)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(PosterPalette.actionBlueDeep)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: PosterControlMetric.minimumTouchTarget)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
                 .padding(.horizontal, PosterSpacing.xs)

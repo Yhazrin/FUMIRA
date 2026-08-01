@@ -10,6 +10,11 @@ final class AppModel {
     private var hasPrepared = false
     /// Single in-flight pipeline task — cancel stops URLSession poll/upload via stream termination.
     private var pipelineTask: Task<Void, Never>?
+    /// Exact-target story work happens before the image pipeline starts, but
+    /// still belongs to that same user request and must be cancellable.
+    private var targetBeatTask: Task<StoryBeat, Error>?
+    private var targetBeatRequestID: UUID?
+    private var failedBrowsedTargetTime: TimePosition?
     /// Keeps repeated viewfinder entries from racing camera-session startup.
     private var cameraPreviewTask: Task<Void, Never>?
     /// Coalesces rapid pinch / Camera Control updates before publishing to ActivityKit.
@@ -65,6 +70,9 @@ final class AppModel {
     var shareImageData: Data?
     var isPreparingPoster = false
     var isSavingPoster = false
+    /// Keeps a browsed-time request single-flight while the relay writes its
+    /// exact target beat. Result UI uses this for honest progress feedback.
+    var isPreparingBrowsedTimeGeneration = false
     /// Non-error user feedback on the share screen (e.g. saved confirmation).
     var shareFeedbackMessage: String?
     var modelCatalog: AIModelCatalog = .bundled
@@ -80,8 +88,15 @@ final class AppModel {
     var cameraZoomSnapshot = CameraZoomSnapshot.unavailable
     var isCameraGridEnabled = false
     var cameraActivityFeedback: String?
+    /// Smoothed live Vision observation used only by the lightweight viewfinder
+    /// focus overlay. The capture pipeline receives its center as the narrative
+    /// subject anchor without requiring a manual tap.
+    var cameraTrackedSubject: CameraTrackedSubject?
     let motionField: MotionFieldModel
     let captureMotion: CaptureMotionModel
+    let temporalDarkroom: TemporalDarkroomModel
+    let temporalShake: TemporalShakeModel
+    let blowReveal: BlowRevealModel
     /// A stable preview identity prevents remounting the SwiftUI/UIKit bridge
     /// whenever unrelated camera chrome state changes.
     let cameraPreview: AnyView
@@ -94,6 +109,13 @@ final class AppModel {
             service: dependencies.captureMotion,
             haptics: dependencies.haptics
         )
+        temporalDarkroom = TemporalDarkroomModel(
+            service: dependencies.temporalDarkroom
+        )
+        temporalShake = TemporalShakeModel(
+            service: dependencies.temporalShake
+        )
+        blowReveal = BlowRevealModel(service: dependencies.blowInput)
     }
 
     var hasLiveCameraControls: Bool {
@@ -120,8 +142,19 @@ final class AppModel {
         dependencies.camera as? any CameraZoomProviding
     }
 
+    private var cameraSubjectTrackingProvider: (any CameraSubjectTrackingProviding)? {
+        dependencies.camera as? any CameraSubjectTrackingProviding
+    }
+
+    var temporalShakeResponderService: DeviceTemporalShakeService? {
+        dependencies.temporalShake as? DeviceTemporalShakeService
+    }
+
     var isPipelineBusy: Bool {
-        switch phase {
+        if isPreparingBrowsedTimeGeneration {
+            return true
+        }
+        return switch phase {
         case .shuttered, .understanding, .storyWriting, .generating:
             true
         default:
@@ -208,6 +241,31 @@ final class AppModel {
         } catch {
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    func prewarmCameraPreviewIfAuthorized() async {
+        guard let prewarmer = dependencies.camera as? any CameraPreviewPrewarming else {
+            return
+        }
+        await prewarmer.prewarmPreviewIfAuthorized()
+    }
+
+    func beginCameraSubjectTracking() {
+        guard let provider = cameraSubjectTrackingProvider else { return }
+        provider.setSubjectTrackingObserver { [weak self] subject in
+            guard let self, self.phase == .viewfinder else { return }
+            self.cameraTrackedSubject = subject
+            guard let center = subject?.center else { return }
+            self.narrativeSubjectAnchor = TemporalSubjectAnchor(
+                normalizedX: center.x,
+                normalizedY: center.y
+            )
+        }
+    }
+
+    func endCameraSubjectTracking() {
+        cameraSubjectTrackingProvider?.setSubjectTrackingObserver(nil)
+        cameraTrackedSubject = nil
     }
 
     func openSettings() {
@@ -301,9 +359,14 @@ final class AppModel {
             lastErrorMessage = nil
             cameraActivityFeedback = "已显示在灵动岛"
             dependencies.haptics.play(.selection)
-        } catch {
+        } catch let error as CameraLiveActivityError {
             lastErrorMessage = error.localizedDescription
             cameraActivityFeedback = error.localizedDescription
+            dependencies.haptics.play(.selection)
+        } catch {
+            let message = "无法显示灵动岛：\(error.localizedDescription)"
+            lastErrorMessage = message
+            cameraActivityFeedback = message
             dependencies.haptics.play(.selection)
         }
         cameraActivityFeedbackTask = Task { [weak self] in
@@ -556,7 +619,8 @@ final class AppModel {
         targetTime: TimePosition,
         sessionID: UUID,
         understanding: SceneUnderstanding? = nil,
-        story: TemporalStory? = nil
+        story: TemporalStory? = nil,
+        futureFork: TemporalFutureForkBranch? = nil
     ) async {
         guard let option = modelOption(for: .image) else {
             presentConfigurationFailure()
@@ -574,7 +638,25 @@ final class AppModel {
 
         let resolvedUnderstanding = understanding ?? sceneUnderstanding
         let resolvedStory = story ?? temporalStory
-        let resolvedBeat = resolvedStory?.generationBeat(for: targetTime)
+        let baseBeat = resolvedStory?.generationBeat(for: targetTime)
+        let resolvedBeat: StoryBeat?
+        if let futureFork {
+            guard let baseBeat,
+                  let forkedBeat = futureFork.applying(
+                    to: baseBeat,
+                    target: targetTime
+                  ) else {
+                presentFailure(
+                    stage: .imageGeneration,
+                    error: GenerationError.invalidParameters,
+                    sessionID: sessionID
+                )
+                return
+            }
+            resolvedBeat = forkedBeat
+        } else {
+            resolvedBeat = baseBeat
+        }
         // Mock mode still gets a short local fallback string for GeneratedFrame.
         // Remote generation ignores client prompt authorship.
         let prompt = TemporalImagePrompt.make(for: targetTime)
@@ -605,6 +687,16 @@ final class AppModel {
                         progress: value
                     )
                 case let .completed(frame):
+                    guard
+                        frame.sessionID == sessionID,
+                        targetTime.hasSameExactTimeIdentity(
+                            asOffsetDays: frame.time.offsetDays
+                        )
+                    else {
+                        throw GenerationError.generationFailed(
+                            message: "目标照片的时间没有对齐，请重新生成这一帧。"
+                        )
+                    }
                     guard let imageData = frame.imageData, !imageData.isEmpty else {
                         throw GenerationError.generationFailed(message: "目标照片已经生成，但图片内容为空。")
                     }
@@ -623,12 +715,14 @@ final class AppModel {
                         decodedImage: decoded
                     )
                     let completedFrame: GeneratedFrame
-                    if let beatID = resolvedBeat?.id, frame.storyBeatID == nil {
+                    if futureFork != nil || frame.storyBeatID == nil {
                         completedFrame = GeneratedFrame(
                             id: frame.id,
                             sessionID: frame.sessionID,
                             time: frame.time,
-                            storyBeatID: beatID,
+                            storyBeatID: frame.storyBeatID ?? resolvedBeat?.id,
+                            futureForkID: futureFork?.id ?? frame.futureForkID,
+                            futureForkTitle: futureFork?.title ?? frame.futureForkTitle,
                             prompt: frame.prompt,
                             modelOptionID: frame.modelOptionID,
                             imageData: frame.imageData
@@ -837,21 +931,109 @@ final class AppModel {
         await generateStoryWorld()
     }
 
+    /// Generates an evidence-backed alternative at the exact time of the
+    /// current result. Selection and shaking stay read-only; only this explicit
+    /// confirmation starts work. The original capture remains the sole image
+    /// source so repeated branches cannot accumulate generation drift.
+    func generateFutureFork(_ branch: TemporalFutureForkBranch) async {
+        guard
+            phase == .result,
+            !isPipelineBusy,
+            generatedFrame?.futureForkID != branch.id,
+            let photo = capturedPhoto,
+            let currentFrame = generatedFrame,
+            let understanding = sceneUnderstanding,
+            let story = temporalStory,
+            currentFrame.time.offsetDays > 0,
+            let baseBeat = story.generationBeat(for: currentFrame.time),
+            branch.applying(to: baseBeat, target: currentFrame.time) != nil
+        else {
+            return
+        }
+
+        preserveCurrentResultForUndo()
+        invalidatePipelineWork()
+        let sessionID = UUID()
+        let targetTime = currentFrame.time
+        activeSessionID = sessionID
+        capturedTargetTime = targetTime
+        selectedTime = targetTime
+        // Leave the result surface before clearing its mounted frame. This
+        // prevents a render pass where ResultView is still visible but its
+        // generated image and reveal state have already been reset.
+        phase = .generating
+        prepareForNewTargetResult()
+
+        let task = Task {
+            await startImageGeneration(
+                photo: photo,
+                targetTime: targetTime,
+                sessionID: sessionID,
+                understanding: understanding,
+                story: story,
+                futureFork: branch
+            )
+        }
+        pipelineTask = task
+        await task.value
+    }
+
     /// Deliberate exploration strategy: promote the story browser's current
     /// year to a new generation target. Fetches a fresh exact target beat
     /// from the server so the generation uses the precise visual changes
     /// for this year — not the nearest canonical beat.
     func generateAtStoryPreviewTime() async {
-        guard let understanding = sceneUnderstanding, let story = temporalStory else {
+        guard
+            phase == .result,
+            !isPipelineBusy,
+            let sourcePhotoID = capturedPhoto?.id,
+            let sourceFrameID = generatedFrame?.id,
+            let understanding = sceneUnderstanding,
+            let story = temporalStory
+        else {
             return
         }
-        // Fetch a new exact target beat for the browse year.
-        do {
-            let exactBeat = try await dependencies.story.writeTargetBeat(
+        // Freeze the explicit tap target before awaiting the story service. The
+        // result rail remains browsable while this request is in flight, so
+        // reading selectedTime again after the await can otherwise combine an
+        // exact beat for time A with an image request for time B.
+        let requestedTime = selectedTime
+        let requestID = UUID()
+        failedBrowsedTargetTime = nil
+        targetBeatRequestID = requestID
+        isPreparingBrowsedTimeGeneration = true
+        let task = Task {
+            try await dependencies.story.writeTargetBeat(
                 understanding: understanding,
                 story: story,
-                target: selectedTime
+                target: requestedTime
             )
+        }
+        targetBeatTask = task
+        // Fetch a new exact target beat for the browse year.
+        do {
+            let exactBeat = try await task.value
+            // Ignore a stale response if the user left Result or another result
+            // replaced the source frame while the exact beat was being written.
+            guard
+                targetBeatRequestID == requestID,
+                phase == .result,
+                capturedPhoto?.id == sourcePhotoID,
+                generatedFrame?.id == sourceFrameID
+            else {
+                finishTargetBeatRequest(requestID)
+                return
+            }
+            guard
+                let exactTarget = exactBeat.exactTarget,
+                requestedTime.hasSameExactTimeIdentity(
+                    asOffsetDays: exactTarget.offsetDays
+                )
+            else {
+                throw GenerationError.generationFailed(
+                    message: "目标时间没有对齐，请重新生成这一帧。"
+                )
+            }
             // Inject the exact beat into the story for this generation.
             temporalStory = TemporalStory(
                 title: story.title,
@@ -861,9 +1043,26 @@ final class AppModel {
                 beats: story.beats,
                 targetBeat: exactBeat
             )
-            capturedTargetTime = selectedTime
+            capturedTargetTime = requestedTime
+            selectedTime = requestedTime
+            failedBrowsedTargetTime = nil
+            finishTargetBeatRequest(requestID)
             await generateStoryWorld()
+        } catch is CancellationError {
+            finishTargetBeatRequest(requestID)
+            return
         } catch {
+            guard
+                targetBeatRequestID == requestID,
+                phase == .result,
+                capturedPhoto?.id == sourcePhotoID,
+                generatedFrame?.id == sourceFrameID
+            else {
+                finishTargetBeatRequest(requestID)
+                return
+            }
+            failedBrowsedTargetTime = requestedTime
+            finishTargetBeatRequest(requestID)
             failedStage = .story
             let classified = Self.classify(error)
             lastGenerationError = classified
@@ -905,6 +1104,20 @@ final class AppModel {
             // Non-retryable: return to the previous result or camera instead of
             // immediately submitting the same invalid request again.
             showOriginalNow()
+            return
+        }
+
+        if stage == .story,
+           let failedBrowsedTargetTime,
+           generatedFrame != nil,
+           sceneUnderstanding != nil,
+           temporalStory != nil {
+            failedStage = nil
+            lastErrorMessage = nil
+            lastGenerationError = nil
+            phase = .result
+            selectedTime = failedBrowsedTargetTime
+            await generateAtStoryPreviewTime()
             return
         }
 
@@ -1068,7 +1281,46 @@ final class AppModel {
         captureMotion.activate()
     }
 
+    /// The top-screen covering ritual was removed from the product flow.
+    /// Keep this seam so the root lifecycle remains explicit, but never start
+    /// proximity monitoring for a design that no longer has a visible action.
+    func syncTemporalDarkroom(
+        for _: AppPhase,
+        reduceMotion _: Bool,
+        sceneIsActive _: Bool
+    ) {
+        temporalDarkroom.deactivate()
+    }
+
+    /// Shake is an opt-in branch selector for future results. It is short-lived,
+    /// has a button fallback, and cannot mutate time or start generation.
+    func syncTemporalShake(
+        for phase: AppPhase,
+        reduceMotion: Bool,
+        sceneIsActive: Bool
+    ) {
+        temporalShake.setSceneActive(sceneIsActive)
+        let target = generatedFrame?.time ?? generationTargetTime
+        let branches = TemporalFutureForkEngine.resolve(
+            understanding: sceneUnderstanding,
+            target: target
+        ).branches
+        guard phase == .result,
+              sceneIsActive,
+              target.offsetDays > 0,
+              branches.count >= 2 else {
+            temporalShake.deactivate()
+            return
+        }
+        temporalShake.activate(reduceMotion: reduceMotion)
+    }
+
+    func playFutureForkDetent() {
+        dependencies.haptics.play(.selection)
+    }
+
     func prepareResultReveal() {
+        blowReveal.reset()
         resultRevealProgress = 0
         didPlayResultRevealHaptic = false
         isRealityAlignmentPresented = false
@@ -1085,6 +1337,7 @@ final class AppModel {
     }
 
     func completeResultReveal() {
+        blowReveal.deactivate()
         updateResultRevealProgress(1)
     }
 
@@ -1123,6 +1376,9 @@ final class AppModel {
 
     func openShare() {
         dependencies.haptics.play(.save)
+        // A prior poster may belong to a different browsed or generated time.
+        // Clear it before the share sheet can expose stale bytes.
+        shareImageData = nil
         shareFeedbackMessage = nil
         lastErrorMessage = nil
         phase = .share
@@ -1141,6 +1397,10 @@ final class AppModel {
         switch host {
         case "camera":
             handleCameraActivityDeepLink(url)
+        case "progress":
+            // Live Activity tap during developing — bring the person back to
+            // whatever developing stage is already on screen.
+            break
         case "share":
             guard temporalStory != nil || generatedFrame != nil else { return }
             openShare()
@@ -1180,10 +1440,11 @@ final class AppModel {
         do {
             let data = try shareImageData ?? composePosterPNG()
             shareImageData = data
+            let time = posterTime
             let snapshot = PosterSnapshot(
-                time: selectedTime,
+                time: time,
                 title: temporalStory?.title ?? currentStoryBeat?.title ?? "这一刻的时间故事",
-                yearLabel: PosterComposer.yearLabel(for: selectedTime),
+                yearLabel: PosterComposer.yearLabel(for: time),
                 imageData: data
             )
             posterURL = try await dependencies.storage.save(snapshot)
@@ -1200,13 +1461,29 @@ final class AppModel {
         dependencies.haptics.play(.save)
     }
 
+    /// Posters are artifacts of the frame that actually exists. Browsing the
+    /// rail may change `selectedTime`, but it cannot relabel old image bytes.
+    private var posterTime: TimePosition {
+        generatedFrame?.time ?? generationTargetTime
+    }
+
     private func composePosterPNG() throws -> Data {
-        try PosterComposer.renderPNG(
-            time: selectedTime,
-            yearLabel: PosterComposer.yearLabel(for: selectedTime),
+        let time = posterTime
+        let trace = TemporalInterpretationTrace.resolve(
+            story: temporalStory,
+            understanding: sceneUnderstanding,
+            at: time
+        )
+        return try PosterComposer.renderPNG(
+            time: time,
+            yearLabel: PosterComposer.yearLabel(for: time),
             title: temporalStory?.title ?? currentStoryBeat?.title ?? "这一刻的时间故事",
-            narrative: currentNarrative,
-            sceneImageData: generatedFrame?.imageData
+            narrative: StoryCopyPolicy.removingRepeatedTimePrefix(
+                from: trace.narrative,
+                time: time
+            ),
+            sceneImageData: generatedFrame?.imageData,
+            interpretationTrace: trace
         )
     }
 
@@ -1311,6 +1588,10 @@ final class AppModel {
     /// Invalidate the active session and cancel the in-flight pipeline Task (stops remote poll).
     private func invalidatePipelineWork() {
         activeSessionID = nil
+        targetBeatTask?.cancel()
+        targetBeatTask = nil
+        targetBeatRequestID = nil
+        isPreparingBrowsedTimeGeneration = false
         pipelineTask?.cancel()
         pipelineTask = nil
         cameraActivityUpdateTask?.cancel()
@@ -1463,6 +1744,9 @@ final class AppModel {
     }
 
     private func prepareForNewTargetResult() {
+        temporalDarkroom.reset()
+        temporalShake.deactivate()
+        blowReveal.reset()
         generatedFrame = nil
         generatedPhoto = nil
         decodedGeneratedImage = nil
@@ -1504,6 +1788,10 @@ final class AppModel {
     }
 
     private func clearPipelineResult() {
+        temporalDarkroom.reset()
+        temporalShake.deactivate()
+        blowReveal.reset()
+        failedBrowsedTargetTime = nil
         capturedTargetTime = nil
         capturedPhoto = nil
         temporalCapturePacket = nil
@@ -1536,6 +1824,13 @@ final class AppModel {
         shareFeedbackMessage = nil
         isPreparingPoster = false
         isSavingPoster = false
+    }
+
+    private func finishTargetBeatRequest(_ requestID: UUID) {
+        guard targetBeatRequestID == requestID else { return }
+        targetBeatTask = nil
+        targetBeatRequestID = nil
+        isPreparingBrowsedTimeGeneration = false
     }
 
     private static func makeGeneratedPhoto(

@@ -16,6 +16,9 @@ then reveals the image and story together.
 - Valid JPEG capture data visible throughout the pipeline
 - Real rear-camera permission, live full-width upper-card preview, blue camera
   body controls, and photo capture on iPhone
+- Result-only microphone level gesture that blows the captured paper upward to
+  reveal the generated time photo; no recording or stored audio, with a direct
+  button fallback
 - Automatic interactive scene fallback when running in Simulator
 - Structured scene subjects, identity rules, clues, and change drivers
 - Target-photo-first pipeline with no pre-generation understanding/story gate
@@ -24,6 +27,10 @@ then reveals the image and story together.
 - Model route catalog with runnable and backend-required availability states
 - Continuous nonlinear time adjustment, not five fixed anchors
 - Interruptible SwiftUI motion and haptics
+- Optional future-fork ritual on a completed future result: Scene Bible evidence
+  yields two or three deterministic possibilities at the same exact time;
+  shaking or tapping only changes the selection, and an explicit confirmation
+  regenerates from the original capture without changing the target year
 - Accessibility labels, Dynamic Type, and Reduce Motion behavior
 - Unit tests for time mapping, generation-first ordering, generated-image analysis,
   story variation, route validity, exact-time prompts, state transitions, and

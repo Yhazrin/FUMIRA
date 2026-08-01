@@ -32,23 +32,56 @@ struct SettingsView: View {
                 Section {
                     Picker(
                         "生成服务",
-                        selection: Binding(
-                            get: { model.modelConfiguration.imageOptionID },
-                            set: { optionID in
-                                Task {
-                                    await model.selectModel(optionID: optionID, for: .image)
-                                }
-                            }
-                        )
+                        selection: imageProviderBinding
                     ) {
-                        ForEach(readyImageOptions) { option in
-                            Text(option.provider.displayName)
-                                .tag(option.id)
-                        }
+                        Text(AIProviderKind.miniMax.displayName)
+                            .tag(AIProviderKind.miniMax)
+                        Text(AIProviderKind.apiMart.displayName)
+                            .tag(AIProviderKind.apiMart)
                     }
                     .pickerStyle(.segmented)
                 } header: {
                     Text("图片生成")
+                } footer: {
+                    Text(
+                        selectedImageProvider == .apiMart
+                            ? "选择中转站后，可在下方指定具体生图模型。"
+                            : "MiniMax 直接图生图，保持主体与构图。"
+                    )
+                }
+
+                if selectedImageProvider == .apiMart {
+                    Section {
+                        ForEach(apiMartImageOptions) { option in
+                            Button {
+                                Task {
+                                    await model.selectModel(optionID: option.id, for: .image)
+                                }
+                            } label: {
+                                HStack(alignment: .top, spacing: 12) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(option.displayName)
+                                            .foregroundStyle(PosterPalette.ink)
+                                        Text(option.detail)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 0)
+                                    if model.modelConfiguration.imageOptionID == option.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(PosterPalette.actionBlue)
+                                    }
+                                }
+                            }
+                            .accessibilityAddTraits(
+                                model.modelConfiguration.imageOptionID == option.id
+                                    ? [.isSelected]
+                                    : []
+                            )
+                        }
+                    } header: {
+                        Text("中转站模型")
+                    }
                 }
 
                 Section {
@@ -79,9 +112,50 @@ struct SettingsView: View {
         .tint(PosterPalette.skyDeep)
     }
 
-    private var readyImageOptions: [AIModelOption] {
+    private var selectedImageProvider: AIProviderKind {
+        model.modelCatalog.option(id: model.modelConfiguration.imageOptionID)?.provider
+            ?? .miniMax
+    }
+
+    private var imageProviderBinding: Binding<AIProviderKind> {
+        Binding(
+            get: { selectedImageProvider },
+            set: { provider in
+                Task {
+                    await selectImageProvider(provider)
+                }
+            }
+        )
+    }
+
+    private var apiMartImageOptions: [AIModelOption] {
         model.modelCatalog.options(for: .image).filter {
-            $0.availability == .ready && $0.provider.imageGenerationRoute != nil
+            $0.provider == .apiMart
+                && $0.availability == .ready
+                && $0.provider.imageGenerationRoute != nil
+        }
+    }
+
+    private var miniMaxImageOptionID: String {
+        model.modelCatalog.options(for: .image).first {
+            $0.provider == .miniMax && $0.availability == .ready
+        }?.id ?? "fumira.image.identity"
+    }
+
+    private var defaultAPIMartImageOptionID: String {
+        apiMartImageOptions.first?.id ?? "apimart.image.gpt-image-2"
+    }
+
+    private func selectImageProvider(_ provider: AIProviderKind) async {
+        switch provider {
+        case .miniMax:
+            await model.selectModel(optionID: miniMaxImageOptionID, for: .image)
+        case .apiMart:
+            if selectedImageProvider != .apiMart {
+                await model.selectModel(optionID: defaultAPIMartImageOptionID, for: .image)
+            }
+        default:
+            break
         }
     }
 }

@@ -16,6 +16,47 @@ final class PosterShareTests: XCTestCase {
         XCTAssertNotNil(UIImage(data: data))
     }
 
+    func testComposerRendersDeterministicTemporalFingerprint() throws {
+        let time = TimePosition(normalized: 0.4)
+        let trace = TemporalInterpretationTrace.resolve(
+            story: .parkReference,
+            understanding: nil,
+            at: time
+        )
+
+        let first = try PosterComposer.renderPNG(
+            time: time,
+            yearLabel: PosterComposer.yearLabel(for: time),
+            title: "公园会记得你",
+            narrative: "同一条小路，树影更长了一些。",
+            sceneImageData: nil,
+            interpretationTrace: trace
+        )
+        let repeated = try PosterComposer.renderPNG(
+            time: time,
+            yearLabel: PosterComposer.yearLabel(for: time),
+            title: "公园会记得你",
+            narrative: "同一条小路，树影更长了一些。",
+            sceneImageData: nil,
+            interpretationTrace: trace
+        )
+        let withoutStoryMarkers = try PosterComposer.renderPNG(
+            time: time,
+            yearLabel: PosterComposer.yearLabel(for: time),
+            title: "公园会记得你",
+            narrative: "同一条小路，树影更长了一些。",
+            sceneImageData: nil,
+            interpretationTrace: .resolve(
+                story: nil,
+                understanding: nil,
+                at: time
+            )
+        )
+
+        XCTAssertEqual(first, repeated)
+        XCTAssertNotEqual(first, withoutStoryMarkers)
+    }
+
     func testPosterTimeLabelMatchesVisibleTimePrecision() {
         XCTAssertEqual(PosterComposer.yearLabel(for: .now), "NOW")
         XCTAssertEqual(
@@ -102,6 +143,50 @@ final class PosterShareTests: XCTestCase {
         XCTAssertNil(model.lastErrorMessage)
         let saved = await storage.savedSnapshots
         XCTAssertEqual(saved.count, 1)
+    }
+
+    func testSavedPosterKeepsGeneratedFrameTimeAfterBrowsingElsewhere() async throws {
+        let storage = MockPosterStorage()
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: MockStoryProvider(stepDelay: .zero),
+            generation: MockGenerationProvider(stepDelay: .zero),
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: storage,
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let generatedTime = TimePosition(offsetDays: 12.5 * 365.25)
+        let browsedTime = TimePosition(offsetDays: -42 * 365.25)
+        model.sceneUnderstanding = .parkReference
+        model.temporalStory = .fallback(
+            understanding: .parkReference,
+            targetTime: generatedTime
+        )
+        model.generatedFrame = GeneratedFrame(
+            sessionID: UUID(),
+            time: generatedTime,
+            prompt: "generated-at-twelve-and-a-half-years"
+        )
+        model.selectedTime = browsedTime
+
+        await model.savePosterToLibrary()
+
+        let saved = await storage.savedSnapshots
+        let poster = try XCTUnwrap(saved.first)
+        XCTAssertEqual(saved.count, 1)
+        XCTAssertEqual(poster.time.offsetDays, generatedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(
+            poster.yearLabel,
+            PosterComposer.yearLabel(for: generatedTime)
+        )
+        XCTAssertNotEqual(poster.time, browsedTime)
+        XCTAssertNotNil(UIImage(data: poster.imageData))
     }
 
     func testOpenShareThenReturnPreservesTime() {

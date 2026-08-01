@@ -1,5 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { analyzeUploadedAsset, writeTargetBeat, writeTemporalStory } from "../intelligence.js";
+import {
+  canonicalTimePosition,
+  MAXIMUM_TIME_OFFSET_DAYS,
+} from "../queue.js";
 import { resolveStoryCopyConstraints } from "../storyCopy.js";
 import { resolveUnderstandingCopyConstraints } from "../understandingCopy.js";
 import type {
@@ -58,28 +62,36 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
 
   app.post<{ Body: {
     understanding?: SceneUnderstandingPayload;
-    targetTime?: { offsetYears?: number; offsetDays?: number; compactLabel?: string };
+    targetTime?: {
+      normalized?: number;
+      offsetYears?: number;
+      offsetDays?: number;
+      compactLabel?: string;
+    };
     copyConstraints?: Partial<StoryCopyConstraints>;
     requestId?: string;
   } }>(
     "/v1/stories",
     async (request, reply) => {
       const body = request.body;
-      if (!body?.understanding || !body.requestId?.trim() || !Number.isFinite(body.targetTime?.offsetYears) || !body.targetTime?.compactLabel?.trim()) {
+      if (!body?.understanding || !body.requestId?.trim() || !body.targetTime) {
         return reply.code(400).send(error("invalid_body", "缺少图片理解、目标年份或 requestId。", false));
       }
+      const resolvedTime = resolveExactTime(body.targetTime, {
+        requireOffsetYears: true,
+        requireCompactLabel: true,
+      });
+      if (!resolvedTime.ok) {
+        return reply.code(400).send(error(
+          "invalid_time_position",
+          resolvedTime.userMessage,
+          false
+        ));
+      }
       const copyConstraints = resolveStoryCopyConstraints(body.copyConstraints);
-      const offsetDays = body.targetTime.offsetDays ?? (body.targetTime.offsetYears as number) * 365.25;
-      const now = new Date();
-      const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
-      const exactTarget: ExactTarget = {
-        offsetDays,
-        targetDateISO: targetDate.toISOString().slice(0, 10),
-        compactLabel: body.targetTime.compactLabel.trim(),
-      };
       const result = await writeTemporalStory({
         understanding: body.understanding,
-        targetTime: exactTarget,
+        targetTime: resolvedTime.value,
         copyConstraints,
         requestId: body.requestId.trim(),
       });
@@ -103,7 +115,13 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
       identityRules?: string[];
       canonicalBeats?: Array<{ anchorYears?: number; title?: string; narrative?: string; visualPrompt?: string }>;
     };
-    target?: { offsetDays?: number; targetDateISO?: string; compactLabel?: string };
+    target?: {
+      normalized?: number;
+      offsetYears?: number;
+      offsetDays?: number;
+      targetDateISO?: string;
+      compactLabel?: string;
+    };
     requestId?: string;
   } }>(
     "/v1/target-beats",
@@ -112,17 +130,15 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
       if (!body?.understanding || !body.requestId?.trim() || !body.target) {
         return reply.code(400).send(error("invalid_body", "缺少图片理解、目标时间或 requestId。", false));
       }
-      const offsetDays = body.target.offsetDays;
-      if (!Number.isFinite(offsetDays) || offsetDays === undefined) {
-        return reply.code(400).send(error("invalid_body", "缺少精确目标天数 (offsetDays)。", false));
+      const resolvedTime = resolveExactTime(body.target);
+      if (!resolvedTime.ok) {
+        return reply.code(400).send(error(
+          "invalid_time_position",
+          resolvedTime.userMessage,
+          false
+        ));
       }
-      const now = new Date();
-      const targetDate = new Date(now.getTime() + offsetDays * 86_400_000);
-      const exactTarget: ExactTarget = {
-        offsetDays,
-        targetDateISO: body.target.targetDateISO ?? targetDate.toISOString().slice(0, 10),
-        compactLabel: body.target.compactLabel?.trim() ?? `${Math.abs(offsetDays).toFixed(0)} 天${offsetDays < 0 ? "前" : "后"}`,
-      };
+      const exactTarget = resolvedTime.value;
       const storyContext = {
         title: body.storyContext?.title ?? "",
         presentTruth: body.storyContext?.presentTruth ?? "",
@@ -151,6 +167,80 @@ export async function registerIntelligenceRoutes(app: FastifyInstance): Promise<
       };
     }
   );
+}
+
+const TIME_POSITION_TOLERANCE_YEARS = 0.001;
+const TIME_POSITION_TOLERANCE_NORMALIZED = 1e-9;
+
+type ExactTimeInput = {
+  normalized?: number;
+  offsetYears?: number;
+  offsetDays?: number;
+  compactLabel?: string;
+};
+
+function resolveExactTime(
+  input: ExactTimeInput,
+  requirements: {
+    requireOffsetYears?: boolean;
+    requireCompactLabel?: boolean;
+  } = {}
+):
+  | { ok: true; value: ExactTarget }
+  | { ok: false; userMessage: string } {
+  if (!Number.isFinite(input.offsetDays)) {
+    return { ok: false, userMessage: "缺少精确目标天数 (offsetDays)。" };
+  }
+
+  const offsetDays = input.offsetDays as number;
+  if (Math.abs(offsetDays) > MAXIMUM_TIME_OFFSET_DAYS) {
+    return { ok: false, userMessage: "时间超出可生成的前后一百年范围。" };
+  }
+
+  const canonical = canonicalTimePosition(offsetDays);
+  if (
+    requirements.requireOffsetYears
+    && !Number.isFinite(input.offsetYears)
+  ) {
+    return { ok: false, userMessage: "缺少目标年份 (offsetYears)。" };
+  }
+  if (
+    input.offsetYears !== undefined
+    && (
+      !Number.isFinite(input.offsetYears)
+      || Math.abs(input.offsetYears - canonical.offsetYears)
+        > TIME_POSITION_TOLERANCE_YEARS
+    )
+  ) {
+    return { ok: false, userMessage: "目标时间字段彼此不一致。" };
+  }
+  if (
+    input.normalized !== undefined
+    && (
+      !Number.isFinite(input.normalized)
+      || Math.abs(input.normalized - canonical.normalized)
+        > TIME_POSITION_TOLERANCE_NORMALIZED
+    )
+  ) {
+    return { ok: false, userMessage: "目标时间字段彼此不一致。" };
+  }
+
+  const compactLabel = input.compactLabel?.trim();
+  if (requirements.requireCompactLabel && !compactLabel) {
+    return { ok: false, userMessage: "缺少目标时间标签 (compactLabel)。" };
+  }
+  if (compactLabel !== undefined && compactLabel !== canonical.compactLabel) {
+    return { ok: false, userMessage: "目标时间字段彼此不一致。" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      offsetDays: canonical.offsetDays,
+      targetDateISO: canonical.targetDateISO,
+      compactLabel: canonical.compactLabel,
+    },
+  };
 }
 
 function normalizeNarrativeAnchor(

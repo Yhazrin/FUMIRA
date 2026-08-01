@@ -34,17 +34,23 @@ struct ConnectionView: View {
                     .padding(.horizontal, PosterSpacing.lg)
                     .padding(
                         .top,
-                        proxy.safeAreaInsets.top + PosterSpacing.xl + 12
+                        proxy.safeAreaInsets.top + PosterSpacing.xl + 28
                     )
                     .opacity(1 - FUMIRASpatialMotion.map(entryProgress, from: 0.18...0.62, to: 0...1))
                     .scaleEffect(1 - FUMIRASpatialMotion.map(entryProgress, from: 0...0.62, to: 0...0.035), anchor: .topLeading)
 
-                CameraLaunchIconButton(action: onLaunchCamera)
-                    .position(
-                        x: proxy.size.width * 0.5,
-                        y: proxy.size.height * 0.46
-                    )
-                    .opacity(1 - FUMIRASpatialMotion.map(entryProgress, from: 0...0.14, to: 0...1))
+                // RootView promotes the touched control into CameraEntryPortal.
+                // Remove this source immediately once that persistent copy is
+                // active so two identical apertures never cross-fade and read
+                // as a flash or duplicated redraw.
+                if entryProgress <= 0.001 {
+                    CameraLaunchIconButton(action: onLaunchCamera)
+                        .position(
+                            x: proxy.size.width * 0.5,
+                            y: proxy.size.height * 0.46
+                        )
+                        .transition(.identity)
+                }
             }
         }
     }
@@ -52,19 +58,20 @@ struct ConnectionView: View {
 
 private struct FUMIRAWordmark: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text("FUMIRA")
                 .font(PosterTypography.wordmark)
-                .foregroundStyle(PosterPalette.actionBlueDeep)
+                .foregroundStyle(PosterPalette.actionBlue)
+                .tracking(1.2)
 
             HStack(spacing: PosterSpacing.sm) {
                 Capsule()
                     .fill(PosterPalette.toyRed)
-                    .frame(width: 32, height: 4)
+                    .frame(width: 36, height: 4)
 
                 Text("TIME CAMERA")
                     .font(.caption2.weight(.black))
-                    .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.76))
+                    .foregroundStyle(PosterPalette.actionBlue.opacity(0.72))
             }
         }
         .accessibilityElement(children: .ignore)
@@ -81,7 +88,7 @@ private struct CameraLaunchIconButton: View {
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(PosterPalette.paperWhite)
                 .frame(width: 88, height: 88)
-                .background(PosterPalette.actionBlueDeep)
+                .background(PosterPalette.actionBlue)
                 .clipShape(Circle())
                 .contentShape(Circle())
         }

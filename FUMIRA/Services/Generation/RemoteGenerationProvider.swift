@@ -178,6 +178,7 @@ actor RemoteGenerationProvider: GenerationProvider {
             timePosition: TimePositionDTO(time: request.time),
             aspectRatio: Self.aspectRatio(for: request.photo),
             imageProvider: request.model.provider.imageGenerationRoute ?? "minimax",
+            imageModel: Self.relayImageModel(for: request.model),
             requestId: requestId,
             structuredContext: StructuredContextDTO(
                 schemaVersion: "generation-context.v3",
@@ -317,6 +318,15 @@ actor RemoteGenerationProvider: GenerationProvider {
         return Task.isCancelled
     }
 
+    /// Vendor model id for the relay (e.g. `gpt-image-2`). MiniMax omits this.
+    private static func relayImageModel(for option: AIModelOption) -> String? {
+        guard option.provider.imageGenerationRoute == "apimart" else { return nil }
+        if option.modelID.hasPrefix("apimart/") {
+            return String(option.modelID.dropFirst("apimart/".count))
+        }
+        return option.modelID
+    }
+
     private static func aspectRatio(for photo: CapturedPhoto) -> String {
         guard photo.pixelWidth > 0, photo.pixelHeight > 0 else { return "3:4" }
         let ratio = Double(photo.pixelWidth) / Double(photo.pixelHeight)
@@ -399,6 +409,7 @@ private struct CreateGenerationRequest: Encodable {
     let timePosition: TimePositionDTO
     let aspectRatio: String
     let imageProvider: String
+    let imageModel: String?
     let requestId: String
     let structuredContext: StructuredContextDTO
 }

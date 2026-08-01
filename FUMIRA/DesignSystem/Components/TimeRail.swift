@@ -4,6 +4,7 @@ import SwiftUI
 struct TimeRail: View {
     let value: Double
     var chrome: WaveTimeRailChrome = .paper
+    var isExternalValueDirectDriven = false
     var onDetent: (WaveTimeDetent) -> Void = { _ in }
     let onChange: (Double) -> Void
 
@@ -11,6 +12,7 @@ struct TimeRail: View {
         WaveTimeRail(
             value: value,
             chrome: chrome,
+            isExternalValueDirectDriven: isExternalValueDirectDriven,
             onDetent: onDetent,
             onChange: onChange
         )

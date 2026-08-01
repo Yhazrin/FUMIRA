@@ -16,15 +16,19 @@ extension AnyTransition {
         }
     }
 
-    /// Camera entry settles without masking the live preview or punching holes.
+    /// Kept for call-site compatibility. Viewfinder slide is now an explicit
+    /// RootView progress track (`viewfinderSlideProgress`) because AppModel
+    /// phase swaps are not wrapped in `withAnimation`.
     static func cameraAperture(reduceMotion: Bool) -> AnyTransition {
         guard !reduceMotion else { return .identity }
         return .asymmetric(
-            insertion: .modifier(
-                active: PhaseOpacityFloor(opacity: 0.96),
-                identity: PhaseOpacityFloor(opacity: 1)
-            )
-            .animation(PosterMotion.phaseChange),
+            insertion: .offset(y: -48)
+                .combined(
+                    with: .modifier(
+                        active: PhaseOpacityFloor(opacity: 0.92),
+                        identity: PhaseOpacityFloor(opacity: 1)
+                    )
+                ),
             removal: .identity
         )
     }

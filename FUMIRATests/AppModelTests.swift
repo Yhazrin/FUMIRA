@@ -17,11 +17,11 @@ final class AppModelTests: XCTestCase {
         #if targetEnvironment(simulator)
         let model = AppModel(dependencies: .runtime)
         XCTAssertFalse(model.isUsingLiveCamera)
-        XCTAssertFalse(model.hasLiveCameraControls)
+        XCTAssertTrue(model.hasLiveCameraControls)
         #endif
     }
 
-    func testResultRevealFallbackCompletesTimeDoor() {
+    func testResultRevealFallbackCompletesBlowReveal() {
         let model = AppModel(dependencies: .test)
         model.prepareResultReveal()
 
@@ -30,27 +30,6 @@ final class AppModelTests: XCTestCase {
 
         model.completeResultReveal()
         XCTAssertEqual(model.resultRevealProgress, 1, accuracy: 0.001)
-    }
-
-    func testResultRevealMapsShortestYawArcIntoContinuousProgress() {
-        XCTAssertEqual(
-            ResultView.revealProgress(yaw: 0.115, baseline: 0),
-            0.5,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            ResultView.revealProgress(yaw: 0.23, baseline: 0),
-            1,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            ResultView.revealProgress(
-                yaw: -.pi + 0.115,
-                baseline: .pi
-            ),
-            0.5,
-            accuracy: 0.001
-        )
     }
 
     func testRealityAlignmentUsesCapturedAttitudeAndWrapsAngles() {
@@ -86,14 +65,16 @@ final class AppModelTests: XCTestCase {
         )
     }
 
-    func testMockCameraHidesUnsupportedLiveControls() async {
+    func testMockCameraExposesFlipAndFlashControls() async {
         let model = AppModel(dependencies: .test)
         await model.prepare()
         model.beginPhoneOnlyPath()
         await model.grantCameraAccess()
-        XCTAssertFalse(model.hasLiveCameraControls)
-        XCTAssertFalse(model.canSwitchCamera)
-        XCTAssertFalse(model.supportsCameraFlash)
+        // Give the preview-startup refresh a beat to publish mock controls.
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertTrue(model.hasLiveCameraControls)
+        XCTAssertTrue(model.canSwitchCamera)
+        XCTAssertTrue(model.supportsCameraFlash)
         model.toggleCameraGrid()
         XCTAssertTrue(model.isCameraGridEnabled)
     }
@@ -242,6 +223,302 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotNil(model.temporalStory)
     }
 
+    func testGeneratingAtAnotherBrowsedTimeSendsThatExactTimeAndReturnsItsImage() async throws {
+        let firstImageData = makeTestJPEG(width: 900, height: 1_200)
+        let secondImageData = makeTestJPEG(width: 1_200, height: 900)
+        let generation = TimeRecordingGenerationProvider(
+            outputDataByRequest: [firstImageData, secondImageData]
+        )
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: MockStoryProvider(stepDelay: .zero),
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let firstTime = TimePosition(offsetDays: -1_234.5)
+        let secondTime = TimePosition(offsetDays: 8_765.25)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        model.updateTime(normalized: firstTime.normalized)
+        await model.capture()
+
+        let firstFrameID = try XCTUnwrap(model.generatedFrame?.id)
+        model.updateTime(normalized: secondTime.normalized)
+        await model.generateAtStoryPreviewTime()
+
+        let requestedTimes = await generation.requestedTimes()
+        XCTAssertEqual(requestedTimes.count, 2)
+        XCTAssertEqual(requestedTimes[0].offsetDays, firstTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(requestedTimes[1].offsetDays, secondTime.offsetDays, accuracy: 0.001)
+        let capturedTargetTime = try XCTUnwrap(model.capturedTargetTime)
+        let generatedFrame = try XCTUnwrap(model.generatedFrame)
+        let exactTarget = try XCTUnwrap(model.temporalStory?.targetBeat?.exactTarget)
+        XCTAssertEqual(capturedTargetTime.offsetDays, secondTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(generatedFrame.time.offsetDays, secondTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(
+            exactTarget.offsetDays,
+            secondTime.offsetDays,
+            accuracy: 0.001
+        )
+        XCTAssertNotEqual(generatedFrame.id, firstFrameID)
+        XCTAssertEqual(generatedFrame.imageData, secondImageData)
+        XCTAssertNotNil(generatedFrame.imageData.flatMap(UIImage.init(data:)))
+        XCTAssertEqual(model.phase, .result)
+    }
+
+    func testBrowsedTimeGenerationKeepsTapTimeWhenRailMovesDuringExactBeatRequest() async throws {
+        let story = GatedTargetBeatStoryProvider()
+        let generation = TimeRecordingGenerationProvider(
+            outputData: makeTestJPEG(width: 900, height: 1_200)
+        )
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: story,
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let tappedTime = TimePosition(offsetDays: -4_321.25)
+        let laterRailTime = TimePosition(offsetDays: 9_876.5)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+        model.updateTime(normalized: tappedTime.normalized)
+
+        let generationTask = Task { await model.generateAtStoryPreviewTime() }
+        let requestedTarget = await story.waitForRequestedTarget()
+        model.updateTime(normalized: laterRailTime.normalized)
+        await story.releaseTargetBeat()
+        await generationTask.value
+
+        let requestedTimes = await generation.requestedTimes()
+        let finalRequest = try XCTUnwrap(requestedTimes.last)
+        let exactTarget = try XCTUnwrap(model.temporalStory?.targetBeat?.exactTarget)
+        let generatedFrame = try XCTUnwrap(model.generatedFrame)
+        let capturedTargetTime = try XCTUnwrap(model.capturedTargetTime)
+        XCTAssertEqual(requestedTarget.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(finalRequest.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(generatedFrame.time.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(capturedTargetTime.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(model.selectedTime.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertEqual(exactTarget.offsetDays, tappedTime.offsetDays, accuracy: 0.001)
+        XCTAssertNotEqual(finalRequest, laterRailTime)
+        XCTAssertEqual(model.phase, .result)
+    }
+
+    func testBrowsedTimeGenerationIsSingleFlightWhileWritingExactBeat() async {
+        let story = GatedTargetBeatStoryProvider()
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: story,
+            generation: TimeRecordingGenerationProvider(
+                outputData: makeTestJPEG(width: 900, height: 1_200)
+            ),
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+        model.updateTime(normalized: 0.42)
+
+        let first = Task { await model.generateAtStoryPreviewTime() }
+        _ = await story.waitForRequestedTarget()
+        XCTAssertTrue(model.isPreparingBrowsedTimeGeneration)
+        await model.generateAtStoryPreviewTime()
+        let targetBeatRequestCount = await story.targetBeatRequestCount()
+        XCTAssertEqual(targetBeatRequestCount, 1)
+
+        await story.releaseTargetBeat()
+        await first.value
+        XCTAssertFalse(model.isPreparingBrowsedTimeGeneration)
+        XCTAssertEqual(model.phase, .result)
+    }
+
+    func testRetakeIgnoresLateExactBeatFailure() async {
+        let story = GatedFailingTargetBeatStoryProvider()
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: story,
+            generation: TimeRecordingGenerationProvider(
+                outputData: makeTestJPEG(width: 900, height: 1_200)
+            ),
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+        model.updateTime(normalized: -0.46)
+
+        let request = Task { await model.generateAtStoryPreviewTime() }
+        await story.waitUntilRequested()
+        model.retake()
+        await story.failTargetBeat()
+        await request.value
+
+        XCTAssertEqual(model.phase, .viewfinder)
+        XCTAssertNil(model.failedStage)
+        XCTAssertNil(model.lastErrorMessage)
+        XCTAssertFalse(model.isPreparingBrowsedTimeGeneration)
+    }
+
+    func testRetryAfterExactBeatFailureKeepsBrowsedTargetTime() async throws {
+        let story = FailOnceTargetBeatStoryProvider()
+        let generation = TimeRecordingGenerationProvider(
+            outputDataByRequest: [
+                makeTestJPEG(width: 900, height: 1_200),
+                makeTestJPEG(width: 1_200, height: 900),
+            ]
+        )
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: story,
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let browsedTarget = TimePosition(offsetDays: 7_654.25)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+        model.updateTime(normalized: browsedTarget.normalized)
+
+        await model.generateAtStoryPreviewTime()
+        XCTAssertEqual(model.phase, .pipelineFailure)
+        XCTAssertEqual(model.failedStage, .story)
+
+        await model.retryPipeline()
+
+        let generatedFrame = try XCTUnwrap(model.generatedFrame)
+        let requestedTimes = await generation.requestedTimes()
+        let retriedTime = try XCTUnwrap(requestedTimes.last)
+        XCTAssertEqual(requestedTimes.count, 2)
+        XCTAssertEqual(
+            retriedTime.offsetDays,
+            browsedTarget.offsetDays,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            generatedFrame.time.offsetDays,
+            browsedTarget.offsetDays,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(model.phase, .result)
+    }
+
+    func testBrowsedExactBeatOneHourAwayIsRejectedBeforeImageGeneration() async throws {
+        let generation = TimeRecordingGenerationProvider(
+            outputData: makeTestJPEG(width: 900, height: 1_200)
+        )
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: OneHourMismatchedTargetBeatStoryProvider(),
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let browsedTarget = TimePosition(offsetDays: 7_654.25)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+        let originalFrameID = try XCTUnwrap(model.generatedFrame?.id)
+        model.updateTime(normalized: browsedTarget.normalized)
+
+        await model.generateAtStoryPreviewTime()
+
+        XCTAssertEqual(model.phase, .pipelineFailure)
+        XCTAssertEqual(model.failedStage, .story)
+        XCTAssertEqual(model.generatedFrame?.id, originalFrameID)
+        let requestedTimes = await generation.requestedTimes()
+        XCTAssertEqual(requestedTimes.count, 1)
+        XCTAssertTrue(model.lastErrorMessage?.contains("时间没有对齐") == true)
+    }
+
+    func testProviderFrameOneHourAwayIsRejected() async {
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: MockStoryProvider(stepDelay: .zero),
+            generation: MismatchedTimeGenerationProvider(
+                outputData: makeTestJPEG(width: 900, height: 1_200)
+            ),
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+
+        await model.prepare()
+        model.beginPhoneOnlyPath()
+        await model.grantCameraAccess()
+        await model.capture()
+
+        XCTAssertEqual(model.phase, .pipelineFailure)
+        XCTAssertEqual(model.failedStage, .imageGeneration)
+        XCTAssertNil(model.generatedFrame)
+        XCTAssertTrue(model.lastErrorMessage?.contains("时间没有对齐") == true)
+    }
+
     func testStoryNarrativeChangesAcrossTime() {
         let story = TemporalStory.parkReference
         let past = story.narrative(for: TimePosition(offsetDays: -36_525))
@@ -251,6 +528,37 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(past, present)
         XCTAssertNotEqual(present, future)
         XCTAssertNotEqual(past, future)
+    }
+
+    func testGenerationBeatRejectsExactTargetOneHourAway() {
+        let requestedTime = TimePosition(offsetDays: 10 * 365.25)
+        let canonicalBeat = StoryBeat(
+            anchorYears: requestedTime.offsetYears,
+            title: "标准节点",
+            narrative: "标准叙事",
+            visualPrompt: "标准提示"
+        )
+        let mismatchedExactBeat = StoryBeat(
+            anchorYears: requestedTime.offsetYears,
+            title: "错误精确节点",
+            narrative: "错误精确叙事",
+            visualPrompt: "错误精确提示",
+            exactTarget: ExactTarget(
+                offsetDays: requestedTime.offsetDays + 1.0 / 24.0,
+                targetDateISO: "",
+                compactLabel: requestedTime.compactLabel
+            )
+        )
+        let story = TemporalStory(
+            title: "时间故事",
+            logline: "同一场景",
+            presentTruth: "此刻",
+            identityRules: [],
+            beats: [canonicalBeat],
+            targetBeat: mismatchedExactBeat
+        )
+
+        XCTAssertEqual(story.generationBeat(for: requestedTime)?.id, canonicalBeat.id)
     }
 
     func testVisibleNarrativeDoesNotRepeatDedicatedTimeLabel() {
@@ -322,7 +630,7 @@ final class AppModelTests: XCTestCase {
         )
     }
 
-    func testResultLayoutDoesNotApplySafeAreaTopTwice() {
+    func testResultLayoutAccountsForSafeAreaTopOnce() {
         let withoutReportedInset = ResultLayoutGeometry.layout(
             in: CGSize(width: 402, height: 759),
             safeAreaTop: 0,
@@ -334,8 +642,16 @@ final class AppModelTests: XCTestCase {
             aspectRatio: 3.0 / 4.0
         )
 
-        XCTAssertEqual(withReportedInset.photoTop, withoutReportedInset.photoTop)
-        XCTAssertEqual(withReportedInset.photoSize, withoutReportedInset.photoSize)
+        XCTAssertEqual(
+            withReportedInset.photoTop,
+            withoutReportedInset.photoTop + 59,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            withReportedInset.photoSize.width,
+            withoutReportedInset.photoSize.width,
+            accuracy: 0.000_001
+        )
     }
 
     func testResultPrimaryActionsNeverExceedAvailableWidth() {
@@ -432,39 +748,11 @@ final class AppModelTests: XCTestCase {
             10,
             accuracy: 0.001
         )
-    }
-
-    func testTimeDoorMotionUsesTheSharedRevealProgress() {
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorDepartureProgress(0),
-            0,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorDepartureProgress(0.54),
-            0.5,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorDepartureProgress(1),
-            1,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorFadeProgress(0.47),
-            0,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorFadeProgress(0.71),
-            0.5,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            FUMIRASpatialMotion.timeDoorFadeProgress(1),
-            1,
-            accuracy: 0.001
-        )
+        XCTAssertEqual(FUMIRASpatialMotion.captureFlipDegrees(0), 0, accuracy: 0.001)
+        XCTAssertEqual(FUMIRASpatialMotion.captureFlipDegrees(0.36), 180, accuracy: 0.001)
+        XCTAssertEqual(FUMIRASpatialMotion.captureFlipDegrees(0.72), 360, accuracy: 0.001)
+        XCTAssertEqual(FUMIRASpatialMotion.captureFlipDegrees(1), 360, accuracy: 0.001)
+        XCTAssertEqual(FUMIRASpatialMotion.captureFlipDegrees(2), 360, accuracy: 0.001)
     }
 
     func testSpatialDepthIsOrderedAndChromeStaysStable() {
@@ -813,6 +1101,135 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.canUndoGeneration)
     }
 
+    func testFutureForkRegeneratesFromOriginalAtSameExactTime() async throws {
+        let output = makeTestJPEG(width: 720, height: 960)
+        let generation = TimeRecordingGenerationProvider(outputData: output)
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: MockStoryProvider(stepDelay: .zero),
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let target = TimePosition(offsetDays: 12 * 365.25)
+        let understanding = SceneUnderstanding.parkReference
+        let story = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: target
+        )
+        let source = CapturedPhoto(
+            data: makeTestJPEG(width: 900, height: 1_200),
+            pixelWidth: 900,
+            pixelHeight: 1_200
+        )
+        let originalFrameID = UUID()
+        model.capturedPhoto = source
+        model.sceneUnderstanding = understanding
+        model.temporalStory = story
+        model.capturedTargetTime = target
+        model.selectedTime = target
+        model.generatedFrame = GeneratedFrame(
+            id: originalFrameID,
+            sessionID: UUID(),
+            time: target,
+            storyBeatID: story.targetBeat?.id,
+            imageData: source.data
+        )
+        model.generatedPhoto = source
+        model.phase = .result
+
+        let fork = try XCTUnwrap(
+            TemporalFutureForkEngine.resolve(
+                understanding: understanding,
+                target: target
+            ).branches.dropFirst().first
+        )
+        await model.generateFutureFork(fork)
+
+        XCTAssertEqual(model.phase, .result)
+        XCTAssertEqual(model.generatedFrame?.time, target)
+        XCTAssertEqual(model.selectedTime, target)
+        XCTAssertEqual(model.capturedTargetTime, target)
+        XCTAssertEqual(model.generatedFrame?.futureForkID, fork.id)
+        XCTAssertEqual(model.generatedFrame?.futureForkTitle, fork.title)
+        XCTAssertEqual(model.previousGeneratedFrame?.id, originalFrameID)
+        let requestedTimes = await generation.requestedTimes()
+        let requestedStoryBeats = await generation.requestedStoryBeats()
+        XCTAssertEqual(requestedTimes, [target])
+
+        let requestedBeat = try XCTUnwrap(requestedStoryBeats.last ?? nil)
+        XCTAssertEqual(requestedBeat.id, story.targetBeat?.id)
+        XCTAssertEqual(requestedBeat.exactTarget, story.targetBeat?.exactTarget)
+        XCTAssertEqual(requestedBeat.renderPlan, story.targetBeat?.renderPlan)
+        XCTAssertTrue(requestedBeat.visualPrompt.contains("解释分支"))
+    }
+
+    func testFutureForkWithDifferentTargetCannotStartGeneration() async throws {
+        let output = makeTestJPEG(width: 720, height: 960)
+        let generation = TimeRecordingGenerationProvider(outputData: output)
+        let dependencies = AppDependencies(
+            camera: MockCameraService(),
+            cameraPreview: MockCameraPreviewFactory(),
+            hardware: MockHardwareController(),
+            understanding: MockImageUnderstandingProvider(stepDelay: .zero),
+            story: MockStoryProvider(stepDelay: .zero),
+            generation: generation,
+            modelCatalog: BundledAIModelCatalogProvider(),
+            modelConfigurationStore: InMemoryAIModelConfigurationStore(),
+            storage: MockPosterStorage(),
+            haptics: MockHapticsClient(),
+            motionField: MockMotionFieldService()
+        )
+        let model = AppModel(dependencies: dependencies)
+        let generatedTarget = TimePosition(offsetDays: 10 * 365.25)
+        let otherTarget = TimePosition(offsetDays: 20 * 365.25)
+        let understanding = SceneUnderstanding.parkReference
+        let story = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: generatedTarget
+        )
+        let source = CapturedPhoto(
+            data: makeTestJPEG(width: 900, height: 1_200),
+            pixelWidth: 900,
+            pixelHeight: 1_200
+        )
+        let frame = GeneratedFrame(
+            sessionID: UUID(),
+            time: generatedTarget,
+            storyBeatID: story.targetBeat?.id,
+            imageData: source.data
+        )
+        model.capturedPhoto = source
+        model.sceneUnderstanding = understanding
+        model.temporalStory = story
+        model.capturedTargetTime = generatedTarget
+        model.selectedTime = generatedTarget
+        model.generatedFrame = frame
+        model.generatedPhoto = source
+        model.phase = .result
+
+        let mismatchedFork = try XCTUnwrap(
+            TemporalFutureForkEngine.resolve(
+                understanding: understanding,
+                target: otherTarget
+            ).branches.first
+        )
+        await model.generateFutureFork(mismatchedFork)
+
+        XCTAssertEqual(model.phase, .result)
+        XCTAssertEqual(model.generatedFrame?.id, frame.id)
+        let requestedTimes = await generation.requestedTimes()
+        XCTAssertTrue(requestedTimes.isEmpty)
+        XCTAssertFalse(model.canUndoGeneration)
+    }
+
     private func makeTestJPEG(width: Int, height: Int) -> Data {
         let size = CGSize(width: width, height: height)
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -865,6 +1282,231 @@ private actor TracingGenerationProvider: GenerationProvider {
                 prompt: request.prompt,
                 modelOptionID: request.model.id,
                 imageData: outputData
+            )))
+            continuation.finish()
+        }
+    }
+}
+
+private actor TimeRecordingGenerationProvider: GenerationProvider {
+    private let outputDataByRequest: [Data]
+    private var times: [TimePosition] = []
+    private var storyBeats: [StoryBeat?] = []
+
+    init(outputData: Data) {
+        outputDataByRequest = [outputData]
+    }
+
+    init(outputDataByRequest: [Data]) {
+        precondition(!outputDataByRequest.isEmpty)
+        self.outputDataByRequest = outputDataByRequest
+    }
+
+    func generate(
+        request: ImageGenerationRequest
+    ) async -> AsyncThrowingStream<GenerationEvent, Error> {
+        let outputIndex = min(times.count, outputDataByRequest.count - 1)
+        let outputData = outputDataByRequest[outputIndex]
+        times.append(request.time)
+        storyBeats.append(request.storyBeat)
+        return AsyncThrowingStream { continuation in
+            continuation.yield(.completed(GeneratedFrame(
+                sessionID: request.sessionID,
+                time: request.time,
+                storyBeatID: request.storyBeat?.id,
+                prompt: request.prompt,
+                modelOptionID: request.model.id,
+                imageData: outputData
+            )))
+            continuation.finish()
+        }
+    }
+
+    func requestedTimes() -> [TimePosition] {
+        times
+    }
+
+    func requestedStoryBeats() -> [StoryBeat?] {
+        storyBeats
+    }
+}
+
+private actor GatedTargetBeatStoryProvider: StoryProvider {
+    private var requestedTarget: TimePosition?
+    private var targetBeatContinuation: CheckedContinuation<Void, Never>?
+    private var requestCount = 0
+
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        requestCount += 1
+        requestedTarget = target
+        await withCheckedContinuation { continuation in
+            targetBeatContinuation = continuation
+        }
+        guard let targetBeat = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: target
+        ).targetBeat else {
+            throw GenerationError.generationFailed(message: "测试目标节点生成失败。")
+        }
+        return targetBeat
+    }
+
+    func write(
+        request: StoryRequest
+    ) async -> AsyncThrowingStream<StoryEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.completed(.fallback(
+                understanding: request.understanding,
+                targetTime: request.targetTime
+            )))
+            continuation.finish()
+        }
+    }
+
+    func waitForRequestedTarget() async -> TimePosition {
+        while requestedTarget == nil {
+            await Task.yield()
+        }
+        return requestedTarget ?? .now
+    }
+
+    func releaseTargetBeat() {
+        targetBeatContinuation?.resume()
+        targetBeatContinuation = nil
+    }
+
+    func targetBeatRequestCount() -> Int {
+        requestCount
+    }
+}
+
+private actor GatedFailingTargetBeatStoryProvider: StoryProvider {
+    private var wasRequested = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        wasRequested = true
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+        throw GenerationError.networkFailure
+    }
+
+    func write(
+        request: StoryRequest
+    ) async -> AsyncThrowingStream<StoryEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.completed(.fallback(
+                understanding: request.understanding,
+                targetTime: request.targetTime
+            )))
+            continuation.finish()
+        }
+    }
+
+    func waitUntilRequested() async {
+        while !wasRequested {
+            await Task.yield()
+        }
+    }
+
+    func failTargetBeat() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private actor FailOnceTargetBeatStoryProvider: StoryProvider {
+    private var requestCount = 0
+
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        requestCount += 1
+        if requestCount == 1 {
+            throw GenerationError.networkFailure
+        }
+        guard let targetBeat = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: target
+        ).targetBeat else {
+            throw GenerationError.generationFailed(message: "测试目标节点生成失败。")
+        }
+        return targetBeat
+    }
+
+    func write(
+        request: StoryRequest
+    ) async -> AsyncThrowingStream<StoryEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.completed(.fallback(
+                understanding: request.understanding,
+                targetTime: request.targetTime
+            )))
+            continuation.finish()
+        }
+    }
+}
+
+private actor MismatchedTimeGenerationProvider: GenerationProvider {
+    let outputData: Data
+
+    init(outputData: Data) {
+        self.outputData = outputData
+    }
+
+    func generate(
+        request: ImageGenerationRequest
+    ) async -> AsyncThrowingStream<GenerationEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.completed(GeneratedFrame(
+                sessionID: request.sessionID,
+                time: TimePosition(offsetDays: request.time.offsetDays + 1.0 / 24.0),
+                storyBeatID: request.storyBeat?.id,
+                prompt: request.prompt,
+                modelOptionID: request.model.id,
+                imageData: outputData
+            )))
+            continuation.finish()
+        }
+    }
+}
+
+private actor OneHourMismatchedTargetBeatStoryProvider: StoryProvider {
+    func writeTargetBeat(
+        understanding: SceneUnderstanding,
+        story: TemporalStory,
+        target: TimePosition
+    ) async throws -> StoryBeat {
+        let mismatchedTarget = TimePosition(
+            offsetDays: target.offsetDays + 1.0 / 24.0
+        )
+        guard let beat = TemporalStory.fallback(
+            understanding: understanding,
+            targetTime: mismatchedTarget
+        ).targetBeat else {
+            throw GenerationError.generationFailed(message: "测试目标节点生成失败。")
+        }
+        return beat
+    }
+
+    func write(
+        request: StoryRequest
+    ) async -> AsyncThrowingStream<StoryEvent, Error> {
+        AsyncThrowingStream { continuation in
+            continuation.yield(.completed(.fallback(
+                understanding: request.understanding,
+                targetTime: request.targetTime
             )))
             continuation.finish()
         }

@@ -4,16 +4,39 @@ import UIKit
 struct SharePosterView: View {
     let model: AppModel
 
+    /// The poster labels the image bytes that actually exist. Result browsing
+    /// can move independently, so `selectedTime` is not authoritative here.
+    private var posterTime: TimePosition {
+        model.generatedFrame?.time ?? model.generationTargetTime
+    }
+
     private var yearLabel: String {
-        PosterComposer.yearLabel(for: model.selectedTime)
+        PosterComposer.yearLabel(for: posterTime)
     }
 
     private var posterTitle: String {
-        model.temporalStory?.title ?? model.currentStoryBeat?.title ?? "这一刻的时间故事"
+        model.temporalStory?.title
+            ?? model.temporalStory?.generationBeat(for: posterTime)?.title
+            ?? "这一刻的时间故事"
     }
 
     private var sceneImage: UIImage? {
         model.generatedFrame?.imageData.flatMap(UIImage.init(data:))
+    }
+
+    private var interpretationTrace: TemporalInterpretationTrace {
+        .resolve(
+            story: model.temporalStory,
+            understanding: model.sceneUnderstanding,
+            at: posterTime
+        )
+    }
+
+    private var posterNarrative: String {
+        StoryCopyPolicy.removingRepeatedTimePrefix(
+            from: interpretationTrace.narrative,
+            time: posterTime
+        )
     }
 
     var body: some View {
@@ -26,11 +49,12 @@ struct SharePosterView: View {
                 )
 
                 PosterExportCard(
-                    time: model.selectedTime,
+                    time: posterTime,
                     yearLabel: yearLabel,
                     title: posterTitle,
-                    narrative: model.currentNarrative,
-                    sceneImage: sceneImage
+                    narrative: posterNarrative,
+                    sceneImage: sceneImage,
+                    interpretationTrace: interpretationTrace
                 )
                 .shadow(color: PosterEffects.floating, radius: 16, y: 8)
                 .flatDecorationRotation(model.motionField)
@@ -69,7 +93,7 @@ struct SharePosterView: View {
     }
 
     private var shareTaskID: String {
-        "\(model.selectedTime.normalized)-\(model.generatedFrame?.id.uuidString ?? "none")"
+        "\(posterTime.normalized)-\(model.generatedFrame?.id.uuidString ?? "none")"
     }
 
     @ViewBuilder

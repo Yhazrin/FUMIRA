@@ -6,7 +6,9 @@ struct PosterScreenContainer<Content: View>: View {
 
     var body: some View {
         ZStack {
+            // Full-bleed fill — never leave a reserved white home-indicator band.
             background.ignoresSafeArea()
+
             GeometryReader { proxy in
                 ScrollView {
                     content()
@@ -16,16 +18,18 @@ struct PosterScreenContainer<Content: View>: View {
                                 0,
                                 proxy.size.height
                                     - PosterSpacing.md * 2
+                                    - proxy.safeAreaInsets.top
+                                    - proxy.safeAreaInsets.bottom
                             ),
                             alignment: .top
                         )
                         .padding(.horizontal, PosterSpacing.lg)
-                        // RootView already lays utility pages inside the system
-                        // safe area. Reapplying these insets here creates the
-                        // large empty band above every page title.
                         .padding(.vertical, PosterSpacing.md)
+                        .safeAreaPadding(.top)
+                        .safeAreaPadding(.bottom)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .scrollIndicators(.hidden)
             }
         }
     }

@@ -158,55 +158,107 @@ enum PreviewFixtures {
         let renderer = UIGraphicsImageRenderer(size: renderSize)
         return renderer.jpegData(withCompressionQuality: 0.9) { context in
             let bounds = CGRect(origin: .zero, size: renderSize)
-            UIColor(red: 0.16, green: 0.64, blue: 0.9, alpha: 1).setFill()
-            context.fill(bounds)
+            let graphics = context.cgContext
 
-            UIColor.white.withAlphaComponent(0.92).setFill()
-            context.fill(CGRect(
-                x: renderSize.width * 0.08,
-                y: renderSize.height * 0.12,
-                width: renderSize.width * 0.84,
-                height: renderSize.height * 0.24
-            ))
-
-            UIColor(red: 0.23, green: 0.69, blue: 0.43, alpha: 1).setFill()
-            context.fill(CGRect(
-                x: 0,
-                y: renderSize.height * 0.62,
-                width: renderSize.width,
-                height: renderSize.height * 0.38
-            ))
-
-            let markerSize = min(renderSize.width, renderSize.height) * 0.065
-            UIColor(red: 0.93, green: 0.23, blue: 0.2, alpha: 1).setFill()
-            for point in [
-                CGPoint(x: 12, y: 12),
-                CGPoint(x: renderSize.width - markerSize - 12, y: 12),
-                CGPoint(x: 12, y: renderSize.height - markerSize - 12),
-                CGPoint(
-                    x: renderSize.width - markerSize - 12,
-                    y: renderSize.height - markerSize - 12
-                ),
-            ] {
-                context.fill(CGRect(origin: point, size: CGSize(width: markerSize, height: markerSize)))
+            let skyGradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: [
+                    UIColor(PosterPalette.skySoft).cgColor,
+                    UIColor(PosterPalette.paper).cgColor,
+                ] as CFArray,
+                locations: [0, 1]
+            )
+            if let skyGradient {
+                graphics.drawLinearGradient(
+                    skyGradient,
+                    start: .zero,
+                    end: CGPoint(x: 0, y: renderSize.height * 0.68),
+                    options: []
+                )
+            } else {
+                UIColor(PosterPalette.skySoft).setFill()
+                context.fill(bounds)
             }
 
-            let label = "TARGET"
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(
-                    ofSize: min(renderSize.width * 0.1, 54),
-                    weight: .black
-                ),
-                .foregroundColor: UIColor.black,
-            ]
-            let labelSize = label.size(withAttributes: attributes)
-            label.draw(
-                at: CGPoint(
-                    x: (renderSize.width - labelSize.width) / 2,
-                    y: (renderSize.height - labelSize.height) / 2
-                ),
-                withAttributes: attributes
+            let distantHill = UIBezierPath()
+            distantHill.move(to: CGPoint(x: 0, y: renderSize.height * 0.55))
+            distantHill.addCurve(
+                to: CGPoint(x: renderSize.width, y: renderSize.height * 0.52),
+                controlPoint1: CGPoint(x: renderSize.width * 0.28, y: renderSize.height * 0.42),
+                controlPoint2: CGPoint(x: renderSize.width * 0.68, y: renderSize.height * 0.63)
             )
+            distantHill.addLine(to: CGPoint(x: renderSize.width, y: renderSize.height))
+            distantHill.addLine(to: CGPoint(x: 0, y: renderSize.height))
+            distantHill.close()
+            UIColor(PosterPalette.grassLight).setFill()
+            distantHill.fill()
+
+            let foregroundHill = UIBezierPath()
+            foregroundHill.move(to: CGPoint(x: 0, y: renderSize.height * 0.72))
+            foregroundHill.addCurve(
+                to: CGPoint(x: renderSize.width, y: renderSize.height * 0.66),
+                controlPoint1: CGPoint(x: renderSize.width * 0.34, y: renderSize.height * 0.62),
+                controlPoint2: CGPoint(x: renderSize.width * 0.76, y: renderSize.height * 0.82)
+            )
+            foregroundHill.addLine(to: CGPoint(x: renderSize.width, y: renderSize.height))
+            foregroundHill.addLine(to: CGPoint(x: 0, y: renderSize.height))
+            foregroundHill.close()
+            UIColor(PosterPalette.leafGreen).setFill()
+            foregroundHill.fill()
+
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: renderSize.width * 0.47, y: renderSize.height * 0.55))
+            path.addCurve(
+                to: CGPoint(x: renderSize.width * 0.78, y: renderSize.height),
+                controlPoint1: CGPoint(x: renderSize.width * 0.43, y: renderSize.height * 0.71),
+                controlPoint2: CGPoint(x: renderSize.width * 0.62, y: renderSize.height * 0.84)
+            )
+            path.addLine(to: CGPoint(x: renderSize.width * 0.28, y: renderSize.height))
+            path.addCurve(
+                to: CGPoint(x: renderSize.width * 0.47, y: renderSize.height * 0.55),
+                controlPoint1: CGPoint(x: renderSize.width * 0.42, y: renderSize.height * 0.82),
+                controlPoint2: CGPoint(x: renderSize.width * 0.52, y: renderSize.height * 0.69)
+            )
+            path.close()
+            UIColor(PosterPalette.paper).setFill()
+            path.fill()
+
+            let trunkWidth = renderSize.width * 0.035
+            UIColor(PosterPalette.pine).setFill()
+            context.fill(
+                CGRect(
+                    x: renderSize.width * 0.16,
+                    y: renderSize.height * 0.36,
+                    width: trunkWidth,
+                    height: renderSize.height * 0.42
+                )
+            )
+            context.fill(
+                CGRect(
+                    x: renderSize.width * 0.78,
+                    y: renderSize.height * 0.42,
+                    width: trunkWidth * 0.82,
+                    height: renderSize.height * 0.30
+                )
+            )
+
+            UIColor(PosterPalette.pine).setFill()
+            for canopy in [
+                CGRect(
+                    x: renderSize.width * 0.03,
+                    y: renderSize.height * 0.18,
+                    width: renderSize.width * 0.31,
+                    height: renderSize.width * 0.31
+                ),
+                CGRect(
+                    x: renderSize.width * 0.68,
+                    y: renderSize.height * 0.28,
+                    width: renderSize.width * 0.24,
+                    height: renderSize.width * 0.24
+                ),
+            ] {
+                context.cgContext.fillEllipse(in: canopy)
+            }
         }
     }
 
@@ -227,22 +279,20 @@ enum PreviewFixtures {
             UIColor.clear.setFill()
             UIRectFill(CGRect(origin: .zero, size: renderSize))
 
-            let label = "TARGET"
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(
-                    ofSize: min(renderSize.width * 0.1, 54),
-                    weight: .black
-                ),
-                .foregroundColor: UIColor.white,
-            ]
-            let labelSize = label.size(withAttributes: attributes)
-            label.draw(
-                at: CGPoint(
-                    x: (renderSize.width - labelSize.width) / 2,
-                    y: (renderSize.height - labelSize.height) / 2
-                ),
-                withAttributes: attributes
+            UIColor.white.setFill()
+            let foregroundCanopy = CGRect(
+                x: renderSize.width * 0.03,
+                y: renderSize.height * 0.18,
+                width: renderSize.width * 0.31,
+                height: renderSize.width * 0.31
             )
+            UIRectFill(CGRect(
+                x: renderSize.width * 0.16,
+                y: renderSize.height * 0.36,
+                width: renderSize.width * 0.035,
+                height: renderSize.height * 0.42
+            ))
+            UIBezierPath(ovalIn: foregroundCanopy).fill()
         }
     }
 }

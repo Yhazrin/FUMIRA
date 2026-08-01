@@ -40,10 +40,20 @@ struct TemporalPhotoCard: View {
     var rotationXDegrees: Double = 0
     var rotationYDegrees: Double = 0
     var rotationZDegrees: Double = 0
+    /// Extra Y-axis spin in degrees (e.g. capture flip 0...360). Independent of
+    /// the small spatial yaw so a full turn can complete while lift settles.
+    var flipYDegrees: Double = 0
     var paperBorderEnabled = true
     var reduceMotion = false
     var motionField: MotionFieldModel?
     var handPose: TemporalPhotoHandPose = .resting
+    /// Optional, interactive content for the paper reverse. This is used only
+    /// while a developing photo is being held; ordinary capture/result cards
+    /// retain the standard FUMIRA time-print back.
+    var backContent: AnyView?
+    /// Lets Reduce Motion swap the reverse face without an intermediate 3D
+    /// turn, while preserving the same information and controls.
+    var forceBackFace = false
 
     private var lift: CGFloat {
         reduceMotion ? 0 : FUMIRASpatialMotion.clamp(spatialProgress)
@@ -55,7 +65,9 @@ struct TemporalPhotoCard: View {
         rotationXDegrees * Double(lift) + (reduceMotion ? 0 : handPose.pitchDegrees)
     }
     private var effectiveYaw: Double {
-        rotationYDegrees * Double(lift) + (reduceMotion ? 0 : handPose.yawDegrees)
+        rotationYDegrees * Double(lift)
+            + (reduceMotion ? 0 : handPose.yawDegrees)
+            + (reduceMotion ? 0 : flipYDegrees)
     }
     private var effectiveRoll: Double {
         rotationZDegrees * Double(lift) + (reduceMotion ? 0 : handPose.rollDegrees)
@@ -64,6 +76,14 @@ struct TemporalPhotoCard: View {
     private var isBackFacing: Bool {
         let wrapped = effectiveYaw.truncatingRemainder(dividingBy: 360)
         return abs(wrapped) > 90 && abs(wrapped) < 270
+    }
+
+    private var showsBackFace: Bool {
+        forceBackFace || isBackFacing
+    }
+
+    private var exposesInteractiveBack: Bool {
+        backContent != nil && showsBackFace
     }
 
     var body: some View {
@@ -82,7 +102,11 @@ struct TemporalPhotoCard: View {
                 .rotationEffect(.degrees(effectiveRoll))
                 .scaleEffect(1 + renderedLift * PosterMotion.spatialScalePeak)
         }
-        .accessibilityElement(children: .ignore)
+        // Keep ordinary time prints as one image, but preserve the real
+        // controls when an interactive reverse is facing the reader. Using
+        // the mounted controls here (instead of an accessibility copy) is
+        // essential for TextField focus and keyboard input.
+        .accessibilityElement(children: exposesInteractiveBack ? .contain : .ignore)
         .accessibilityLabel("时间照片")
         .accessibilityValue("空间深度 \(Int((renderedLift * 100).rounded()))%")
         .accessibilityAddTraits(.isImage)
@@ -103,22 +127,12 @@ struct TemporalPhotoCard: View {
         let frontShape = RoundedRectangle(cornerRadius: frontRadius, style: .continuous)
 
         ZStack {
-            DynamicPhotoShadow(
-                lift: renderedLift,
-                pitch: effectivePitch,
-                yaw: effectiveYaw,
-                motionField: motionField,
-                reduceMotion: reduceMotion,
-                cornerRadius: boundedRadius
-            )
-
             if paperBorderEnabled {
-                backSurface(shape: cardShape, edgeDepth: edgeDepth)
                 paperRim(shape: cardShape)
                 sideEdges(shape: cardShape, edgeDepth: edgeDepth)
             }
 
-            frontOrBack(shape: frontShape)
+            cardFaces(shape: frontShape)
                 .frame(width: frontWidth, height: frontHeight)
                 .offset(y: -edgeDepth * 0.5)
         }
@@ -131,27 +145,6 @@ struct TemporalPhotoCard: View {
             .overlay {
                 shape.stroke(PosterEffects.photoPaperStroke, lineWidth: 1)
             }
-    }
-
-    private func backSurface(
-        shape: RoundedRectangle,
-        edgeDepth: CGFloat
-    ) -> some View {
-        shape
-            .fill(PosterPalette.paperWhite)
-            .overlay {
-                VStack(spacing: PosterSpacing.xs) {
-                    Capsule()
-                        .fill(PosterPalette.actionBlue.opacity(0.18))
-                        .frame(width: 34, height: 2)
-                    Text("FUMIRA / TIME PRINT")
-                        .font(.caption2.weight(.black))
-                        .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.42))
-                }
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            }
-            .offset(y: edgeDepth * 0.62)
-            .opacity(isBackFacing ? 1 : 0.28 + renderedLift * 0.24)
     }
 
     private func sideEdges(
@@ -179,47 +172,63 @@ struct TemporalPhotoCard: View {
         .accessibilityHidden(true)
     }
 
-    private func frontOrBack(shape: RoundedRectangle) -> some View {
+    private func cardFaces(shape: RoundedRectangle) -> some View {
         ZStack {
-            if !isBackFacing {
-                frontContent
+            frontContent
+                .clipShape(shape)
+                .overlay {
+                    SpecularPhotoHighlight(
+                        lift: renderedLift,
+                        pitch: effectivePitch,
+                        yaw: effectiveYaw,
+                        motionField: motionField,
+                        reduceMotion: reduceMotion
+                    )
                     .clipShape(shape)
-                    .overlay {
-                        SpecularPhotoHighlight(
-                            lift: renderedLift,
-                            pitch: effectivePitch,
-                            yaw: effectiveYaw,
-                            motionField: motionField,
-                            reduceMotion: reduceMotion
-                        )
-                        .clipShape(shape)
+                }
+                .opacity(showsBackFace ? 0 : 1)
+
+            backFaceContent
+                .clipShape(shape)
+                .rotation3DEffect(
+                    .degrees(forceBackFace && reduceMotion ? 0 : 180),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: PosterMotion.spatialPerspective
+                )
+                .opacity(showsBackFace ? 1 : 0)
+        }
+    }
+
+    @ViewBuilder
+    private var backFaceContent: some View {
+        if let backContent {
+            backContent
+        } else {
+            PosterPalette.paperWhite
+                .overlay {
+                    VStack(spacing: PosterSpacing.xs) {
+                        Capsule()
+                            .fill(PosterPalette.actionBlue.opacity(0.18))
+                            .frame(width: 34, height: 2)
+                        Image(systemName: "clock.arrow.2.circlepath")
+                            .font(.title3.weight(.bold))
+                        Text("FUMIRA / TIME PRINT")
+                            .font(.caption2.weight(.black))
                     }
-            } else {
-                PosterPalette.paperWhite
-                    .overlay {
-                        VStack(spacing: PosterSpacing.xs) {
-                            Image(systemName: "clock.arrow.2.circlepath")
-                                .font(.title3.weight(.bold))
-                            Text("FUMIRA")
-                                .font(.caption.weight(.black))
-                        }
-                        .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.46))
-                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                    }
-                    .clipShape(shape)
-            }
+                    .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.46))
+                }
         }
     }
 
     @ViewBuilder
     private var frontContent: some View {
         if let image {
-            ZStack {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+            if let foregroundMask {
+                ZStack {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
 
-                if let foregroundMask {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -238,8 +247,12 @@ struct TemporalPhotoCard: View {
                         )
                         .accessibilityHidden(true)
                 }
+                .compositingGroup()
+            } else {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
             }
-            .compositingGroup()
         } else {
             ZStack {
                 PosterPalette.skySoft
@@ -274,37 +287,6 @@ private struct SpecularPhotoHighlight: View {
         )
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-    }
-}
-
-private struct DynamicPhotoShadow: View {
-    let lift: CGFloat
-    let pitch: Double
-    let yaw: Double
-    let motionField: MotionFieldModel?
-    let reduceMotion: Bool
-    let cornerRadius: CGFloat
-
-    var body: some View {
-        let roll = reduceMotion ? 0 : (motionField?.roll ?? 0)
-        let fieldPitch = reduceMotion ? 0 : (motionField?.pitch ?? 0)
-        let offset = FUMIRASpatialMotion.photoShadowOffset(
-            lift: lift,
-            pitch: pitch,
-            yaw: yaw,
-            motionRoll: roll,
-            motionPitch: fieldPitch
-        )
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(PosterPalette.ink.opacity(0.001))
-            .shadow(
-                color: PosterEffects.photoPaperShadow.opacity(0.18 + lift * 0.32),
-                radius: 4 + lift * PosterEffects.photoPaperLandingShadowRadius,
-                x: offset.width,
-                y: offset.height
-            )
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 }
 

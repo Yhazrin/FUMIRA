@@ -96,11 +96,29 @@ enum CameraAspectRatio: String, CaseIterable, Sendable, Equatable {
         }
     }
 
+    /// Points of vertical drag needed to cross one framing step on the
+    /// viewfinder lower band. Dragging the card's lower edge down expands
+    /// toward full frame; dragging it up tightens toward square.
+    static let verticalAspectStepDistance: CGFloat = 48
+
+    /// Resolves a vertical lower-band drag into the nearest supported framing.
+    /// Positive translation (finger down) expands toward full frame; negative
+    /// (finger up) tightens toward square. Mapping always begins at the ratio
+    /// held when the gesture began.
+    static func aspectRatio(
+        afterVerticalTranslation translation: CGFloat,
+        startingAt start: CameraAspectRatio
+    ) -> CameraAspectRatio {
+        guard translation.isFinite else { return start }
+        let offset = Int(
+            (translation / verticalAspectStepDistance).rounded(.towardZero)
+        )
+        return aspectRatio(offsetting: offset, startingAt: start)
+    }
+
     /// Resolves a two-finger pinch into the nearest supported camera framing.
-    /// Opening the pinch expands toward the native full-frame composition;
-    /// closing it tightens toward the square crop. The mapping always begins
-    /// at the ratio held when the gesture began, so it is interruptible and
-    /// never accumulates stale gesture samples.
+    /// Kept for VoiceOver step adjustments that still speak in magnification
+    /// terms. Opening expands toward full frame; closing tightens toward square.
     static func aspectRatio(
         afterPinchMagnification magnification: CGFloat,
         startingAt start: CameraAspectRatio
@@ -110,12 +128,19 @@ enum CameraAspectRatio: String, CaseIterable, Sendable, Equatable {
         let pinchStep: CGFloat = 1.16
         let logarithmicDistance = log(magnification) / log(pinchStep)
         let offset = Int(logarithmicDistance.rounded(.towardZero))
-        let startIndex = pinchOrder.firstIndex(of: start) ?? 0
-        let resolvedIndex = min(max(startIndex + offset, 0), pinchOrder.count - 1)
-        return pinchOrder[resolvedIndex]
+        return aspectRatio(offsetting: offset, startingAt: start)
     }
 
-    private static let pinchOrder: [CameraAspectRatio] = [
+    private static func aspectRatio(
+        offsetting offset: Int,
+        startingAt start: CameraAspectRatio
+    ) -> CameraAspectRatio {
+        let startIndex = framingOrder.firstIndex(of: start) ?? 0
+        let resolvedIndex = min(max(startIndex + offset, 0), framingOrder.count - 1)
+        return framingOrder[resolvedIndex]
+    }
+
+    private static let framingOrder: [CameraAspectRatio] = [
         .square,
         .classic,
         .widescreen,
@@ -177,6 +202,22 @@ protocol CameraZoomProviding: Sendable {
     )
 }
 
+/// Starts the capture session only when camera access is already authorized.
+/// This lets entry motion overlap session startup without presenting permission
+/// UI ahead of the product's consent screen.
+protocol CameraPreviewPrewarming: Sendable {
+    func prewarmPreviewIfAuthorized() async
+}
+
+/// Optional live subject following. Implementations perform detection and
+/// tracking off the main actor and publish only compact normalized geometry.
+protocol CameraSubjectTrackingProviding: Sendable {
+    @MainActor
+    func setSubjectTrackingObserver(
+        _ observer: (@MainActor @Sendable (CameraTrackedSubject?) -> Void)?
+    )
+}
+
 protocol CameraService: Sendable {
     func requestAuthorization() async throws -> CameraAuthorization
     func startPreview() async throws
@@ -194,8 +235,10 @@ protocol CameraOpticalContextProviding: Sendable {
     func opticalContext() async -> TemporalOpticalContext
 }
 
-actor MockCameraService: CameraService, TemporalCameraSampling, CameraOpticalContextProviding {
+actor MockCameraService: CameraService, TemporalCameraSampling, CameraOpticalContextProviding, CameraControlProviding {
     private var mostRecentCaptureData: Data?
+    private var lensPosition: CameraLensPosition = .back
+    private var flashMode: CameraFlashMode = .auto
 
     func requestAuthorization() async throws -> CameraAuthorization {
         .authorized
@@ -204,6 +247,25 @@ actor MockCameraService: CameraService, TemporalCameraSampling, CameraOpticalCon
     func startPreview() async throws {}
 
     func stopPreview() async {}
+
+    func currentControls() async -> CameraControlSnapshot {
+        CameraControlSnapshot(
+            lensPosition: lensPosition,
+            flashMode: flashMode,
+            canSwitchCamera: true,
+            supportsFlash: true
+        )
+    }
+
+    func switchCamera() async throws -> CameraControlSnapshot {
+        lensPosition = lensPosition == .back ? .front : .back
+        return await currentControls()
+    }
+
+    func setFlashMode(_ mode: CameraFlashMode) async throws -> CameraControlSnapshot {
+        flashMode = mode
+        return await currentControls()
+    }
 
     func capturePhoto(composition: CameraAspectRatio) async throws -> CapturedPhoto {
         let data = try await MainActor.run {
