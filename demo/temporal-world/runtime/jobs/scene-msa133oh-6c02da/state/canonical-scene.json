@@ -1,0 +1,452 @@
+{
+  "version": 2,
+  "sceneId": "scene-msa133ou",
+  "createdAt": "2026-08-01T07:06:41.646Z",
+  "source": {
+    "type": "photo",
+    "inputPath": "input/photo.jpg",
+    "visionAnalysis": "{\"objects\":[{\"type\":\"building\",\"label\":\"Campus Main Building\",\"confidence\":0.92,\"bounds\":{\"x\":0.3,\"y\":0.2,\"w\":0.4,\"h\":0.5}},{\"type\":\"tree\",\"label\":\"Oak Tree\",\"confidence\":0.88,\"bounds\":{\"x\":0.1,\"y\":0.3,\"w\":0.15,\"h\":0.3}},{\"type\":\"tree\",\"label\":\"Pine Tree\",\"confidence\":0.85,\"bounds\":{\"x\":0.75,\"y\":0.25,\"w\":0.12,\"h\":0.35}},{\"type\":\"road\",\"label\":\"Campus Path\",\"confidence\":0.95,\"bounds\":{\"x\":0,\"y\":0.7,\"w\":1,\"h\":0.3}},{\"type\":\"person\",\"label\":\"Student\",\"confidence\":0.72,\"bounds\":{\"x\":0.5,\"y\":0.5,\"w\":0.08,\"h\":0.2}}],\"scene\":\"university campus with main building, trees, and walking paths\",\"style\":\"modern architecture with warm brick and glass\",\"dominantColors\":[\"#8B7355\",\"#4A90D9\",\"#5B8C3E\",\"#D4C5A9\"],\"timeOfDay\":\"afternoon\",\"weather\":\"clear\"}",
+    "generatedAt": "2026-08-01T07:06:41.647Z"
+  },
+  "entities": [
+    {
+      "id": "building_main",
+      "type": "building",
+      "label": "Main Building",
+      "position": [
+        0,
+        0,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "geometry": {
+        "builder": "stylized-building",
+        "parameters": {
+          "floors": 4,
+          "width": 5,
+          "depth": 2.5,
+          "cornerRadius": 0.14,
+          "windowColumns": 8
+        }
+      },
+      "material": {
+        "color": "#C4A882",
+        "roughness": 0.45,
+        "metalness": 0,
+        "clearcoat": 0.08,
+        "opacity": 1
+      },
+      "temporalBehavior": {
+        "mode": "decay",
+        "rate": 0.01
+      },
+      "variants": [],
+      "buildStatus": "blockout",
+      "confidence": 0.92
+    },
+    {
+      "id": "tree_oak_1",
+      "type": "tree",
+      "label": "Oak Tree",
+      "position": [
+        -3,
+        0,
+        -1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "geometry": {
+        "builder": "organic-tree",
+        "parameters": {
+          "height": 3.5,
+          "crownRadius": 1.8,
+          "trunkRadius": 0.15,
+          "seed": 42
+        }
+      },
+      "material": {
+        "color": "#5B8C3E",
+        "roughness": 0.7,
+        "metalness": 0,
+        "clearcoat": 0.05,
+        "opacity": 1
+      },
+      "temporalBehavior": {
+        "mode": "grow",
+        "rate": 0.05
+      },
+      "variants": [],
+      "buildStatus": "blockout",
+      "confidence": 0.88
+    },
+    {
+      "id": "tree_pine_1",
+      "type": "tree",
+      "label": "Pine Tree",
+      "position": [
+        3.5,
+        0,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "geometry": {
+        "builder": "organic-tree",
+        "parameters": {
+          "height": 4,
+          "crownRadius": 1.2,
+          "trunkRadius": 0.12,
+          "seed": 77
+        }
+      },
+      "material": {
+        "color": "#3E6B2E",
+        "roughness": 0.72,
+        "metalness": 0,
+        "clearcoat": 0.05,
+        "opacity": 1
+      },
+      "temporalBehavior": {
+        "mode": "grow",
+        "rate": 0.03
+      },
+      "variants": [],
+      "buildStatus": "blockout",
+      "confidence": 0.85
+    },
+    {
+      "id": "path_main",
+      "type": "path",
+      "label": "Campus Path",
+      "position": [
+        0,
+        0.01,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "geometry": {
+        "builder": "flat-path",
+        "parameters": {
+          "width": 2,
+          "length": 8,
+          "curve": 0.1
+        }
+      },
+      "material": {
+        "color": "#D4C5A9",
+        "roughness": 0.65,
+        "metalness": 0,
+        "clearcoat": 0.04,
+        "opacity": 1
+      },
+      "temporalBehavior": {
+        "mode": "static"
+      },
+      "variants": [],
+      "buildStatus": "blockout",
+      "confidence": 0.95
+    },
+    {
+      "id": "ground",
+      "type": "terrain",
+      "label": "Ground",
+      "position": [
+        0,
+        -0.05,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "geometry": {
+        "builder": "ground-plane",
+        "parameters": {
+          "width": 16,
+          "depth": 16,
+          "subdivisions": 8
+        }
+      },
+      "material": {
+        "color": "#8BC34A",
+        "roughness": 0.75,
+        "metalness": 0,
+        "clearcoat": 0.02,
+        "opacity": 1
+      },
+      "temporalBehavior": {
+        "mode": "static"
+      },
+      "variants": [],
+      "buildStatus": "blockout",
+      "confidence": 1
+    }
+  ],
+  "ground": {
+    "type": "grass",
+    "color": "#8BC34A",
+    "size": 16
+  },
+  "camera": {
+    "position": [
+      8,
+      6,
+      8
+    ],
+    "target": [
+      0,
+      0.5,
+      0
+    ],
+    "fov": 45,
+    "near": 0.1,
+    "far": 100
+  },
+  "lighting": {
+    "key": {
+      "color": "#FFE4B5",
+      "intensity": 1.2,
+      "position": [
+        5,
+        8,
+        3
+      ]
+    },
+    "fill": {
+      "color": "#E8E0D4",
+      "intensity": 0.4,
+      "position": [
+        -3,
+        4,
+        -2
+      ]
+    },
+    "rim": {
+      "color": "#FFF5E6",
+      "intensity": 0.3,
+      "position": [
+        0,
+        6,
+        -5
+      ]
+    },
+    "ambient": {
+      "color": "#F7F5EF",
+      "intensity": 0.5,
+      "position": [
+        0,
+        0,
+        0
+      ]
+    },
+    "contactShadow": true,
+    "shadowIntensity": 0.3
+  },
+  "temporalAnchors": [
+    {
+      "normalizedTime": -0.8,
+      "year": 2016,
+      "label": "2016",
+      "entityStates": {
+        "building_main": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "tree_oak_1": {
+          "visible": true,
+          "scale": [
+            0.7,
+            0.7,
+            0.7
+          ]
+        },
+        "tree_pine_1": {
+          "visible": true,
+          "scale": [
+            0.65,
+            0.65,
+            0.65
+          ]
+        }
+      }
+    },
+    {
+      "normalizedTime": 0,
+      "year": 2026,
+      "label": "2026",
+      "entityStates": {
+        "building_main": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "tree_oak_1": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "tree_pine_1": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "normalizedTime": 0.6,
+      "year": 2036,
+      "label": "2036",
+      "entityStates": {
+        "building_main": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "material": {
+            "roughness": 0.55
+          }
+        },
+        "tree_oak_1": {
+          "visible": true,
+          "scale": [
+            1.3,
+            1.3,
+            1.3
+          ]
+        },
+        "tree_pine_1": {
+          "visible": true,
+          "scale": [
+            1.25,
+            1.25,
+            1.25
+          ]
+        }
+      }
+    },
+    {
+      "normalizedTime": 1,
+      "year": 2046,
+      "label": "2046",
+      "entityStates": {
+        "building_main": {
+          "visible": true,
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "material": {
+            "roughness": 0.65
+          }
+        },
+        "tree_oak_1": {
+          "visible": true,
+          "scale": [
+            1.6,
+            1.6,
+            1.6
+          ]
+        },
+        "tree_pine_1": {
+          "visible": true,
+          "scale": [
+            1.5,
+            1.5,
+            1.5
+          ]
+        }
+      }
+    }
+  ],
+  "style": {
+    "name": "soft-clay",
+    "globalRoughness": [
+      0.35,
+      0.8
+    ],
+    "globalMetalness": [
+      0,
+      0
+    ],
+    "bevelRadius": [
+      0.02,
+      0.2
+    ],
+    "colorPalette": [
+      "#C4A882",
+      "#8B7355",
+      "#5B8C3E",
+      "#3E6B2E",
+      "#4A90D9",
+      "#D4C5A9",
+      "#8BC34A"
+    ],
+    "lightingMood": "warm"
+  },
+  "metadata": {
+    "description": "University campus scene with main building and trees",
+    "dominantColors": [
+      "#C4A882",
+      "#5B8C3E",
+      "#D4C5A9"
+    ],
+    "complexity": "medium",
+    "estimatedEntities": 6
+  }
+}

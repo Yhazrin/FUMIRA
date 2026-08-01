@@ -1,0 +1,204 @@
+{
+  "scene": {
+    "entities": [
+      {
+        "id": "entity_001",
+        "type": "building",
+        "geometry": {
+          "type": "box",
+          "dimensions": { "width": 8, "height": 14, "depth": 6 },
+          "position": { "x": 0, "y": 7, "z": -12 },
+          "rotation": { "x": 0, "y": 0.15, "z": 0 }
+        },
+        "material": {
+          "color": "#D4C5A0",
+          "roughness": 0.85,
+          "metalness": 0.05,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.92
+      },
+      {
+        "id": "entity_002",
+        "type": "building",
+        "geometry": {
+          "type": "box",
+          "dimensions": { "width": 7, "height": 12, "depth": 5 },
+          "position": { "x": -8, "y": 6, "z": -10 },
+          "rotation": { "x": 0, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#C8B88A",
+          "roughness": 0.82,
+          "metalness": 0.03,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.90
+      },
+      {
+        "id": "entity_003",
+        "type": "building",
+        "geometry": {
+          "type": "box",
+          "dimensions": { "width": 9, "height": 15, "depth": 5 },
+          "position": { "x": 10, "y": 7.5, "z": -11 },
+          "rotation": { "x": 0, "y": -0.2, "z": 0 }
+        },
+        "material": {
+          "color": "#BFAF82",
+          "roughness": 0.88,
+          "metalness": 0.02,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.88
+      },
+      {
+        "id": "entity_004",
+        "type": "object",
+        "geometry": {
+          "type": "box",
+          "dimensions": { "width": 1.2, "height": 2.2, "depth": 1.2 },
+          "position": { "x": 6, "y": 1.1, "z": -4 },
+          "rotation": { "x": 0, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#FFFFFF",
+          "roughness": 0.6,
+          "metalness": 0.1,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.85
+      },
+      {
+        "id": "entity_005",
+        "type": "tree",
+        "geometry": {
+          "type": "sphere",
+          "dimensions": { "width": 2.5, "height": 3.5, "depth": 2.5 },
+          "position": { "x": -4, "y": 2.5, "z": -6 },
+          "rotation": { "x": 0, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#3A7D44",
+          "roughness": 0.9,
+          "metalness": 0.0,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.88
+      },
+      {
+        "id": "entity_006",
+        "type": "tree",
+        "geometry": {
+          "type": "sphere",
+          "dimensions": { "width": 3, "height": 4, "depth": 3 },
+          "position": { "x": 3, "y": 3, "z": -7 },
+          "rotation": { "x": 0, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#2E6B3A",
+          "roughness": 0.92,
+          "metalness": 0.0,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.86
+      },
+      {
+        "id": "entity_007",
+        "type": "terrain",
+        "geometry": {
+          "type": "plane",
+          "dimensions": { "width": 40, "height": 0.1, "depth": 30 },
+          "position": { "x": 0, "y": 0, "z": -5 },
+          "rotation": { "x": -1.5708, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#8B8B7A",
+          "roughness": 0.95,
+          "metalness": 0.0,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.95
+      },
+      {
+        "id": "entity_008",
+        "type": "object",
+        "geometry": {
+          "type": "cylinder",
+          "dimensions": { "width": 0.08, "height": 8, "depth": 0.08 },
+          "position": { "x": -2, "y": 4, "z": -2 },
+          "rotation": { "x": 0, "y": 0, "z": 1.5708 }
+        },
+        "material": {
+          "color": "#222222",
+          "roughness": 0.7,
+          "metalness": 0.3,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": 0, "end": 1 },
+        "confidence": 0.82
+      },
+      {
+        "id": "entity_009",
+        "type": "object",
+        "geometry": {
+          "type": "cylinder",
+          "dimensions": { "width": 0.06, "height": 12, "depth": 0.06 },
+          "position": { "x": 5, "y": 6, "z": -3 },
+          "rotation": { "x": 0, "y": 0, "z": 1.5708 }
+        },
+        "material": {
+          "color": "#333333",
+          "roughness": 0.65,
+          "metalness": 0.35,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": 0, "end": 1 },
+        "confidence": 0.80
+      },
+      {
+        "id": "entity_010",
+        "type": "terrain",
+        "geometry": {
+          "type": "plane",
+          "dimensions": { "width": 40, "height": 0.05, "depth": 4 },
+          "position": { "x": 0, "y": 0.05, "z": 0 },
+          "rotation": { "x": -1.5708, "y": 0, "z": 0 }
+        },
+        "material": {
+          "color": "#A0A090",
+          "roughness": 0.9,
+          "metalness": 0.0,
+          "opacity": 1.0
+        },
+        "temporalRange": { "start": -1, "end": 1 },
+        "confidence": 0.93
+      }
+    ],
+    "camera": {
+      "position": { "x": 0, "y": 3.5, "z": 8 },
+      "target": { "x": 0, "y": 4, "z": -10 }
+    },
+    "lighting": {
+      "ambient": { "color": "#F7F5EF", "intensity": 0.6 },
+      "directional": {
+        "color": "#FFE4B5",
+        "intensity": 0.85,
+        "position": { "x": 5, "y": 12, "z": 8 }
+      }
+    }
+  },
+  "metadata": {
+    "sceneDescription": "A residential street view with multi-story beige apartment buildings, overhead power lines, a guard booth with orange stripes, scattered vegetation and trees, and a paved sidewalk running along the foreground",
+    "dominantColors": ["#D4C5A0", "#3A7D44", "#8B8B7A", "#FFFFFF", "#C8B88A"],
+    "complexity": "medium",
+    "estimatedVertices": 2800
+  }
+}

@@ -128,13 +128,62 @@ async function fetchSceneData(sid) {
       const res = await fetch(url);
       if (res.status === 404) continue;
       if (!res.ok) continue;
-      const fixture = await res.json();
-      if (!fixture || !fixture.entities || fixture.entities.length === 0) continue;
-      loadFixture(fixture);
+      let data = await res.json();
+      if (!data) continue;
+
+      // Handle SceneRuntime manifest format (sceneGraph + entities object)
+      // Convert to fixture format (entities array)
+      if (data.sceneGraph && data.entities && !Array.isArray(data.entities)) {
+        data = manifestToFixture(data);
+      }
+
+      if (!data.entities || data.entities.length === 0) continue;
+      loadFixture(data);
       return;
     } catch { /* try next URL */ }
   }
   setSceneState('waiting');
+}
+
+// Convert SceneRuntime manifest → desktop fixture format
+function manifestToFixture(manifest) {
+  const nodesById = {};
+  for (const node of (manifest.sceneGraph || [])) {
+    nodesById[node.id] = node;
+  }
+
+  const entities = [];
+  for (const [entityId, compiled] of Object.entries(manifest.entities || {})) {
+    const node = nodesById[compiled.sceneNodeId] || {};
+    const spec = compiled.spec || {};
+    entities.push({
+      id: entityId,
+      type: spec.type || 'prop',
+      label: spec.label || entityId,
+      position: node.position || [0, 0, 0],
+      rotation: node.rotation || [0, 0, 0],
+      scale: node.scale || [1, 1, 1],
+      geometry: {
+        builder: node.geometry?.type || 'box',
+        parameters: {
+          width: node.geometry?.args?.[0] ?? 1,
+          height: node.geometry?.args?.[1] ?? 1,
+          depth: node.geometry?.args?.[2] ?? 1,
+        },
+      },
+      material: node.material || { color: '#C4A882', roughness: 0.65 },
+      confidence: 1.0,
+    });
+  }
+
+  return {
+    id: 'manifest-scene',
+    name: 'Reconstructed Scene',
+    entities,
+    camera: manifest.defaultCamera,
+    temporalSpec: manifest.temporalSpec,
+    palette: {}, // use entity material colors directly
+  };
 }
 
 let pollTimer = null;
@@ -373,6 +422,18 @@ function loadFixture(fixture) {
   }
 
   const P = fixture.palette || {};
+  // Default palette fallback for when entities carry their own colors
+  const defaults = {
+    charcoal: 0x202425, warmWhite: 0xF2EEE5, warmWhiteR: 0xCEC7B8,
+    orange: 0xFF672A, orangeRim: 0xC9441D, lime: 0xB7D83D,
+    yellow: 0xFFC52A, trunk: 0x6B4E3D, foliage1: 0x7E9A27,
+    foliage2: 0xB7D83D, foliage3: 0x5B8C3E, skin: 0xF2D5B5,
+    cloth1: 0xFF672A, cloth2: 0x3A3E3F, road: 0x9E9688,
+    sidewalk: 0xC8C0B2, grass: 0x8FCB7E,
+  };
+  for (const [k, v] of Object.entries(defaults)) {
+    if (P[k] === undefined) P[k] = v;
+  }
   timelineIntervals = fixture.temporalSpec?.timelineIntervals || [];
 
   // Add ground
