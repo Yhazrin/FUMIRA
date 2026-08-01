@@ -14,6 +14,7 @@ struct ResultView: View {
     @State private var selectedFutureForkIndex = 0
     @State private var futureForkShakeFeedbackTrigger: Int?
     @State private var showsInterpretationEvidence = false
+    @State private var showsDiorama = false
 
     private var generatedTime: TimePosition {
         model.generatedFrame?.time ?? model.generationTargetTime
@@ -118,6 +119,10 @@ struct ResultView: View {
     var body: some View {
         resultPage
         .background(Color.clear)
+        .sheet(isPresented: $showsDiorama) {
+            DioramaView(model: model)
+                .interactiveDismissDisabled(false)
+        }
         .overlay(alignment: .topLeading) {
             if model.temporalShake.isMonitoring,
                let service = model.temporalShakeResponderService {
@@ -177,7 +182,7 @@ struct ResultView: View {
 
     private var resultPage: some View {
         PosterScreenContainer(background: .clear) {
-            VStack(alignment: .leading, spacing: PosterSpacing.lg) {
+            VStack(alignment: .leading, spacing: ClaySpacing.xxl) {
                 ResultPageHeading(
                     title: resultTitle,
                     interpretation: "一种可能的时间解释"
@@ -188,7 +193,7 @@ struct ResultView: View {
                         owner: .result,
                         aspectRatio: photoAspectRatio,
                         maximumHeight: ResultLayoutGeometry.accessiblePhotoMaximumHeight,
-                        cornerRadius: PosterRadius.photoPaper
+                        cornerRadius: ClayShape.lg
                     )
 
                     TemporalBlowRevealSurface(
@@ -243,15 +248,15 @@ struct ResultView: View {
     }
 
     private var resultActionDock: some View {
-        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+        VStack(alignment: .leading, spacing: ClaySpacing.sm) {
             if !isBrowseTimeGenerated {
                 generateBrowsedFrameButton
             }
 
             saveButton
 
-            HStack(spacing: PosterSpacing.sm) {
-                Spacer(minLength: PosterSpacing.sm)
+            HStack(spacing: ClaySpacing.sm) {
+                Spacer(minLength: ClaySpacing.sm)
 
                 compactAction(
                     title: "对准现实",
@@ -303,10 +308,10 @@ struct ResultView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(PosterPalette.actionBlueDeep)
+                .foregroundStyle(ClayPalette.orangeRim)
                 .frame(
-                    width: PosterControlMetric.compactDiameter,
-                    height: PosterControlMetric.compactDiameter
+                    width: 56,
+                    height: 56
                 )
                 .contentShape(Circle())
         }
@@ -320,16 +325,16 @@ struct ResultView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(
                     isTiltTimeActive
-                        ? PosterPalette.paperWhite
-                        : PosterPalette.actionBlueDeep
+                        ? ClayPalette.warmWhite
+                        : ClayPalette.orangeRim
                 )
                 .frame(
-                    width: PosterControlMetric.compactDiameter,
-                    height: PosterControlMetric.compactDiameter
+                    width: 56,
+                    height: 56
                 )
                 .background(
                     isTiltTimeActive
-                        ? PosterPalette.actionBlueDeep
+                        ? ClayPalette.orangeRim
                         : Color.clear,
                     in: Circle()
                 )
@@ -378,13 +383,21 @@ struct ResultView: View {
             } label: {
                 Label("重拍", systemImage: "camera.rotate")
             }
+
+            Divider()
+
+            Button {
+                showsDiorama = true
+            } label: {
+                Label("3D 微缩场景", systemImage: "cube.transparent")
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(PosterPalette.mutedInk)
+                .foregroundStyle(ClayPalette.textOnDark)
                 .frame(
-                    width: PosterControlMetric.compactDiameter,
-                    height: PosterControlMetric.compactDiameter
+                    width: 56,
+                    height: 56
                 )
                 .contentShape(Circle())
         }
@@ -409,24 +422,24 @@ struct ResultView: View {
     private var narrativeSection: some View {
         let trace = interpretationTrace
 
-        return VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+        return VStack(alignment: .leading, spacing: ClaySpacing.sm) {
             Text(displayedNarrative)
-                .font(PosterTypography.supporting)
-                .foregroundStyle(PosterPalette.mutedInk)
+                .font(ClayTypography.bodySmall)
+                .foregroundStyle(ClayPalette.textMuted)
                 .lineLimit(showsInterpretationEvidence ? nil : 1)
                 .fixedSize(horizontal: false, vertical: true)
                 .contentTransition(.opacity)
 
             DisclosureGroup(isExpanded: $showsInterpretationEvidence) {
                 TemporalWitnessRibbon(trace: trace)
-                    .padding(.top, PosterSpacing.sm)
+                    .padding(.top, ClaySpacing.sm)
             } label: {
                 Text("画面线索")
-                    .font(PosterTypography.label)
-                    .foregroundStyle(PosterPalette.mutedInk)
-                    .frame(minHeight: PosterControlMetric.minimumTouchTarget, alignment: .leading)
+                    .font(ClayTypography.label)
+                    .foregroundStyle(ClayPalette.textMuted)
+                    .frame(minHeight: ClaySpacing.minTapTarget, alignment: .leading)
             }
-            .tint(PosterPalette.mutedInk)
+            .tint(ClayPalette.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("result.temporal-interpretation")
@@ -453,7 +466,7 @@ struct ResultView: View {
     }
 
     private var futureForkSection: some View {
-        VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+        VStack(alignment: .leading, spacing: ClaySpacing.sm) {
             TemporalFutureForkView(
                 items: futureForkPresentationItems,
                 selectedIndex: selectedFutureForkIndex,
@@ -467,15 +480,15 @@ struct ResultView: View {
 
             if let selectedFutureFork {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: PosterSpacing.md) {
+                    HStack(spacing: ClaySpacing.lg) {
                         futureForkAdvanceAction
 
-                        Spacer(minLength: PosterSpacing.sm)
+                        Spacer(minLength: ClaySpacing.sm)
 
                         futureForkGenerateAction(selectedFutureFork)
                     }
 
-                    VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+                    VStack(alignment: .leading, spacing: ClaySpacing.xxs) {
                         futureForkGenerateAction(selectedFutureFork)
                         futureForkAdvanceAction
                     }
@@ -493,9 +506,9 @@ struct ResultView: View {
                 "下一种",
                 systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
             )
-            .font(PosterTypography.label)
-            .foregroundStyle(PosterPalette.mutedInk)
-            .frame(minHeight: PosterControlMetric.minimumTouchTarget)
+            .font(ClayTypography.label)
+            .foregroundStyle(ClayPalette.textMuted)
+            .frame(minHeight: ClaySpacing.minTapTarget)
             .contentShape(Rectangle())
         }
         .buttonStyle(PosterPressStyle())
@@ -514,26 +527,26 @@ struct ResultView: View {
             }
         } label: {
             Text(isCurrent ? "已经显影" : "显影这一可能")
-                .font(PosterTypography.label)
+                .font(ClayTypography.label)
                 .foregroundStyle(
                     isCurrent
-                        ? PosterPalette.mutedInk
-                        : PosterPalette.paperWhite
+                        ? ClayPalette.textMuted
+                        : ClayPalette.warmWhite
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
-                .padding(.horizontal, PosterSpacing.md)
-                .frame(minHeight: PosterControlMetric.minimumTouchTarget)
+                .padding(.horizontal, ClaySpacing.lg)
+                .frame(minHeight: ClaySpacing.minTapTarget)
                 .background(
                     isCurrent
-                        ? PosterPalette.cardLight
-                        : PosterPalette.actionBlue,
+                        ? ClayPalette.warmWhite
+                        : ClayPalette.orange,
                     in: Capsule()
                 )
                 .overlay {
                     if isCurrent {
                         Capsule()
-                            .stroke(PosterPalette.line, lineWidth: 1)
+                            .stroke(ClayPalette.warmWhiteRim, lineWidth: 1)
                     }
                 }
         }
@@ -704,14 +717,14 @@ private struct ResultPageHeading: View {
     let interpretation: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+        VStack(alignment: .leading, spacing: ClaySpacing.xxs) {
             Text(interpretation)
-                .font(PosterTypography.caption)
-                .foregroundStyle(PosterPalette.mutedInk)
+                .font(ClayTypography.labelSmall)
+                .foregroundStyle(ClayPalette.textMuted)
 
             Text(title)
-                .font(PosterTypography.screenTitle)
-                .foregroundStyle(PosterPalette.ink)
+                .font(ClayTypography.displaySmall)
+                .foregroundStyle(ClayPalette.charcoal)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
         }
@@ -728,32 +741,32 @@ private struct BlowRevealPrompt: View {
     var body: some View {
         let clampedProgress = FUMIRASpatialMotion.clamp(progress)
 
-        HStack(spacing: PosterSpacing.sm) {
+        HStack(spacing: ClaySpacing.sm) {
             Label("吹一口气", systemImage: "wind")
-                .font(PosterTypography.label)
-                .foregroundStyle(PosterPalette.actionBlueDeep)
+                .font(ClayTypography.label)
+                .foregroundStyle(ClayPalette.orangeRim)
 
-            Spacer(minLength: PosterSpacing.xs)
+            Spacer(minLength: ClaySpacing.xxs)
 
             Button(action: complete) {
                 Text("直接显影")
-                    .font(PosterTypography.label)
-                    .foregroundStyle(PosterPalette.ink)
-                    .padding(.horizontal, PosterSpacing.md)
-                    .frame(minHeight: PosterControlMetric.minimumTouchTarget)
-                    .background(PosterPalette.bellYellow, in: Capsule())
+                    .font(ClayTypography.label)
+                    .foregroundStyle(ClayPalette.charcoal)
+                    .padding(.horizontal, ClaySpacing.lg)
+                    .frame(minHeight: ClaySpacing.minTapTarget)
+                    .background(ClayPalette.yellow, in: Capsule())
             }
             .buttonStyle(PosterPressStyle())
             .accessibilityIdentifier("result.reveal-now")
             .accessibilityHint("不使用麦克风，直接显示\(target.compactLabel)的照片")
         }
-        .padding(.leading, PosterSpacing.md)
-        .padding(.trailing, PosterSpacing.xs)
-        .padding(.vertical, PosterSpacing.xs)
-        .background(PosterPalette.paperWhite, in: Capsule())
+        .padding(.leading, ClaySpacing.lg)
+        .padding(.trailing, ClaySpacing.xxs)
+        .padding(.vertical, ClaySpacing.xxs)
+        .background(ClayPalette.warmWhite, in: Capsule())
         .overlay {
             Capsule()
-                .stroke(PosterPalette.line, lineWidth: 1)
+                .stroke(ClayPalette.warmWhiteRim, lineWidth: 1)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
@@ -804,7 +817,7 @@ private struct RealityComparisonSurface: View {
                 transaction.disablesAnimations = true
             }
             .clipShape(
-                RoundedRectangle(cornerRadius: PosterRadius.photoPaper, style: .continuous)
+                RoundedRectangle(cornerRadius: ClayShape.lg, style: .continuous)
             )
         }
     }
@@ -841,31 +854,31 @@ private struct RealityComparisonSurface: View {
 
             HStack {
                 Text("原片 · NOW")
-                    .foregroundStyle(PosterPalette.actionBlueDeep)
+                    .foregroundStyle(ClayPalette.orangeRim)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(PosterPalette.paperWhite.opacity(0.94), in: Capsule())
+                    .background(ClayPalette.warmWhite.opacity(0.94), in: Capsule())
                 Spacer()
                 Text(target.compactLabel)
-                    .foregroundStyle(PosterPalette.paperWhite)
+                    .foregroundStyle(ClayPalette.warmWhite)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(PosterPalette.actionBlue, in: Capsule())
+                    .background(ClayPalette.orange, in: Capsule())
             }
-            .font(PosterTypography.caption.weight(.semibold))
-            .padding(.horizontal, PosterSpacing.md)
-            .padding(.top, PosterSpacing.lg + CameraChromeMetrics.controlDiameter)
+            .font(ClayTypography.labelSmall.weight(.semibold))
+            .padding(.horizontal, ClaySpacing.lg)
+            .padding(.top, ClaySpacing.xxl + CameraChromeMetrics.controlDiameter)
             .allowsHitTesting(false)
             .zIndex(4)
 
-            PosterGlassCard(cornerRadius: PosterRadius.card) {
+            PosterGlassCard(cornerRadius: ClayShape.card) {
                 Text("拖动，看时间差")
-                    .font(PosterTypography.cardTitle)
+                    .font(ClayTypography.heading)
                     .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, PosterSpacing.md)
-            .padding(.bottom, PosterSpacing.md)
+            .padding(.horizontal, ClaySpacing.lg)
+            .padding(.bottom, ClaySpacing.lg)
             .frame(maxHeight: .infinity, alignment: .bottom)
             .allowsHitTesting(false)
             .zIndex(4)
@@ -884,7 +897,7 @@ private struct RealityComparisonSurface: View {
     }
 
     private var comparisonChrome: some View {
-        HStack(spacing: PosterSpacing.sm) {
+        HStack(spacing: ClaySpacing.sm) {
             Spacer(minLength: 0)
 
             comparisonControl(
@@ -916,8 +929,8 @@ private struct RealityComparisonSurface: View {
                 action: close
             )
         }
-        .padding(.horizontal, PosterSpacing.md)
-        .padding(.top, PosterSpacing.sm)
+        .padding(.horizontal, ClaySpacing.lg)
+        .padding(.top, ClaySpacing.sm)
         .zIndex(5)
     }
 
@@ -929,16 +942,16 @@ private struct RealityComparisonSurface: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(PosterTypography.label)
-                .foregroundStyle(PosterPalette.actionBlueDeep)
+                .font(ClayTypography.label)
+                .foregroundStyle(ClayPalette.orangeRim)
                 .frame(
                     width: CameraChromeMetrics.controlDiameter,
                     height: CameraChromeMetrics.controlDiameter
                 )
-                .background(PosterPalette.paperWhite.opacity(0.94), in: Circle())
+                .background(ClayPalette.warmWhite.opacity(0.94), in: Circle())
                 .overlay {
                     Circle()
-                        .stroke(PosterPalette.actionBlue.opacity(0.22), lineWidth: 1)
+                        .stroke(ClayPalette.orange.opacity(0.22), lineWidth: 1)
                 }
         }
         .buttonStyle(PosterPressStyle())
@@ -949,23 +962,23 @@ private struct RealityComparisonSurface: View {
     private func boundaryHandle(at x: CGFloat, height: CGFloat) -> some View {
         ZStack {
             Capsule(style: .continuous)
-                .fill(PosterPalette.paperWhite.opacity(0.92))
+                .fill(ClayPalette.warmWhite.opacity(0.92))
                 .frame(width: 3, height: height)
-                .shadow(color: PosterPalette.actionBlue.opacity(0.22), radius: 6)
+                .shadow(color: ClayPalette.orange.opacity(0.22), radius: 6)
 
             Capsule(style: .continuous)
-                .fill(PosterPalette.paperWhite)
+                .fill(ClayPalette.warmWhite)
                 .frame(width: 34, height: 56)
                 .overlay {
                     Capsule(style: .continuous)
-                        .stroke(PosterPalette.actionBlue.opacity(0.28), lineWidth: 1)
+                        .stroke(ClayPalette.orange.opacity(0.28), lineWidth: 1)
                 }
                 .overlay {
                     Image(systemName: "arrow.left.and.right")
-                        .font(PosterTypography.caption)
-                        .foregroundStyle(PosterPalette.actionBlueDeep)
+                        .font(ClayTypography.labelSmall)
+                        .foregroundStyle(ClayPalette.orangeRim)
                 }
-                .shadow(color: PosterPalette.actionBlue.opacity(0.18), radius: 10, y: 3)
+                .shadow(color: ClayPalette.orange.opacity(0.18), radius: 10, y: 3)
         }
         .position(x: x, y: height * 0.5)
     }
@@ -995,7 +1008,7 @@ private struct RealityComparisonSurface: View {
                 .resizable()
                 .scaledToFill()
         } else {
-            PosterPalette.skySoft
+            ClayPalette.orangeRim
         }
     }
 }
@@ -1019,7 +1032,7 @@ private enum RealityComparisonMode: Equatable {
 private struct RealityComparisonGrid: View {
     var body: some View {
         Canvas { context, size in
-            let color = PosterPalette.paperWhite.opacity(0.38)
+            let color = ClayPalette.warmWhite.opacity(0.38)
             let thirdsX = [size.width / 3, size.width * 2 / 3]
             let thirdsY = [size.height / 3, size.height * 2 / 3]
             for x in thirdsX {
@@ -1110,7 +1123,7 @@ enum ResultLayoutGeometry {
         )
         let panelHeight = max(container.height - panelTop, minimumVisiblePanelHeight)
         let photoBottom = photoTop + photoSize.height
-        let desiredReveal = max(photoBottom - panelTop + PosterSpacing.md, 96)
+        let desiredReveal = max(photoBottom - panelTop + ClaySpacing.lg, 96)
         let maximumPanelPull = min(
             desiredReveal,
             max(panelHeight - minimumVisiblePanelHeight - safeAreaBottom, 0)
@@ -1147,7 +1160,7 @@ enum ResultLayoutGeometry {
     ) -> CGSize {
         let ratio = max(aspectRatio, 0.01)
         let availableWidth = max(container.width, 1)
-        let maximumHeight = max(container.height - safeAreaTop - PosterSpacing.sm, 1)
+        let maximumHeight = max(container.height - safeAreaTop - ClaySpacing.sm, 1)
         let widthDrivenHeight = availableWidth / ratio
 
         if widthDrivenHeight <= maximumHeight {
@@ -1157,12 +1170,12 @@ enum ResultLayoutGeometry {
     }
 
     static func contentWidth(in viewportWidth: CGFloat) -> CGFloat {
-        max(viewportWidth - PosterSpacing.md * 2, 1)
+        max(viewportWidth - ClaySpacing.lg * 2, 1)
     }
 
     static func primaryActionLayout(in contentWidth: CGFloat) -> PrimaryActionLayout {
         let width = max(contentWidth, 1)
-        let spacing = PosterSpacing.sm
+        let spacing = ClaySpacing.sm
         if width < 330 {
             return PrimaryActionLayout(
                 isStacked: true,
@@ -1192,13 +1205,13 @@ private struct ResultTextAction: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(PosterPalette.actionBlueDeep)
-                .frame(maxWidth: .infinity, minHeight: PosterControlMetric.minimumTouchTarget)
+                .foregroundStyle(ClayPalette.orangeRim)
+                .frame(maxWidth: .infinity, minHeight: ClaySpacing.minTapTarget)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-                .padding(.horizontal, PosterSpacing.xs)
-                .background(PosterPalette.cardActive)
-                .clipShape(RoundedRectangle(cornerRadius: PosterRadius.control, style: .continuous))
+                .padding(.horizontal, ClaySpacing.xxs)
+                .background(ClayPalette.orange)
+                .clipShape(RoundedRectangle(cornerRadius: ClayShape.md, style: .continuous))
                 .contentShape(Rectangle())
         }
         .buttonStyle(PosterPressStyle())

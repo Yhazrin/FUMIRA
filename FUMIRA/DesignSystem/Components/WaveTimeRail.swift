@@ -42,36 +42,36 @@ struct WaveTimeRail: View {
 
     private var idleBarColor: Color {
         switch chrome {
-        case .paper: PosterPalette.waveIdle
-        case .immersive: PosterPalette.paperWhite.opacity(0.38)
+        case .paper: ClayPalette.charcoal.opacity(0.18)
+        case .immersive: ClayPalette.warmWhite.opacity(0.38)
         }
     }
 
     private var landmarkColor: Color {
         switch chrome {
-        case .paper: PosterPalette.mutedInk
-        case .immersive: PosterPalette.paperWhite.opacity(0.7)
+        case .paper: ClayPalette.textMuted
+        case .immersive: ClayPalette.warmWhite.opacity(0.7)
         }
     }
 
     private var landmarkNowColor: Color {
         switch chrome {
-        case .paper: PosterPalette.ink
-        case .immersive: PosterPalette.paperWhite
+        case .paper: ClayPalette.charcoal
+        case .immersive: ClayPalette.warmWhite
         }
     }
 
     private var yearLabelForeground: Color {
         switch chrome {
-        case .paper: PosterPalette.ink
-        case .immersive: PosterPalette.paperWhite
+        case .paper: ClayPalette.charcoal
+        case .immersive: ClayPalette.warmWhite
         }
     }
 
     private var yearLabelFill: Color {
         switch chrome {
-        case .paper: PosterPalette.paperWhite.opacity(0.92)
-        case .immersive: PosterPalette.ink.opacity(0.55)
+        case .paper: ClayPalette.warmWhite.opacity(0.92)
+        case .immersive: ClayPalette.charcoal.opacity(0.55)
         }
     }
 
@@ -101,7 +101,7 @@ struct WaveTimeRail: View {
     }
 
     var body: some View {
-        VStack(spacing: PosterSpacing.xs) {
+        VStack(spacing: ClaySpacing.xxs) {
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let thumbX = normalizedToX(displayValue, width: width)
@@ -146,10 +146,12 @@ struct WaveTimeRail: View {
     }
 
     private var accessibilityValueText: String {
-        if abs(timePosition.offsetDays) < 0.5 {
+        let days = timePosition.offsetDays
+        guard days.isFinite else { return "现在" }
+        if abs(days) < 0.5 {
             return "现在，\(timeLabel)"
         }
-        let direction = timePosition.offsetDays < 0 ? "向过去" : "向未来"
+        let direction = days < 0 ? "向过去" : "向未来"
         return "\(timePosition.compactLabel)，目标 \(timeLabel)，\(direction)"
     }
 
@@ -187,7 +189,7 @@ struct WaveTimeRail: View {
                     width: barWidth,
                     height: barHeight
                 )
-                let path = RoundedRectangle(cornerRadius: PosterRadius.waveBar, style: .continuous)
+                let path = RoundedRectangle(cornerRadius: ClayShape.xs, style: .continuous)
                     .path(in: rect)
                 context.fill(path, with: .color(idleBarColor))
             }
@@ -200,7 +202,7 @@ struct WaveTimeRail: View {
                 height: activeHeight
             )
             let activePath = Capsule(style: .continuous).path(in: activeRect)
-            context.fill(activePath, with: .color(PosterPalette.actionBlue))
+            context.fill(activePath, with: .color(ClayPalette.orange))
         }
         .frame(width: width, height: height)
         .animation(
@@ -216,7 +218,7 @@ struct WaveTimeRail: View {
         return Text(timeLabel)
             .font(.caption.weight(.semibold).monospacedDigit())
             .foregroundStyle(yearLabelForeground)
-            .padding(.horizontal, PosterSpacing.sm)
+            .padding(.horizontal, ClaySpacing.sm)
             .padding(.vertical, 2)
             .background(
                 Capsule(style: .continuous)
@@ -224,7 +226,7 @@ struct WaveTimeRail: View {
             )
             .overlay {
                 Capsule(style: .continuous)
-                    .stroke(PosterPalette.actionBlue.opacity(0.55), lineWidth: 1)
+                    .stroke(ClayPalette.orange.opacity(0.55), lineWidth: 1)
             }
             .position(x: x, y: max(12, centerY - barMaxHeight / 2 - 11))
             .offset(y: -3 * releaseImpact)
@@ -520,17 +522,17 @@ enum WaveTimeBrowseSnap {
         @State private var value = 0.0
 
         var body: some View {
-            VStack(spacing: PosterSpacing.lg) {
+            VStack(spacing: ClaySpacing.xxl) {
                 Text(TimePosition(normalized: value).compactLabel)
                     .font(.headline)
-                    .foregroundStyle(PosterPalette.ink)
+                    .foregroundStyle(ClayPalette.charcoal)
 
                 WaveTimeRail(value: value) { value = $0 }
-                    .padding(.horizontal, PosterSpacing.lg)
+                    .padding(.horizontal, ClaySpacing.xxl)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(PosterPalette.canvas)
+            .background(ClayPalette.charcoal)
         }
     }
     return PreviewWrapper()
@@ -542,13 +544,13 @@ enum WaveTimeBrowseSnap {
 
         var body: some View {
             ZStack {
-                PosterPalette.ink
+                ClayPalette.charcoal
                     .ignoresSafeArea()
                 LinearGradient(
                     colors: [
-                        PosterEffects.cameraTopScrim,
+                        ClayPalette.charcoal.opacity(0.38),
                         Color.clear,
-                        PosterEffects.cameraBottomScrim
+                        ClayPalette.charcoal.opacity(0.48)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -558,8 +560,8 @@ enum WaveTimeBrowseSnap {
                 VStack {
                     Spacer()
                     WaveTimeRail(value: value, chrome: .immersive) { value = $0 }
-                        .padding(.horizontal, PosterSpacing.lg)
-                        .padding(.bottom, PosterSpacing.xl)
+                        .padding(.horizontal, ClaySpacing.xxl)
+                        .padding(.bottom, ClaySpacing.xxxl)
                 }
             }
         }

@@ -200,4 +200,15 @@ enum PosterMotion {
     static let reveal = Animation.timingCurve(0.12, 0.78, 0.18, 1, duration: 0.72)
     /// Soft lift for cards entering on scroll. iOS 17+ scrollTransition curve.
     static let scrollReveal = Animation.timingCurve(0.22, 1, 0.36, 1, duration: scrollRevealDuration)
+
+    // MARK: - Clay OS spring overrides
+
+    /// Clay 按钮反馈弹簧
+    static let clayButton = ClayMotion.buttonSpring
+
+    /// Clay 面板/卡片弹簧
+    static let clayPanel = ClayMotion.panelSpring
+
+    /// Clay 状态切换弹簧
+    static let clayToggle = ClayMotion.toggleSpring
 }

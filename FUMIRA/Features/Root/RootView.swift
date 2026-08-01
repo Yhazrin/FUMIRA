@@ -97,7 +97,7 @@ struct RootView: View {
                     .zIndex(50)
                 }
 
-                PosterEffects.cameraFlashWash
+                ClayPalette.warmWhite
                     .opacity(shutterFlash)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -141,22 +141,24 @@ struct RootView: View {
             } label: {
                 Image(systemName: "gearshape")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(PosterPalette.ink.opacity(0.72))
+                    .foregroundStyle(ClayPalette.textOnDark.opacity(0.72))
                     .frame(width: 44, height: 44)
-                    .background(PosterPalette.cardLight)
-                    .clipShape(Circle())
-                    .overlay {
+                    .background {
                         Circle()
-                            .stroke(PosterPalette.line, lineWidth: 1)
+                            .fill(ClayPalette.charcoalLight)
+                            .overlay {
+                                Circle()
+                                    .stroke(ClayPalette.warmWhite.opacity(0.12), lineWidth: 1)
+                            }
                     }
             }
             .posterZoomSource(
                 namespace: sceneNamespace,
                 id: PosterZoomID.settingsCog,
-                cornerRadius: PosterRadius.control
+                cornerRadius: ClayShape.md
             )
-            .padding(.trailing, PosterSpacing.lg)
-            .padding(.top, PosterSpacing.sm)
+            .padding(.trailing, ClaySpacing.xxl)
+            .padding(.top, ClaySpacing.sm)
             .accessibilityLabel("设置")
             .accessibilityHint("打开通用设置；模型路由在高级选项中")
         }
@@ -531,7 +533,7 @@ struct RootView: View {
                         model.capturedPhoto?.displayAspectRatio ?? 3.0 / 4.0
                     )
                 ),
-                cornerRadius: PosterRadius.photoPaper
+                cornerRadius: ClayShape.lg
             )
             return source.interpolated(
                 to: destination,
@@ -554,9 +556,9 @@ struct RootView: View {
         case .viewfinder:
             .clear
         case .understanding, .storyWriting, .generating, .result:
-            PosterEffects.photoPaperShadow
+            ClayShadow.rest.color
         case .shuttered:
-            PosterPalette.ink.opacity(0.22)
+            ClayPalette.charcoal.opacity(0.22)
         default:
             .clear
         }
@@ -566,12 +568,12 @@ struct RootView: View {
         switch model.phase {
         case .viewfinder: 0
         case .shuttered: 18 * captureLiftProgress
-        case .understanding: PosterEffects.photoPaperLandingShadowRadius
+        case .understanding: ClayShadow.rest.radius
         case .result:
             reduceMotion
                 ? 0
                 : 4 + photoSpatialProgress
-                    * PosterEffects.photoPaperLandingShadowRadius
+                    * ClayShadow.rest.radius
         default: 14
         }
     }
@@ -580,12 +582,12 @@ struct RootView: View {
         switch model.phase {
         case .viewfinder: 0
         case .shuttered: 10 * captureLiftProgress
-        case .understanding: PosterEffects.photoPaperLandingShadowOffset
+        case .understanding: ClayShadow.rest.y
         case .result:
             reduceMotion
                 ? 0
-                : PosterSpacing.xs + photoSpatialProgress
-                    * PosterEffects.photoPaperLandingShadowOffset
+                : ClaySpacing.xxs + photoSpatialProgress
+                    * ClayShadow.rest.y
         default: 8
         }
     }
@@ -664,15 +666,15 @@ struct RootView: View {
         case .cameraPermission:
             // Matches the liquid portal / hold so the viewfinder slide reveals
             // blue underneath instead of a white canvas flash.
-            PosterPalette.actionBlue
+            ClayPalette.orange
         case .viewfinder, .shuttered:
-            PosterPalette.actionBlue
+            ClayPalette.orange
         case .understanding, .storyWriting, .generating:
-            PosterPalette.canvas
+            ClayPalette.charcoal
         case .connection, .bluetoothPermission, .connected,
              .result, .share,
              .pipelineFailure, .disconnected:
-            PosterPalette.canvas
+            ClayPalette.charcoal
         }
     }
 

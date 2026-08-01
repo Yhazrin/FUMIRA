@@ -1,0 +1,57 @@
+/* FUMIRA Design Tokens — CSS Custom Properties
+ * Source of truth: tokens.json
+ * Platform: Desktop/Web companion
+ */
+
+:root {
+  /* === Palette === */
+  --fumira-paper:          #F2EEE5;
+  --fumira-time-blue:      #4A90D9;
+  --fumira-time-blue-rim:  #3570A8;
+  --fumira-park-green:     #8FCB7E;
+  --fumira-park-green-rim: #5FA04E;
+  --fumira-energy-lime:    #B7D83D;
+  --fumira-ink:            #202425;
+  --fumira-charcoal-light: #3A3E3F;
+  --fumira-orange:         #FF672A;
+  --fumira-orange-rim:     #C9441D;
+  --fumira-yellow:         #FFC52A;
+  --fumira-yellow-rim:     #C18B14;
+  --fumira-warm-white-rim: #CEC7B8;
+  --fumira-error:          #E95E52;
+
+  /* === Material — Roughness === */
+  --fumira-roughness-0: 0.0;
+  --fumira-roughness-1: 0.25;
+  --fumira-roughness-2: 0.55;
+  --fumira-roughness-3: 0.85;
+
+  /* === Material — Metalness === */
+  --fumira-metalness-0: 0.0;
+  --fumira-metalness-1: 0.3;
+  --fumira-metalness-2: 0.7;
+  --fumira-metalness-3: 1.0;
+
+  /* === Material — Clearcoat === */
+  --fumira-clearcoat-0: 0.0;
+  --fumira-clearcoat-1: 0.3;
+  --fumira-clearcoat-2: 0.6;
+  --fumira-clearcoat-3: 1.0;
+
+  /* === Geometry === */
+  --fumira-corner-ratio:        0.067;
+  --fumira-bevel-segments:      8;
+  --fumira-card-radius:         26px;
+  --fumira-photo-paper-radius:  20px;
+  --fumira-compact-ctrl-radius: 18px;
+
+  /* === Spacing === */
+  --fumira-base-unit:       8px;
+  --fumira-content-padding: 24px;
+  --fumira-control-height:  56px;
+  --fumira-min-touch:       44px;
+
+  /* === Time === */
+  --fumira-year-range:       100;
+  --fumira-nonlinear-center: 0.1;
+}

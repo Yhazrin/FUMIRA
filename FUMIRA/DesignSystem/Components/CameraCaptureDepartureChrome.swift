@@ -34,7 +34,7 @@ struct CameraCaptureDepartureChrome: View {
                         systemImage: "arrow.triangle.2.circlepath"
                     )
                 }
-                .padding(.horizontal, PosterSpacing.md)
+                .padding(.horizontal, ClaySpacing.lg)
                 .frame(
                     width: compositionFrame.width,
                     height: CameraChromeMetrics.topRowHeight
@@ -42,7 +42,7 @@ struct CameraCaptureDepartureChrome: View {
                 .position(
                     x: compositionFrame.midX,
                     y: systemInsets.top
-                        + PosterSpacing.sm
+                        + ClaySpacing.sm
                         + CameraChromeMetrics.topRowHeight * 0.5
                 )
 
@@ -51,17 +51,17 @@ struct CameraCaptureDepartureChrome: View {
                     onChange: { _ in },
                     onCapture: {}
                 )
-                .frame(width: proxy.size.width - PosterSpacing.md * 2)
+                .frame(width: proxy.size.width - ClaySpacing.lg * 2)
                 .position(
                     x: proxy.size.width * 0.5,
                     y: controlPlacement.centerY
                 )
                 .shadow(
                     color: controlPlacement.overlaysPreview
-                        ? PosterEffects.cameraFloatingWaveShadow
+                        ? ClayPalette.charcoal.opacity(0.24)
                         : .clear,
-                    radius: PosterEffects.cameraFloatingWaveShadowRadius,
-                    y: PosterEffects.cameraFloatingWaveShadowOffset
+                    radius: 10,
+                    y: 3
                 )
             }
             .frame(width: proxy.size.width, height: proxy.size.height)

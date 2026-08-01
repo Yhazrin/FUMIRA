@@ -40,7 +40,7 @@ struct CameraEntryPortal: View {
             ZStack {
                 // Primary disc — the continuous object the user touched.
                 Circle()
-                    .fill(PosterPalette.actionBlue)
+                    .fill(ClayPalette.orange)
                     .frame(width: source, height: source)
                     .scaleEffect(reduceMotion ? coverScale : 1 + (coverScale - 1) * expand)
                     .position(center)
@@ -49,7 +49,7 @@ struct CameraEntryPortal: View {
                 // the cover so alpha-threshold merge cannot flash the screen.
                 Canvas { context, _ in
                     context.addFilter(
-                        .alphaThreshold(min: 0.5, color: PosterPalette.actionBlue)
+                        .alphaThreshold(min: 0.5, color: ClayPalette.orange)
                     )
                     context.addFilter(.blur(radius: liquidBlur))
 
@@ -80,7 +80,7 @@ struct CameraEntryPortal: View {
 
                 Image(systemName: "camera.aperture")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(PosterPalette.paperWhite)
+                    .foregroundStyle(ClayPalette.warmWhite)
                     .frame(width: source, height: source)
                     .scaleEffect(
                         reduceMotion
@@ -99,7 +99,7 @@ struct CameraEntryPortal: View {
 
     private func liquidDisc(scale: CGFloat) -> some View {
         Circle()
-            .fill(.white)
+            .fill(ClayPalette.orange)
             .frame(
                 width: PosterMotion.cameraEntrySourceDiameter,
                 height: PosterMotion.cameraEntrySourceDiameter

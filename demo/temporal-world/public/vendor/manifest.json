@@ -1,0 +1,11 @@
+{
+  "generated": "2026-08-01T06:04:06Z",
+  "threeVersion": "0.170.0",
+  "files": {
+    "addons/OrbitControls.js": { "sha256": "80efaadea4f8a636a65fb0bd08bfef62f3d93a0bb94e2e7500f23176c5c07f4e", "size": 32134 },
+    "addons/WebGLRenderer.js": { "sha256": "6189d164fb9321651d7c0f9cd5d28ed241dd7443c7b739b439f1879f6b7f9a5f", "size": 155 },
+    "qrcode.min.js": { "sha256": "ec64d89ab3096dce8084912dedff9f2ca5ae64144d0cacd4a082c293d5d06b59", "size": 23738 },
+    "three.module.js": { "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb", "size": 1314681 },
+    "three.module.min.js": { "sha256": "08fd7545d13d2c7fb65ab691530a802dafefd638596501854f267d0fb13c39e7", "size": 691648 }
+  }
+}

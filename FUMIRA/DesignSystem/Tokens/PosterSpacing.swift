@@ -1,17 +1,14 @@
 import Foundation
 
 enum PosterSpacing {
-    static let xs: CGFloat = 4
-    static let sm: CGFloat = 8
-    static let md: CGFloat = 16
-    static let lg: CGFloat = 24
-    static let xl: CGFloat = 32
+    static let xs: CGFloat = ClaySpacing.xxs
+    static let sm: CGFloat = ClaySpacing.sm
+    static let md: CGFloat = ClaySpacing.lg
+    static let lg: CGFloat = ClaySpacing.xxl
+    static let xl: CGFloat = ClaySpacing.xxxl
 }
 
 enum PosterControlMetric {
-    /// Minimum interactive dimension required by the product accessibility contract.
-    static let minimumTouchTarget: CGFloat = 44
-
-    /// Standard compact circular control used beside a primary result action.
+    static let minimumTouchTarget: CGFloat = ClaySpacing.minTapTarget
     static let compactDiameter: CGFloat = 56
 }

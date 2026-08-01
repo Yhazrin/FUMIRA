@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>FUMIRA Remote</title>
+<link rel="stylesheet" href="/src/tokens.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: var(--fumira-charcoal);
+    color: var(--fumira-warm-white);
+    font-family: 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+    overflow: hidden;
+    height: 100%;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Connection screen */
+  #connect-screen {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: 32px;
+    text-align: center;
+  }
+  #connect-screen h1 { font-size: 28px; font-weight: 900; letter-spacing: 2px; margin-bottom: 8px; }
+  #connect-screen h1 span { color: var(--fumira-orange); }
+  #connect-screen p { font-size: 13px; opacity: 0.4; margin-bottom: 32px; letter-spacing: 0.5px; }
+  #session-input {
+    background: rgba(242,238,229,0.08); border: 1px solid rgba(242,238,229,0.12);
+    border-radius: var(--fumira-radius-lg); padding: var(--fumira-space-md) var(--fumira-space-lg);
+    font-size: 28px; font-weight: 900; letter-spacing: 8px;
+    text-align: center; color: var(--fumira-warm-white); width: 280px;
+    outline: none; text-transform: uppercase;
+  }
+  #session-input::placeholder { color: rgba(242,238,229,0.2); letter-spacing: 4px; font-size: 16px; }
+  #join-btn {
+    margin-top: var(--fumira-space-md); background: var(--fumira-orange); color: var(--fumira-charcoal);
+    border: none; border-radius: var(--fumira-radius-lg); padding: var(--fumira-space-md) 48px;
+    font-size: 16px; font-weight: 800; letter-spacing: 1px;
+    cursor: pointer; transition: transform 0.15s ease;
+  }
+  #join-btn:active { transform: scale(0.95); }
+
+  /* Remote screen */
+  #remote-screen {
+    display: none; flex-direction: column;
+    min-height: 100vh; min-height: 100dvh;
+    padding: 0;
+  }
+
+  /* Top bar */
+  .remote-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--fumira-space-md) var(--fumira-space-lg); flex-shrink: 0;
+    padding-top: max(var(--fumira-space-md), env(safe-area-inset-top));
+  }
+  .remote-header .brand { font-size: 12px; font-weight: 800; letter-spacing: 2px; }
+  .remote-header .status { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  .remote-header .status.connected { color: var(--fumira-lime); }
+  .remote-header .status.disconnected { color: var(--fumira-yellow); }
+
+  /* Year display */
+  .year-display {
+    text-align: center; padding: var(--fumira-space-xl) 0; flex-shrink: 0;
+  }
+  .year-display .era {
+    font-size: 12px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; opacity: 0.4; margin-bottom: var(--fumira-space-sm);
+  }
+  .year-display .year {
+    font-size: 72px; font-weight: 900; color: var(--fumira-orange);
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .year-display .interval {
+    font-size: 13px; opacity: 0.4; margin-top: 12px;
+    letter-spacing: 0.5px; padding: 0 var(--fumira-space-xl);
+  }
+
+  /* Slider area */
+  .slider-area {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 0 var(--fumira-space-xl);
+  }
+  .slider-track {
+    width: 100%; height: 120px;
+    position: relative; display: flex;
+    align-items: center;
+  }
+  .slider-line {
+    width: 100%; height: 6px; background: rgba(242,238,229,0.1);
+    border-radius: 3px; position: relative;
+  }
+  .slider-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--fumira-orange), var(--fumira-yellow), var(--fumira-lime));
+    position: absolute; top: 0;
+    transition: width 0.05s ease;
+  }
+  .slider-thumb {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--fumira-warm-white);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    cursor: grab; touch-action: none;
+    transition: box-shadow 0.15s ease;
+  }
+  .slider-thumb:active { box-shadow: 0 2px 10px rgba(0,0,0,0.3); transform: translate(-50%, -50%) scale(0.95); }
+  .slider-thumb .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--fumira-orange); position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+  }
+
+  /* Anchor pills */
+  .anchor-pills {
+    display: flex; gap: 12px; margin-top: var(--fumira-space-lg);
+  }
+  .anchor-pill {
+    padding: var(--fumira-space-sm) var(--fumira-space-md); border-radius: 99px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+    background: rgba(242,238,229,0.06);
+    color: rgba(242,238,229,0.4);
+    border: none; cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .anchor-pill:active, .anchor-pill.active {
+    background: var(--fumira-orange); color: var(--fumira-charcoal);
+  }
+
+  /* Bottom info */
+  .remote-footer {
+    padding: var(--fumira-space-md) var(--fumira-space-lg); flex-shrink: 0;
+    padding-bottom: max(var(--fumira-space-md), env(safe-area-inset-bottom));
+  }
+  .remote-footer .hint {
+    font-size: 11px; opacity: 0.25; letter-spacing: 0.5px;
+  }
+
+  /* No server fallback */
+  .offline-notice {
+    background: rgba(255,199,42,0.1); border: 1px solid rgba(255,199,42,0.2);
+    border-radius: var(--fumira-radius-md); padding: 12px 20px;
+    font-size: 12px; color: var(--fumira-yellow); margin-top: var(--fumira-space-lg);
+  }
+</style>
+</head>
+<body>
+
+<!-- Connect Screen -->
+<div id="connect-screen">
+  <h1>FUMIRA <span>REMOTE</span></h1>
+  <p>Enter session code from desktop</p>
+  <input type="text" id="session-input" maxlength="6" placeholder="SESSION" autocomplete="off" autocapitalize="characters">
+  <button id="join-btn">CONNECT</button>
+  <div class="offline-notice" id="offline-notice" style="display:none;">
+    No server detected. Start the server first:<br>
+    <code>node server/index.js</code>
+  </div>
+</div>
+
+<!-- Remote Screen -->
+<div id="remote-screen">
+  <div class="remote-header">
+    <div class="brand">FUMIRA REMOTE</div>
+    <div class="status" id="ws-status">CONNECTING</div>
+  </div>
+
+  <div class="year-display">
+    <div class="era" id="era">PRESENT</div>
+    <div class="year" id="year">2026</div>
+    <div class="interval" id="interval">Current moment. Everything is familiar.</div>
+  </div>
+
+  <div class="slider-area">
+    <div class="slider-track" id="slider-track">
+      <div class="slider-line">
+        <div class="slider-fill" id="slider-fill" style="width:50%"></div>
+      </div>
+      <div class="slider-thumb" id="slider-thumb" style="left:50%">
+        <div class="dot"></div>
+      </div>
+    </div>
+
+    <div class="anchor-pills">
+      <button class="anchor-pill" data-year="2016">2016</button>
+      <button class="anchor-pill active" data-year="2026">NOW</button>
+      <button class="anchor-pill" data-year="2036">2036</button>
+      <button class="anchor-pill" data-year="2046">2046</button>
+    </div>
+  </div>
+
+  <div class="remote-footer">
+    <div class="hint">Drag to travel through time · Tap anchors to jump</div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let sessionId = null;
+let ws = null;
+let currentTimeP = 0; // [-1, 1]
+
+// ── Session from URL ───────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const urlSession = params.get('session');
+if (urlSession) {
+  document.getElementById('session-input').value = urlSession.toUpperCase();
+}
+
+// ── Connect ────────────────────────────────────────────────
+document.getElementById('join-btn').addEventListener('click', joinSession);
+document.getElementById('session-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') joinSession();
+});
+
+async function joinSession() {
+  const input = document.getElementById('session-input');
+  sessionId = input.value.toUpperCase().trim();
+  if (sessionId.length !== 6) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/session/${sessionId}`);
+    if (!res.ok) throw new Error('Not found');
+    connectWebSocket();
+  } catch (e) {
+    document.getElementById('offline-notice').style.display = 'block';
+    input.style.borderColor = 'rgba(233,94,82,0.5)';
+    setTimeout(() => { input.style.borderColor = ''; }, 2000);
+  }
+}
+
+function connectWebSocket() {
+  ws = new WebSocket(`ws://${window.location.host}/ws?session=${sessionId}&role=mobile`);
+
+  ws.onopen = () => {
+    document.getElementById('connect-screen').style.display = 'none';
+    document.getElementById('remote-screen').style.display = 'flex';
+    document.getElementById('ws-status').textContent = 'CONNECTED';
+    document.getElementById('ws-status').className = 'status connected';
+    initSlider();
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'peer.disconnected') {
+      document.getElementById('ws-status').textContent = 'DESKTOP DISCONNECTED';
+      document.getElementById('ws-status').className = 'status disconnected';
+    }
+    if (msg.type === 'peer.connected') {
+      document.getElementById('ws-status').textContent = 'CONNECTED';
+      document.getElementById('ws-status').className = 'status connected';
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('ws-status').textContent = 'RECONNECTING';
+    document.getElementById('ws-status').className = 'status disconnected';
+    setTimeout(connectWebSocket, 3000);
+  };
+}
+
+// ── Time Mapping ───────────────────────────────────────────
+function pToYears(p) {
+  return Math.sign(p) * 36525 * Math.pow(Math.abs(p), 2.35) / 365.25;
+}
+
+function yearsToP(years) {
+  const days = years * 365.25;
+  return Math.sign(years) * Math.pow(Math.abs(days) / 36525, 1 / 2.35);
+}
+
+function yearToP(year) { return yearsToP(year - 2026); }
+function pToYear(p) { return Math.round(2026 + pToYears(p)); }
+
+// ── Slider ─────────────────────────────────────────────────
+const sliderTrack = document.getElementById('slider-track');
+const sliderFill = document.getElementById('slider-fill');
+const sliderThumb = document.getElementById('slider-thumb');
+let isDragging = false;
+let lastHapticYear = 0;
+
+function initSlider() {
+  sliderThumb.addEventListener('touchstart', onDragStart, { passive: false });
+  sliderThumb.addEventListener('mousedown', onDragStart);
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('touchend', onDragEnd);
+  document.addEventListener('mouseup', onDragEnd);
+
+  // Anchor pills
+  document.querySelectorAll('.anchor-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const year = parseInt(pill.dataset.year);
+      setTimeP(yearToP(year));
+      haptic();
+      document.querySelectorAll('.anchor-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+  });
+
+  setTimeP(0);
+}
+
+function haptic() {
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+
+function onDragStart(e) {
+  isDragging = true;
+  e.preventDefault();
+}
+
+function onDragMove(e) {
+  if (!isDragging) return;
+  e.preventDefault();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const rect = sliderTrack.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const p = (ratio - 0.5) * 2; // map 0-1 to -1 to 1
+  setTimeP(p);
+}
+
+function onDragEnd() {
+  isDragging = false;
+}
+
+function setTimeP(p) {
+  p = Math.max(-1, Math.min(1, p));
+  currentTimeP = p;
+
+  // UI update
+  const ratio = (p + 1) / 2; // -1..1 → 0..1
+  sliderFill.style.width = `${ratio * 100}%`;
+  sliderThumb.style.left = `${ratio * 100}%`;
+
+  const year = pToYear(p);
+  document.getElementById('year').textContent = year;
+  document.getElementById('era').textContent =
+    year < 2020 ? 'PAST' : year <= 2028 ? 'PRESENT' : year <= 2040 ? 'NEAR FUTURE' : 'FUTURE';
+
+  // Update anchor pills
+  const anchors = [2016, 2026, 2036, 2046];
+  document.querySelectorAll('.anchor-pill').forEach(pill => {
+    const pillYear = parseInt(pill.dataset.year);
+    const isClose = Math.abs(year - pillYear) < 2;
+    pill.classList.toggle('active', isClose);
+    // Haptic when crossing anchor
+    if (isClose && Math.abs(lastHapticYear - pillYear) > 2) {
+      haptic();
+      lastHapticYear = pillYear;
+    }
+  });
+
+  // Update interval text
+  const intervals = [
+    { startYear: 2016, endYear: 2020, narrative: 'Campus life is steady.' },
+    { startYear: 2020, endYear: 2026, narrative: 'The area develops slowly.' },
+    { startYear: 2026, endYear: 2028, narrative: 'Current moment.' },
+    { startYear: 2028, endYear: 2032, narrative: 'Building renovation begins.' },
+    { startYear: 2032, endYear: 2036, narrative: 'New facade revealed.' },
+    { startYear: 2036, endYear: 2042, narrative: 'Greener campus.' },
+    { startYear: 2042, endYear: 2056, narrative: 'Mature state.' },
+  ];
+  const iv = intervals.find(iv => year >= iv.startYear && year <= iv.endYear);
+  document.getElementById('interval').textContent = iv ? iv.narrative : '';
+
+  // Send to desktop
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'time.seek', value: p }));
+  }
+}
+
+// ── Auto-connect if session in URL ─────────────────────────
+if (urlSession && urlSession.length === 6) {
+  joinSession();
+}
+</script>
+</body>
+</html>

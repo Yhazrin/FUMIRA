@@ -1,209 +1,118 @@
 # Design System
 
-Direction H — **公园时间海报版**：纯白画布、青蓝天空、草地分层、深松绿、
-手写墨色、清新叶绿点睛。平面大色块，动态海报。禁止蓝紫 AI 渐变，禁止大面积
-荧光黄作为主视觉。**不以米色作 App 主背景**；米色纸感仅保留在海报合成 /
-公园装饰形局部。
+FUMIRA — **Clay OS** 温暖粘土风格。Paper 米白纸感、Time Blue 时间蓝、Park Green 公园绿、
+Energy Lime 能量黄绿、Ink 墨黑为品牌核心。Orange 是重要强调色，但不作为全局主色。
+平面大色块 + Clay 3D 材质层。禁止蓝紫 AI 渐变，禁止大面积荧光黄作为主视觉。
 
-视觉基准屏：**Connection「时间光圈」** — 哆啦蓝 + 纯白门户 + 玩具红细节 +
-铃铛黄点睛。其余 chrome / 设置 / 结果留白对齐纯白画布。
+跨端 token 源文件：`tokens.json`（设计稿）、`tokens.css`（桌面端 CSS）。
 
-## Palette
+## Core Palette
 
-Raw hex values live only in `PosterPalette`. Features must use semantic tokens.
+Raw hex values live only in `ClayPalette` / `PosterPalette`. Features must use semantic tokens.
 
-### Core semantic
+| Token | Hex | Clay Source | Role |
+|---|---|---|---|
+| Paper | `#F2EEE5` | `warmWhite` | **米白纸张** — 布白纸感背景、海报合成区 |
+| Time Blue | `#4A90D9` | `timeBlue` | **时间蓝** — 主操作色、时间强调、相机 UI |
+| Time Blue Rim | `#3570A8` | `timeBlueRim` | 时间蓝暗面 — 按压态、阴影、深色描边 |
+| Park Green | `#8FCB7E` | `parkGreen` | **公园绿** — 草地、自然场景、植物 |
+| Park Green Rim | `#5FA04E` | `parkGreenRim` | 公园绿暗面 — 深层地形、松绿 |
+| Energy Lime | `#B7D83D` | `lime` | **能量黄绿** — 成功、激活、进度指示 |
+| Ink | `#202425` | `charcoal` | **墨黑** — 文字、深色背景、主 chrome |
+| Orange | `#FF672A` | `orange` | **活力橙** — 强调色、玩具红系、温暖点缀 |
+| Yellow | `#FFC52A` | `yellow` | **铃铛黄** — 进度条、警告、小面积点睛 |
+| Warm White Rim | `#CEC7B8` | `warmWhiteRim` | 暖白边缘 — 分割线、细描边 |
+| Error | `#E95E52` | `error` | 错误红 — 可恢复错误 |
 
-| Token | Hex | Role |
-|---|---|---|
-| `canvas` / `pageBackground` | `#FFFFFF` | **纯白画布** — App chrome、设置、结果留白、默认页背景 |
-| `paper` | `#F6F3E8` | 米白纸张 — **仅**海报合成区 / 公园装饰形 / 场景叠色 |
-| `paperWhite` | `#FFFFFF` | 浅色控件填充（同 `canvas`）；白底靠描边建立层级 |
-| `cardLight` | `#FFFFFF` | 完全不透明的浅色信息卡 |
-| `cardDark` | `#111111` | 完全不透明的深色信息卡 |
-| `cardActive` | `#B8E0F5` | 完全不透明的浅蓝选中态信息卡 |
-| `sky` | `#7BC8EB` | 天空青蓝 — Connection 基准、相机叠层、时间强调 |
-| `skySoft` | `#B8E0F5` | 天空近地 / 底部渐变 |
-| `skyDeep` | `#3D8BB5` | 深青蓝 — 叠层、理解页大色块 |
-| `actionBlue` | `#0099FF` | 主题蓝 — 主按钮、进度、时间选中态 |
-| `cameraChromeBlue` | `#0096FA` | 取景器实体圆钮 — 白色符号对比度 3.11:1 |
-| `actionBlueDeep` | `#0074C2` | 按压暗面、描边与高对比蓝色文字 |
-| `actionBlueShadow` | `#005C99` | 时间光圈暗面、光学阴影与外描边 |
-| `toyRed` | `#E82A34` | 首屏镜头与入口按钮的小面积红色点睛 |
-| `bellYellow` | `#FFD33A` | 首屏状态点与镜头标记的小面积黄色点睛 |
-| `grassLight` | `#8FCB7E` | 草地浅绿 — 分层地形近层 |
-| `pine` | `#2A5A3C` | 深松绿 — 仅地形深部与自然场景 |
-| `leafGreen` | `#5FA868` | 清新叶绿 — **仅**自然场景与海报下划线 |
-| `ink` | `#111111` | 深墨黑 — 标题与重要操作 |
-| `mutedInk` | `#6E6C64` | 次要标签（白底约 4.6:1 AA） |
-| `waveIdle` | `ink @ 22%` | 波形时间轴非选中竖条 |
-| `errorCoral` | `#E95E52` | 可恢复错误 |
-| `line` | `#D2D0C8` | 分割线 / 白底卡片细描边 |
-
-### Scene temporal variants
-
-Used by `TemporalParkScene` interpolation — do not hardcode in Features.
+### Extended tones
 
 | Token | Hex | Role |
 |---|---|---|
-| `skyPastTop` | `#D1B894` | 过去天空顶（暖纸感） |
-| `skyPastBottom` | `#E6D1B3` | 过去天空底 |
-| `skyFutureTop` | `#6B8CD1` | 未来天空顶 |
-| `skyFutureBottom` | `#94B3E6` | 未来天空底 |
+| `charcoalLight` | `#3A3E3F` | 暗面二级 — hover、disabled |
+| `orangeRim` | `#C9441D` | 橙暗面 — 按压态 |
+| `yellowRim` | `#C18B14` | 黄暗面 |
 
-### Compatibility aliases (legacy → Direction H)
+## Clay 3D Style
 
-| Legacy | Maps to | Notes |
-|---|---|---|
-| `timeBlue` | `sky` | Prefer `sky` in new code |
-| `deepTimeBlue` | `skyDeep` | Prefer `skyDeep` |
-| `parkGreen` | `pine` | Prefer `pine` |
-| `growthGreen` | `pine` | Generation surfaces use deep pine blocks |
+Clay OS 三维风格是 FUMIRA 的视觉核心。组件使用以下材质系统：
 
-### Usage rules
+### 四级材质分级
 
-- Page / chrome backgrounds use `canvas` (or `pageBackground`). Do **not** use
-  `paper` as a full-screen App background.
-- `paper` is allowed only for poster synthesis caption blocks, park decorative
-  shapes (`ParkPosterBackdrop`), and temporal scene overlays.
-- `leafGreen` is a natural illustration accent, never an interactive fill.
-- Primary buttons prefer `pine` or `ink`; secondary is stroke + `ink` on `canvas`.
-- White-on-white cards need `line` stroke (or shadow) for edge definition.
-- Information cards, clue tags, evidence pills, and result consoles use
-  `cardLight`, `cardDark`, or `cardActive` at full opacity. Do not use Material or
-  translucent color fills for these reading surfaces.
-- Transparency is reserved for spatial media effects that must reveal the scene:
-  viewfinder surrounds, exposure masks, comparison boundaries, and the micro
-  time-slice slit. These are not cards.
-- Photo / park scene remains the visual hero; tokens support it, not compete with it.
-- No raw `Color(red:…)` product colors outside `PosterPalette`.
+| Level | Roughness | Metalness | Clearcoat | 用途 |
+|---|---|---|---|---|
+| 0 — 光滑 | 0.0 | 0.0 | 0.0 | 玻璃、高光面、纯净背景 |
+| 1 — 微磨 | 0.25 | 0.3 | 0.3 | 哑光塑料、卡片、按钮 |
+| 2 — 中磨 | 0.55 | 0.7 | 0.6 | 纸张、布料、海报材质 |
+| 3 — 粗磨 | 0.85 | 1.0 | 1.0 | 石材、木材、地面 |
+
+### 几何参数
+
+- `cornerRadiusRatio` = 0.067（Card 26pt / 390pt 短边）
+- `bevelSegments` = 8（倒角分段数）
+- Card 圆角：26pt
+- 照片纸圆角：20pt
+- 紧凑控件圆角：18pt
+
+### 使用规则
+
+- 卡片和面板使用 Level 1 材质（微磨 + 薄涂层）
+- 海报合成区使用 Level 2 材质（中磨 + 标准涂层）
+- 按钮使用 Level 1 + Level 2 混合（微磨底座 + 中磨表面）
+- 地面 / 场景元素使用 Level 3 材质（粗磨 + 全金属）
+- 所有 3D 元素保持 8 段倒角，确保边缘圆润
+
+## 跨端适配
+
+### Token 来源
+
+- `tokens.json` — 设计稿源文件（Figma 插件、原型工具）
+- `tokens.css` — 桌面端 CSS custom properties
+- `ClayPalette.swift` — iOS 原始色值源
+- `PosterPalette.swift` — iOS 语义 token 桥接层
+
+### 适配规则
+
+- 所有平台从同一 token 源取色，不允许硬编码 hex
+- iOS 使用 `ClayPalette` / `PosterPalette` 枚举
+- Web/Desktop 使用 `tokens.css` custom properties
+- 3D 参数（roughness/metalness/clearcoat）通过 `tokens.json` 同步
+- 间距单位统一使用 pt，CSS 端转为 px（1:1）
+
+## Usage Rules
+
+- Page / chrome backgrounds use `charcoal` (dark mode) or `warmWhite` (light mode).
+- Paper is allowed only for poster synthesis caption blocks and temporal scene overlays.
+- Time Blue is the primary interactive color — buttons, time rail, active states.
+- Park Green is reserved for landscape illustration and nature scene elements.
+- Energy Lime is a success/activation accent, not a full-screen background.
+- Orange is an emphasis color for toys, warmth, and small highlights — not a global primary.
+- Primary actions prefer Time Blue; secondary is stroke + ink on canvas.
+- White-on-white cards need `warmWhiteRim` stroke for edge definition.
+- Photo / scene content remains the visual hero; tokens support it, not compete with it.
+- No raw `Color(red:…)` product colors outside `ClayPalette` / `PosterPalette`.
 
 ## Continuous time rail (`WaveTimeRail`)
 
 - Visual: ~33 rounded vertical bars (audio-waveform); deterministic envelope +
-  rhythm morph continuously with drag. No white card chrome — floats on `canvas` /
-  sky gradients / camera scrims.
-- Selected thumb capsule + cursor use `actionBlue` at full height as the
-  unique tallest peak; ordinary bars stay below 78% of peak and are centered on
-  the rail midline (symmetric ±Y).
-- Calendar year floats above the action-blue cursor; sparse labels are only
-  `-100` / `NOW` / `+100`.
+  rhythm morph continuously with drag.
+- Selected thumb capsule + cursor use `timeBlue` at full height as the unique tallest peak.
+- Calendar year floats above the cursor; sparse labels are only `-100` / `NOW` / `+100`.
 - Drag maps rail X linearly to `TimePosition.normalized` (−1…1). Day/year mapping
-  stays nonlinear via `TimePosition` (finer near NOW). Never snaps to historic
-  five-point landmarks while dragging.
-- Horizontal drag stays continuous and bounded. Pulling vertically changes the
-  same rail's active precision: year → month → day → hour; pulling down returns
-  to coarser precision. The date badge changes format with the active precision,
-  without adding a separate mode label or settings control.
-- On release (and VoiceOver adjust), snaps to the active precision — never to
-  landmark anchors.
+  stays nonlinear via `TimePosition` (finer near NOW).
+- Horizontal drag stays continuous and bounded. Pulling vertically changes precision.
+- On release (and VoiceOver adjust), snaps to the active precision — never to landmarks.
 - Touch target ≥ 44pt; VoiceOver exposes target date / year and adjustable actions.
-- `TimeRail` remains a thin compatibility wrapper → `WaveTimeRail`.
 
 ## Typography
 
-- All in-app type uses Apple system fonts.
-- Functional titles, labels, status and buttons use the normal SF family via
-  semantic text styles. Rounded SF is reserved for the wordmark and occasional
-  poster metric, so functional UI stays calm and recognisably native.
-- Expressive poster character comes from weight, spacing, color, and restrained
-  1–2 degree rotation — never from oversized novelty type.
-
-## Visible copy hierarchy
-
-- Each stage has one primary sentence and one primary action. Do not expose
-  implementation notes, reliability disclaimers, or a second paraphrase of the
-  same gesture in the visible interface.
-- Prefer a large, direct verb phrase (`拖动，看时间差`) over an eyebrow, title,
-  subtitle, helper paragraph, and footer that all explain the same operation.
-- A value already communicated by the photo, time rail, or progress number does
-  not need another status badge.
-- Keep precise behavior and recovery detail in VoiceOver labels and hints so
-  visual simplicity never removes accessible instructions.
-- Opaque rounded cards group one decision or one status. Fewer, larger cards are
-  preferred to several translucent pills.
+- All in-app type uses Apple system fonts (SF Pro / SF Rounded).
+- Functional titles, labels, status and buttons use the normal SF family.
+- Rounded SF is reserved for the wordmark and occasional poster metric.
+- Expressive poster character comes from weight, spacing, color, and restrained rotation.
 
 ## Layout
 
 - The Figma artboards are 390×844 references.
 - Runtime layout is safe-area-aware and scales to compact/large iPhones.
 - Content padding baseline is 24pt; primary control height is 56pt.
-- Card radius: 26pt; photo-paper radius: 20pt; compact controls: 18pt. Primary
-  button radius is half its height. Use continuous corners and one subtle
-  1pt border or soft shadow — never both heavily.
 - Minimum interactive target: 44×44pt.
-
-## Scene
-
-The supplied prototype uses a flat illustrated park. The MVP recreates this as
-native shapes so it can respond continuously to time: sky tint, hill position,
-tree density/scale, sun/moon, path width, grain, and overlay color interpolate
-from a single time value. Sky and grass layers pull from `sky*` / `grassLight` /
-`pine` tokens; active rail / NOW marker uses `actionBlue`.
-
-## 首屏 / 相机视觉
-
-### Connection（时间光圈 · 视觉基准）
-
-- Full-screen supplied blue-and-white line-art background with a static blue
-  wordmark; no portal rings, ornamental lens stack, particles, or parallax.
-- A single centered action-blue aperture button is the hero and entry control.
-  It keeps a 44pt+ target with no visible CTA sentence and no settings gear.
-- The wordmark and button are present immediately and remain geometrically stable.
-- Raw color values remain in `PosterPalette`; Connection uses semantic tokens.
-
-### Viewfinder（沉浸相机）
-
-- The screen is a two-layer camera object. `cameraBody` fills the permanent
-  lower layer; the live / simulator preview is a separate upper card.
-- The preview begins behind the system status region, spans the exact screen
-  width, and uses only continuous bottom corners. It has no side gutter, border,
-  bottom shadow, frosted surround, or artificial Dynamic Island.
-- 16:9, 3:4, and 1:1 keep the card's top and width fixed while only the bottom
-  edge moves upward. Native/full framing is a distinct, taller final stop.
-- Two 44pt Doraemon-blue / white-symbol controls sit inside the upper card with
-  16pt side insets. Their icon contrast is 3.05:1; compact textual feedback uses
-  `actionBlueDeep` instead (5.81:1 against white). iOS owns status-bar and
-  Dynamic Island geometry.
-- The wave-shutter stays visually centered in the exposed blue camera body for
-  every card height. Ratio feedback appears briefly inside the card near its
-  lower edge; there is no persistent instruction paragraph.
-- The center focus treatment is driven by Vision attention saliency plus
-  sequence tracking. It follows one compact subject-core rectangle and holds the
-  last lock during brief misses. Vision samples at about 12Hz; geometry delivery
-  is throttled and the existing reticle interpolates to the next lock, so it
-  moves rather than repeatedly fading in. Small motion is conservative, while a
-  real subject move catches up promptly; there is no manual tap focus or shader
-  field.
-- LiDAR is not part of the live-focus path. Depth output does not identify
-  semantic subjects and requires an additional synchronized capture stream on
-  supported hardware, so it would add heat and session cost without improving
-  the MVP's 2D subject lock. The existing post-capture foreground analysis
-  remains the optional depth-like visual input.
-
-### Chrome screens（权限 / 生成 / 理解 / 故事 / 结果 / 设置 / 失败）
-
-- Default `PosterScreenContainer` background is `canvas` (`#FFFFFF`).
-- Primary actions, progress, and time-selection chrome use `actionBlue`; green
-  remains part of landscape illustration only and is not an action color.
-- Generation, generated-image understanding, story writing, and result all use
-  a white page stage so the sealed/revealed photo remains the visual hero.
-- The developing stage is intentionally quiet: it never displays a percentage,
-  progress bar, queue state, or bottom console. It keeps a pure-white canvas,
-  a platform-native exit control, and a quiet target-time status label—no
-  tinted pill or backdrop gradient asks the person to watch the work.
-- During understanding, story writing, and generation, the captured print can
-  be held vertically or turned horizontally. Its reverse is a paper-white
-  reflection card with one time-specific question. Future uses a concise guess,
-  the past uses three selectable time-imprint stamps, and NOW accepts one short
-  written note. Every response is local and present-tense only; it must not
-  claim to rewrite a generation request that has already been sent. The front
-  stays visually clean: the horizontal turn itself is the affordance.
-- The photo exterior is the hero, the reverse question is the interaction, and
-  the existing off-photo drag remains a temporal-slice exploration. Do not add
-  a carousel, stepper, or several competing waiting activities.
-- The developing print uses the available vertical center beneath the floating
-  top chrome. It has no scanning line or looping analysis ornament.
-- Narrative / status cards on white use `canvas` fill + `line` stroke.
-- Share poster **caption block** may use local `paper` for mild paper feel;
-  the page chrome around it stays white.

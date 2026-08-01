@@ -5,51 +5,64 @@ struct GenerationFailureView: View {
 
     var body: some View {
         PosterScreenContainer {
-            VStack(spacing: PosterSpacing.xl) {
+            VStack(spacing: ClaySpacing.xxxl) {
                 Spacer()
 
                 ZStack {
                     Circle()
-                        .fill(PosterPalette.errorCoral.opacity(0.18))
+                        .fill(ClayPalette.error.opacity(0.18))
                         .frame(width: 120, height: 120)
                     Image(systemName: failureSymbol)
                         .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(PosterPalette.errorCoral)
+                        .foregroundStyle(ClayPalette.error)
                 }
                 .accessibilityHidden(true)
 
-                PosterTitleView(
-                    segments: failureTitle,
-                    color: PosterPalette.errorCoral,
-                    fontSize: 34
-                )
+                VStack(spacing: 4) {
+                    ForEach(failureTitle.indices, id: \.self) { index in
+                        Text(failureTitle[index])
+                            .font(ClayTypography.displayLarge)
+                            .foregroundStyle(ClayPalette.textOnDark)
+                    }
+                }
 
-                VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+                VStack(alignment: .leading, spacing: ClaySpacing.sm) {
                     Text(failureMessage)
-                        .font(.body)
-                        .foregroundStyle(PosterPalette.ink)
+                        .font(ClayTypography.body)
+                        .foregroundStyle(ClayPalette.textOnDark.opacity(0.72))
                         .multilineTextAlignment(.leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer()
 
-                VStack(spacing: PosterSpacing.md) {
+                VStack(spacing: ClaySpacing.lg) {
                     if showsPrimaryRetry {
-                        PosterCapsuleButton(
-                            title: retryTitle,
-                            accessibilityHint: retryAccessibilityHint
-                        ) {
+                        Button {
                             Task { await model.retryPipeline() }
+                        } label: {
+                            Text(retryTitle)
+                                .font(ClayTypography.bodyBold)
+                                .foregroundStyle(ClayPalette.charcoal)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
                         }
+                        .clayButtonStyle()
                     }
 
-                    PosterCapsuleButton(
-                        title: fallbackTitle,
-                        style: .secondary,
-                        accessibilityHint: "退出失败状态并保留已有内容"
-                    ) {
+                    Button {
                         model.showOriginalNow()
+                    } label: {
+                        Text(fallbackTitle)
+                            .font(ClayTypography.bodyBold)
+                            .foregroundStyle(ClayPalette.textOnDark)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                    }
+                    .buttonStyle(.plain)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: ClayShape.button, style: .continuous)
+                            .stroke(ClayPalette.warmWhite.opacity(0.24), lineWidth: 1.5)
                     }
                 }
             }

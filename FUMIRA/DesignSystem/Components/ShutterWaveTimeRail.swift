@@ -86,7 +86,7 @@ struct ShutterWaveTimeRail: View {
     }
 
     var body: some View {
-        VStack(spacing: PosterSpacing.xs) {
+        VStack(spacing: ClaySpacing.xxs) {
             GeometryReader { proxy in
                 let width = proxy.size.width
                 let thumbX = normalizedToX(displayValue, width: width)
@@ -156,10 +156,12 @@ struct ShutterWaveTimeRail: View {
     }
 
     private var accessibilityValueText: String {
-        if abs(timePosition.offsetDays) < 0.5 {
+        let days = timePosition.offsetDays
+        guard days.isFinite else { return "现在" }
+        if abs(days) < 0.5 {
             return "现在，\(timeLabel)"
         }
-        let direction = timePosition.offsetDays < 0 ? "向过去" : "向未来"
+        let direction = days < 0 ? "向过去" : "向未来"
         return "\(timePosition.compactLabel)，目标 \(timeLabel)，\(direction)"
     }
 
@@ -171,19 +173,19 @@ struct ShutterWaveTimeRail: View {
         HStack(spacing: 6) {
             Image(systemName: "calendar")
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(PosterPalette.cameraShutterBlue)
+                .foregroundStyle(ClayPalette.orange)
             Text(timeLabel)
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(PosterPalette.paperWhite)
+                .foregroundStyle(ClayPalette.warmWhite)
                 .monospacedDigit()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .background(PosterPalette.cardDark)
+        .background(ClayPalette.charcoal)
         .clipShape(Capsule())
         .overlay {
             Capsule(style: .continuous)
-                .stroke(PosterPalette.paperWhite.opacity(0.18), lineWidth: 0.5)
+                .stroke(ClayPalette.warmWhite.opacity(0.18), lineWidth: 0.5)
         }
         .rotationEffect(chromeRotation)
         .opacity(isDragging ? 1 : 0)
@@ -530,7 +532,7 @@ private struct WaveformPartingCanvas: View {
                             roundedRect: rect,
                             cornerRadius: min(renderedWidth, renderedHeight) * 0.5
                         ),
-                        with: .color(PosterPalette.paperWhite.opacity(opacity))
+                        with: .color(ClayPalette.warmWhite.opacity(opacity))
                     )
                 }
             }
@@ -589,7 +591,7 @@ private struct MorphingShutterCursor: View {
                 )
                 Capsule(style: .continuous)
                     .fill(
-                        PosterPalette.actionBlue.opacity(
+                        ClayPalette.orange.opacity(
                             Double(0.34 * ghostStrength * (0.55 + 0.45 * morphProgress))
                         )
                     )
@@ -604,10 +606,10 @@ private struct MorphingShutterCursor: View {
             // into the active time bar. Press feedback comes from scale +
             // haptics, never from a second pedestal or simulated button depth.
             Capsule(style: .continuous)
-                .fill(PosterPalette.paperWhite.opacity(0.96))
+                .fill(ClayPalette.warmWhite.opacity(0.96))
                 .overlay {
                     Capsule(style: .continuous)
-                        .fill(PosterPalette.actionBlue)
+                        .fill(ClayPalette.orange)
                         .opacity(morphProgress)
                 }
                 .frame(
@@ -616,12 +618,12 @@ private struct MorphingShutterCursor: View {
                 )
                 .overlay {
                     Capsule(style: .continuous)
-                        .stroke(PosterPalette.actionBlue.opacity(0.45), lineWidth: 1)
+                        .stroke(ClayPalette.orange.opacity(0.45), lineWidth: 1)
                         .opacity(ringOpacity)
                 }
 
             Circle()
-                .fill(PosterPalette.actionBlue)
+                .fill(ClayPalette.orange)
                 .frame(width: 8, height: 8)
                 .opacity(ringOpacity)
         }
@@ -651,12 +653,12 @@ private struct MorphingShutterCursor: View {
 
         var body: some View {
             ZStack {
-                PosterPalette.ink.ignoresSafeArea()
+                ClayPalette.charcoal.ignoresSafeArea()
                 VStack {
                     Spacer()
                     ShutterWaveTimeRail(value: value, onChange: { value = $0 }, onCapture: {})
-                        .padding(.horizontal, PosterSpacing.md)
-                        .padding(.bottom, PosterSpacing.xl)
+                        .padding(.horizontal, ClaySpacing.lg)
+                        .padding(.bottom, ClaySpacing.xxxl)
                 }
             }
         }

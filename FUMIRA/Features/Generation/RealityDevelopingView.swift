@@ -37,13 +37,13 @@ struct RealityDevelopingView: View {
                             dx: rootBounds.minX,
                             dy: rootBounds.minY
                         ),
-                        cornerRadius: PosterRadius.photoPaper
+                        cornerRadius: ClayShape.lg
                     )
 
                     developmentHeader
                         .frame(maxHeight: .infinity, alignment: .top)
-                        .padding(.horizontal, PosterSpacing.lg)
-                        .padding(.top, PosterSpacing.lg)
+                        .padding(.horizontal, ClaySpacing.xxl)
+                        .padding(.top, ClaySpacing.xxl)
                         .safeAreaPadding(.top)
                         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 }
@@ -83,15 +83,15 @@ struct RealityDevelopingView: View {
     private var developmentHeader: some View {
         HStack {
             cancelPipelineButton
-            Spacer(minLength: PosterSpacing.md)
+                Spacer(minLength: ClaySpacing.lg)
             targetBadge
         }
     }
 
     private var targetBadge: some View {
         Label(model.generationTargetTime.compactLabel, systemImage: "clock")
-            .font(PosterTypography.caption)
-            .foregroundStyle(PosterPalette.mutedInk)
+            .font(ClayTypography.labelSmall)
+            .foregroundStyle(ClayPalette.textMuted)
             .lineLimit(1)
             .accessibilityLabel("目标时间 (model.generationTargetTime.compactLabel)")
     }
@@ -108,7 +108,7 @@ struct RealityDevelopingView: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.circle)
                 .controlSize(.large)
-                .tint(PosterPalette.ink)
+                .tint(ClayPalette.charcoal)
                 .frame(minWidth: 44, minHeight: 44)
         }
     }
@@ -119,6 +119,7 @@ struct RealityDevelopingView: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.body.weight(.semibold))
+                .foregroundStyle(ClayPalette.textOnDark)
         }
         .accessibilityIdentifier("reality.cancel")
         .accessibilityLabel("返回相机")
@@ -206,7 +207,7 @@ struct RealityDevelopingView: View {
 
 enum RealityDevelopingGeometry {
     static func photoFrame(in size: CGSize, aspectRatio: CGFloat) -> CGRect {
-        let maximumWidth = max(size.width - PosterSpacing.xl * 2, 1)
+        let maximumWidth = max(size.width - ClaySpacing.xxxl * 2, 1)
         let maximumHeight = max(size.height * 0.60, 1)
         let ratio = max(aspectRatio, 0.01)
         let width = min(maximumWidth, maximumHeight * ratio)
@@ -295,31 +296,31 @@ private struct TemporalSliceEcho: View {
                 }
 
             Rectangle()
-                .fill(PosterPalette.paperWhite.opacity(0.78))
+                .fill(ClayPalette.warmWhite.opacity(0.78))
                 .frame(width: 1)
                 .offset(x: (frame.width - slitWidth) / 2 + slitOffset)
 
             Rectangle()
-                .fill(PosterPalette.paperWhite.opacity(0.78))
+                .fill(ClayPalette.warmWhite.opacity(0.78))
                 .frame(width: 1)
                 .offset(x: (frame.width + slitWidth) / 2 + slitOffset)
 
             Text(timeLabel)
                 .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(PosterPalette.actionBlueDeep)
-                .padding(.horizontal, PosterSpacing.sm)
+                .foregroundStyle(ClayPalette.orangeRim)
+                .padding(.horizontal, ClaySpacing.sm)
                 .frame(minHeight: 26)
-                .background(PosterPalette.paperWhite, in: Capsule())
+                .background(ClayPalette.warmWhite, in: Capsule())
                 .overlay {
                     Capsule()
-                        .stroke(PosterPalette.actionBlue.opacity(0.35), lineWidth: 1)
+                        .stroke(ClayPalette.orange.opacity(0.35), lineWidth: 1)
                 }
-                .padding(PosterSpacing.sm)
+                .padding(ClaySpacing.sm)
         }
         .frame(width: frame.width, height: frame.height)
         .clipShape(
             RoundedRectangle(
-                cornerRadius: PosterRadius.photoPaper,
+                cornerRadius: ClayShape.lg,
                 style: .continuous
             )
         )

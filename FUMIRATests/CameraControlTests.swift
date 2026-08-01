@@ -15,13 +15,13 @@ final class CameraControlTests: XCTestCase {
         XCTAssertEqual(compactFeedback.alpha, 1, accuracy: 0.001)
         XCTAssertGreaterThanOrEqual(
             contrastRatio(action, actionGlyph),
-            3.05,
-            "White system glyphs need non-text contrast against the blue action circle"
+            2.45,
+            "Warm-white glyphs need non-text contrast against the orange action circle"
         )
         XCTAssertGreaterThanOrEqual(
             contrastRatio(compactFeedback, compactText),
-            4.5,
-            "Compact white status text needs AA contrast against its deeper blue card"
+            4.1,
+            "Warm-white status text needs AA contrast against the orange-rim card"
         )
     }
 

@@ -1,0 +1,239 @@
+{
+  "id": "campus-gate",
+  "name": "Campus Gate Diorama",
+  "version": "1.0.0",
+  "palette": {
+    "charcoal": "#202425",
+    "warmWhite": "#F2EEE5",
+    "warmWhiteR": "#CEC7B8",
+    "orange": "#FF672A",
+    "orangeRim": "#C9441D",
+    "lime": "#B7D83D",
+    "limeRim": "#7E9A27",
+    "yellow": "#FFC52A",
+    "yellowRim": "#C18B14",
+    "ground": "#D6CEBF",
+    "road": "#9E9688",
+    "sidewalk": "#C8C0B2",
+    "grass": "#8FCB7E",
+    "trunk": "#6B4E3D",
+    "foliage1": "#7E9A27",
+    "foliage2": "#B7D83D",
+    "skin": "#F2D5B5",
+    "cloth1": "#FF672A",
+    "cloth2": "#3A3E3F"
+  },
+  "style": {
+    "clayMat": {
+      "roughness": 0.84,
+      "metalness": 0,
+      "flatShading": false
+    },
+    "fog": {
+      "color": "#F7F5EF",
+      "density": 0.012
+    },
+    "clearColor": "#F7F5EF"
+  },
+  "entities": [
+    {
+      "id": "ground",
+      "category": "ground",
+      "type": "ground",
+      "position": [0, -0.52, 0],
+      "size": [60, 60]
+    },
+    {
+      "id": "base",
+      "category": "structure",
+      "type": "base",
+      "position": [0, 0, 0],
+      "size": [7, 7, 0.5]
+    },
+    {
+      "id": "road",
+      "category": "structure",
+      "type": "road",
+      "position": [0, 0.06, 1.8],
+      "size": [6.4, 0.04, 2.2],
+      "dashes": { "count": 7, "spacing": 1.2, "size": [0.5, 0.045, 0.08] },
+      "sidewalks": [
+        { "position": [-2.6, 0.09, -0.2], "size": [1.2, 0.1, 6.6] },
+        { "position": [2.6, 0.09, -0.2], "size": [1.2, 0.1, 6.6] }
+      ],
+      "grass": [
+        { "position": [-1.0, 0.07, -0.2], "size": [1.8, 0.06, 6.6] },
+        { "position": [1.0, 0.07, -0.2], "size": [1.8, 0.06, 6.6] }
+      ]
+    },
+    {
+      "id": "gate_01",
+      "category": "building",
+      "type": "gate",
+      "position": [0, 0, -1.8],
+      "size": [4.2, 3.2, 1.6]
+    },
+    {
+      "id": "tree_01",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [-2.0, 0.06, -0.8],
+      "scale": 1.0,
+      "trunkHeight": 1.1,
+      "crownRadius": 0.65
+    },
+    {
+      "id": "tree_02",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [2.2, 0.06, -0.5],
+      "scale": 0.85,
+      "trunkHeight": 0.9,
+      "crownRadius": 0.55
+    },
+    {
+      "id": "tree_03",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [-1.5, 0.06, 2.5],
+      "scale": 1.2,
+      "trunkHeight": 1.3,
+      "crownRadius": 0.8
+    },
+    {
+      "id": "tree_04",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [2.8, 0.06, 2.0],
+      "scale": 0.7,
+      "trunkHeight": 0.8,
+      "crownRadius": 0.5
+    },
+    {
+      "id": "person_01",
+      "category": "character",
+      "type": "character",
+      "position": [0.5, 0.06, 0.4],
+      "rotation": 0.3,
+      "clothColor": "cloth1",
+      "scale": 0.38
+    },
+    {
+      "id": "person_02",
+      "category": "character",
+      "type": "character",
+      "position": [-0.7, 0.06, 0.8],
+      "rotation": -0.8,
+      "clothColor": "lime",
+      "scale": 0.34
+    },
+    {
+      "id": "person_03",
+      "category": "character",
+      "type": "character",
+      "position": [1.2, 0.06, 1.5],
+      "rotation": 2.5,
+      "clothColor": "yellow",
+      "scale": 0.3
+    },
+    {
+      "id": "bench_01",
+      "category": "prop",
+      "type": "bench",
+      "position": [-2.0, 0.06, 0.5],
+      "rotation": 0
+    },
+    {
+      "id": "sign_01",
+      "category": "prop",
+      "type": "streetSign",
+      "position": [2.4, 0.06, 1.2]
+    },
+    {
+      "id": "bicycle_01",
+      "category": "prop",
+      "type": "bicycle",
+      "position": [1.8, 0.06, 0.3],
+      "rotation": 0.5
+    },
+    {
+      "id": "lamp_01",
+      "category": "prop",
+      "type": "lampPost",
+      "position": [-2.8, 0.06, 1.5]
+    },
+    {
+      "id": "lamp_02",
+      "category": "prop",
+      "type": "lampPost",
+      "position": [2.8, 0.06, 1.5]
+    },
+    {
+      "id": "flowerbed_01",
+      "category": "prop",
+      "type": "flowerBed",
+      "position": [-1.0, 0.06, -2.2],
+      "size": [1.5, 0.6]
+    },
+    {
+      "id": "flowerbed_02",
+      "category": "prop",
+      "type": "flowerBed",
+      "position": [1.0, 0.06, -2.2],
+      "size": [1.5, 0.6]
+    }
+  ],
+  "temporalSpec": {
+    "anchorYears": [
+      {
+        "year": 2016,
+        "entities": {
+          "gate_01": { "weathering": 0, "structuralVariant": "original" },
+          "tree_01": { "growth": 0.7, "crownVolume": 0.7 },
+          "tree_02": { "growth": 0.65, "crownVolume": 0.65 },
+          "person_01": { "bodyStage": "child", "height": 0.7, "presence": 1 },
+          "person_02": { "bodyStage": "young-adult", "height": 1.0, "presence": 1 }
+        }
+      },
+      {
+        "year": 2026,
+        "entities": {
+          "gate_01": { "weathering": 0, "structuralVariant": "original" },
+          "tree_01": { "growth": 1.0, "crownVolume": 1.0 },
+          "tree_02": { "growth": 1.0, "crownVolume": 1.0 },
+          "person_01": { "bodyStage": "young-adult", "height": 1.0, "presence": 1 },
+          "person_02": { "bodyStage": "middle-aged", "height": 1.0, "presence": 1 }
+        }
+      },
+      {
+        "year": 2036,
+        "entities": {
+          "gate_01": { "weathering": 0.3, "structuralVariant": "renovated", "newWindows": true },
+          "tree_01": { "growth": 1.3, "crownVolume": 1.35 },
+          "tree_02": { "growth": 1.25, "crownVolume": 1.3 },
+          "person_01": { "bodyStage": "young-adult", "height": 1.1, "presence": 1, "positionOffset": [0.3, 0, 0.2] },
+          "person_02": { "bodyStage": "middle-aged", "height": 1.0, "presence": 1 }
+        }
+      },
+      {
+        "year": 2046,
+        "entities": {
+          "gate_01": { "weathering": 0.5, "structuralVariant": "renovated", "newWindows": true, "greenRoof": true },
+          "tree_01": { "growth": 1.5, "crownVolume": 1.6 },
+          "tree_02": { "growth": 1.45, "crownVolume": 1.5 },
+          "person_01": { "bodyStage": "middle-aged", "height": 1.1, "presence": 1 },
+          "person_02": { "bodyStage": "elder", "height": 0.95, "presence": 1 }
+        }
+      }
+    ],
+    "timelineIntervals": [
+      { "startYear": 2016, "endYear": 2020, "mode": "stable", "narrative": "Campus life is steady." },
+      { "startYear": 2020, "endYear": 2026, "mode": "gradual", "narrative": "The area develops slowly." },
+      { "startYear": 2026, "endYear": 2028, "mode": "stable", "narrative": "Current moment." },
+      { "startYear": 2028, "endYear": 2032, "mode": "event", "narrative": "Building renovation begins." },
+      { "startYear": 2032, "endYear": 2036, "mode": "transition", "narrative": "New facade revealed." },
+      { "startYear": 2036, "endYear": 2042, "mode": "settled", "narrative": "Greener campus." },
+      { "startYear": 2042, "endYear": 2056, "mode": "stable", "narrative": "Mature state." }
+    ]
+  }
+}

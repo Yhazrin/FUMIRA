@@ -9,7 +9,7 @@ struct CameraCompositionCorners: View {
     let frame: CGRect
     let cornerRadius: CGFloat
     var lineWidth: CGFloat = 3
-    var color: Color = PosterPalette.paperWhite
+    var color: Color = ClayPalette.warmWhite
 
     private var canvasPadding: CGFloat { lineWidth + 1 }
 

@@ -46,21 +46,30 @@ struct TimePosition: Hashable, Codable, Sendable {
 
     var compactLabel: String {
         let days = abs(offsetDays)
+        guard days.isFinite else { return "NOW" }
         guard days >= 1.0 / 48.0 else { return "NOW" }
 
         let direction = offsetDays < 0 ? "前" : "后"
         if days < 1 {
-            return "\(Int((days * 24).rounded())) 小时\(direction)"
+            let hours = Int((days * 24).rounded())
+            return "\(hours) 小时\(direction)"
         }
         if days < 31 {
-            return "\(Int(days.rounded())) 天\(direction)"
+            let whole = Int(days.rounded())
+            return "\(whole) 天\(direction)"
         }
         if days < 365.25 {
-            return String(format: "%.1f 个月%@", days / 30.44, direction)
+            let months = days / 30.44
+            guard months.isFinite else { return "NOW" }
+            return String(format: "%.1f 个月%@", months, direction)
         }
         if days < 3_652.5 {
-            return String(format: "%.1f 年%@", days / 365.25, direction)
+            let years = days / 365.25
+            guard years.isFinite else { return "NOW" }
+            return String(format: "%.1f 年%@", years, direction)
         }
-        return "\(Int((days / 365.25).rounded())) 年\(direction)"
+        let years = (days / 365.25).rounded()
+        guard years.isFinite else { return "NOW" }
+        return "\(Int(years)) 年\(direction)"
     }
 }

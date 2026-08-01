@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>FUMIRA — Temporal Clay World</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+
+<div id="loading">
+  <h1>FUMIRA <span>TEMPORAL</span></h1>
+  <p>Initializing temporal clay world</p>
+</div>
+
+<div id="top-bar">
+  <div class="brand">FUMIRA <span>TEMPORAL</span></div>
+  <div style="font-size:11px;letter-spacing:1px;opacity:0.4;">
+    <span id="connection-dot" class="offline"></span>
+    <span id="connection-label">STANDALONE</span>
+  </div>
+</div>
+
+<div id="qr-panel" class="waiting">
+  <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:0.4;">
+    Scan to Control
+  </div>
+  <div id="session-id">------</div>
+  <div id="qr-code"></div>
+  <div id="qr-status" class="waiting">WAITING FOR PHONE</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="interval-card"></div>
+
+<div id="time-display">
+  <div style="text-align:right;">
+    <div class="era-label" id="era-label">PRESENT</div>
+    <div style="font-size:11px;opacity:0.3;letter-spacing:0.5px;" id="interval-label">Current moment</div>
+  </div>
+  <div>
+    <div class="year-label" id="year-label">2026</div>
+  </div>
+  <div style="font-size:11px;opacity:0.2;letter-spacing:0.5px;max-width:120px;">
+    Drag on phone<br>to travel time
+  </div>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

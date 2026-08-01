@@ -5,15 +5,9 @@ enum CameraChromeMetrics {
     static let topRowHeight: CGFloat = 44
     static let controlDiameter: CGFloat = 44
     static let compactFeedbackHeight: CGFloat = 36
-    /// Fixed optical bounds for the morphing shutter + waveform. Geometry
-    /// placement uses the same height so it can decide whether the control
-    /// fits in the exposed blue body or must float over the preview.
     static let waveRailStageHeight: CGFloat = 100
     static let waveRailHeight: CGFloat = 132
 
-    /// Root camera surfaces are full-bleed, so their local GeometryReader
-    /// reports zero safe-area insets. Read the system-owned window geometry
-    /// once here so live chrome and its capture afterimage cannot disagree.
     @MainActor
     static var activeWindowSafeAreaInsets: UIEdgeInsets {
         UIApplication.shared.connectedScenes
@@ -24,7 +18,6 @@ enum CameraChromeMetrics {
     }
 }
 
-/// Solid circular camera action: Doraemon blue, white SF Symbol, no glass card.
 struct CameraChromeButton: View {
     let systemImage: String
     var isEnabled: Bool = true
@@ -41,7 +34,7 @@ struct CameraChromeButton: View {
                 rotation: rotation
             )
         }
-        .buttonStyle(PosterPressStyle())
+        .buttonStyle(ClayPressButtonStyle())
         .disabled(!isEnabled)
         .frame(
             minWidth: CameraChromeMetrics.controlDiameter,
@@ -52,8 +45,6 @@ struct CameraChromeButton: View {
     }
 }
 
-/// Shared visual surface for the viewfinder's 44pt camera controls. Keeping
-/// the glyph separate lets `PhotosPicker` use the exact same button geometry.
 struct CameraChromeGlyph: View {
     let systemImage: String
     var isEnabled: Bool = true
@@ -61,11 +52,11 @@ struct CameraChromeGlyph: View {
 
     var body: some View {
         Image(systemName: systemImage)
-            .font(PosterTypography.label)
+            .font(ClayTypography.label)
             .foregroundStyle(
                 isEnabled
-                    ? PosterEffects.cameraActionForeground
-                    : PosterEffects.cameraActionForeground.opacity(0.35)
+                    ? ClayPalette.warmWhite
+                    : ClayPalette.warmWhite.opacity(0.35)
             )
             .rotationEffect(rotation)
             .frame(
@@ -74,17 +65,27 @@ struct CameraChromeGlyph: View {
             )
             .background {
                 Circle()
-                    .fill(PosterEffects.cameraActionFill)
+                    .fill(ClayPalette.orange)
             }
             .clipShape(Circle())
             .contentShape(Circle())
     }
 }
 
+/// 按压反馈按钮样式
+private struct ClayPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .animation(ClayMotion.buttonSpring, value: configuration.isPressed)
+    }
+}
+
 #Preview {
     ZStack {
-        PosterPalette.skyDeep.ignoresSafeArea()
-        HStack(spacing: PosterSpacing.lg) {
+        ClayPalette.orangeRim.ignoresSafeArea()
+        HStack(spacing: ClaySpacing.xxl) {
             CameraChromeButton(
                 systemImage: "photo.on.rectangle",
                 accessibilityLabelText: "从相册导入"

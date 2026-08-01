@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>FUMIRA Clay Diorama — Campus Gate</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #202425;
+    overflow: hidden;
+    font-family: 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+    color: #F2EEE5;
+    height: 100%;
+    height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+  #canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* Time slider */
+  #time-panel {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(32,36,37,0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(242,238,229,0.08);
+    border-radius: 24px; padding: 12px 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    z-index: 10;
+  }
+  #time-panel label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    opacity: 0.5; white-space: nowrap;
+  }
+  #time-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 260px; height: 6px;
+    background: linear-gradient(90deg, #FF672A, #FFC52A, #B7D83D);
+    border-radius: 3px; outline: none;
+  }
+  #time-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #F2EEE5;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  #time-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  #time-label {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800; font-size: 15px;
+    min-width: 80px; text-align: right;
+    color: #FF672A;
+  }
+
+  /* Scene info */
+  #scene-info {
+    position: fixed; top: 24px; left: 24px;
+    font-size: 11px; letter-spacing: 1.5px;
+    text-transform: uppercase; opacity: 0.4;
+    line-height: 1.8;
+  }
+  #scene-info strong { opacity: 1; color: #FF672A; }
+
+  /* Loading */
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #202425; z-index: 100;
+    transition: opacity 0.6s ease;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  #loading h1 {
+    font-size: 28px; font-weight: 900;
+    letter-spacing: 2px; margin-bottom: 8px;
+  }
+  #loading p {
+    font-size: 12px; letter-spacing: 1.5px;
+    text-transform: uppercase; opacity: 0.4;
+  }
+  .loader-blocks {
+    display: flex; gap: 6px; margin-top: 24px;
+  }
+  .loader-blocks span {
+    width: 10px; height: 10px; border-radius: 2px;
+    animation: loadPulse 0.8s ease infinite alternate;
+  }
+  .loader-blocks span:nth-child(1) { background: #FF672A; animation-delay: 0s; }
+  .loader-blocks span:nth-child(2) { background: #FFC52A; animation-delay: 0.15s; }
+  .loader-blocks span:nth-child(3) { background: #B7D83D; animation-delay: 0.3s; }
+  @keyframes loadPulse {
+    from { opacity: 0.3; transform: scaleY(0.6); }
+    to { opacity: 1; transform: scaleY(1); }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>FUMIRA</h1>
+  <p>Building clay diorama</p>
+  <div class="loader-blocks"><span></span><span></span><span></span></div>
+</div>
+
+<div id="scene-info">
+  <strong>CLAY DIORAMA</strong><br>
+  Campus Gate<br>
+  Drag to rotate · Scroll to zoom<br>
+  Slider to travel time
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="time-panel">
+  <label>Time</label>
+  <input type="range" id="time-slider" min="-1" max="1" step="0.001" value="0">
+  <span id="time-label">NOW</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================
+// §1  PALETTE & STYLE
+// ============================================================
+const P = {
+  charcoal:   0x202425,
+  warmWhite:  0xF2EEE5,
+  warmWhiteR:0xCEC7B8,
+  orange:     0xFF672A,
+  orangeRim:  0xC9441D,
+  lime:       0xB7D83D,
+  limeRim:    0x7E9A27,
+  yellow:     0xFFC52A,
+  yellowRim:  0xC18B14,
+  ground:     0xD6CEBF,
+  road:       0x9E9688,
+  sidewalk:   0xC8C0B2,
+  grass:      0x8FCB7E,
+  trunk:      0x6B4E3D,
+  foliage1:   0x7E9A27,
+  foliage2:   0xB7D83D,
+  skin:       0xF2D5B5,
+  cloth1:     0xFF672A,
+  cloth2:     0x3A3E3F,
+};
+
+// ============================================================
+// §2  CLAY MATERIAL FACTORY
+// ============================================================
+
+// Procedural noise texture for clay surface grain
+function createClayNoiseTexture(size = 256) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(size, size);
+  for (let i = 0; i < imgData.data.length; i += 4) {
+    const v = Math.random() * 30 + 113; // ~0.44-0.56 range
+    imgData.data[i] = v;
+    imgData.data[i+1] = v;
+    imgData.data[i+2] = v;
+    imgData.data[i+3] = 18; // very subtle alpha
+  }
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  return tex;
+}
+const clayNoiseTex = createClayNoiseTexture();
+
+function clayMat(color, opts = {}) {
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: opts.roughness ?? 0.84,
+    metalness: 0,
+    flatShading: false,
+    ...opts,
+  });
+  // Store original color for temporal restoration
+  mat.userData = { baseColor: new THREE.Color(color) };
+  return mat;
+}
+
+// ============================================================
+// §3  SCENE SETUP
+// ============================================================
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: false,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.VSMShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.setClearColor(P.charcoal);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(P.charcoal, 0.018);
+
+const camera = new THREE.PerspectiveCamera(
+  38, window.innerWidth / window.innerHeight, 0.1, 100
+);
+camera.position.set(5.5, 4.8, 6.2);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 3;
+controls.maxDistance = 16;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.target.set(0, 0.6, 0);
+controls.update();
+
+// ============================================================
+// §4  LIGHTING
+// ============================================================
+const ambient = new THREE.AmbientLight(P.warmWhite, 0.35);
+scene.add(ambient);
+
+const key = new THREE.DirectionalLight(0xFFF5E8, 1.4);
+key.position.set(4, 8, 3);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 25;
+key.shadow.camera.left = -8;
+key.shadow.camera.right = 8;
+key.shadow.camera.top = 8;
+key.shadow.camera.bottom = -8;
+key.shadow.radius = 4;
+key.shadow.bias = -0.0005;
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(P.warmWhite, 0.3);
+fill.position.set(-3, 4, -2);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(P.warmWhite, 0.15);
+rim.position.set(0, 2, -5);
+scene.add(rim);
+
+// ============================================================
+// §5  GROUND PLANE (infinite ground under diorama)
+// ============================================================
+const groundGeo = new THREE.PlaneGeometry(60, 60);
+const groundMat = clayMat(P.charcoal, { roughness: 1 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.52;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ============================================================
+// §6  DIORAMA BASE
+// ============================================================
+const BASE_W = 7, BASE_D = 7, BASE_H = 0.5;
+const baseGroup = new THREE.Group();
+
+// Main base
+const baseBody = new THREE.Mesh(
+  new THREE.BoxGeometry(BASE_W, BASE_H, BASE_D, 4, 2, 4),
+  clayMat(P.warmWhiteR)
+);
+baseBody.position.y = -BASE_H / 2;
+baseBody.castShadow = true;
+baseBody.receiveShadow = true;
+baseGroup.add(baseBody);
+
+// Top surface
+const baseTop = new THREE.Mesh(
+  new THREE.BoxGeometry(BASE_W - 0.08, 0.06, BASE_D - 0.08, 4, 1, 4),
+  clayMat(P.warmWhite)
+);
+baseTop.position.y = 0.03;
+baseTop.receiveShadow = true;
+baseGroup.add(baseTop);
+
+scene.add(baseGroup);
+
+// Apply clay noise texture to key surfaces
+[baseTop, body, roof].forEach(mesh => {
+  if (mesh.material) {
+    mesh.material.roughnessMap = clayNoiseTex;
+    mesh.material.needsUpdate = true;
+  }
+});
+
+// ============================================================
+// §7  ROAD & SIDEWALK
+// ============================================================
+const roadGroup = new THREE.Group();
+
+// Main road
+const road = new THREE.Mesh(
+  new THREE.BoxGeometry(BASE_W - 0.6, 0.04, 2.2, 1, 1, 1),
+  clayMat(P.road)
+);
+road.position.set(0, 0.06, 1.8);
+road.receiveShadow = true;
+roadGroup.add(road);
+
+// Road center line
+for (let i = -3; i <= 3; i += 1.2) {
+  const dash = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.045, 0.08),
+    clayMat(P.yellow)
+  );
+  dash.position.set(i, 0.07, 1.8);
+  dash.receiveShadow = true;
+  roadGroup.add(dash);
+}
+
+// Sidewalk left
+const swLeft = new THREE.Mesh(
+  new THREE.BoxGeometry(1.2, 0.1, BASE_D - 0.4),
+  clayMat(P.sidewalk)
+);
+swLeft.position.set(-2.6, 0.09, -0.2);
+swLeft.receiveShadow = true;
+swLeft.castShadow = true;
+roadGroup.add(swLeft);
+
+// Sidewalk right
+const swRight = swLeft.clone();
+swRight.position.x = 2.6;
+roadGroup.add(swRight);
+
+// Grass patches
+const grassLeft = new THREE.Mesh(
+  new THREE.BoxGeometry(1.8, 0.06, BASE_D - 0.4),
+  clayMat(P.grass)
+);
+grassLeft.position.set(-1.0, 0.07, -0.2);
+grassLeft.receiveShadow = true;
+roadGroup.add(grassLeft);
+
+const grassRight = grassLeft.clone();
+grassRight.position.x = 1.0;
+roadGroup.add(grassRight);
+
+scene.add(roadGroup);
+
+// ============================================================
+// §8  CAMPUS GATE BUILDING
+// ============================================================
+const buildingGroup = new THREE.Group();
+buildingGroup.userData = { category: 'building', id: 'gate_01' };
+
+// Main body
+const bodyW = 4.2, bodyH = 3.2, bodyD = 1.6;
+const body = new THREE.Mesh(
+  new THREE.BoxGeometry(bodyW, bodyH, bodyD, 2, 2, 2),
+  clayMat(P.warmWhite)
+);
+body.position.set(0, bodyH / 2, -1.8);
+body.castShadow = true;
+body.receiveShadow = true;
+buildingGroup.add(body);
+
+// Rim / base accent
+const baseRim = new THREE.Mesh(
+  new THREE.BoxGeometry(bodyW + 0.12, 0.2, bodyD + 0.12),
+  clayMat(P.warmWhiteR)
+);
+baseRim.position.set(0, 0.1, -1.8);
+baseRim.castShadow = true;
+buildingGroup.add(baseRim);
+
+// Entrance arch
+const archW = 1.6, archH = 2.2;
+const arch = new THREE.Mesh(
+  new THREE.BoxGeometry(archW, archH, bodyD + 0.15),
+  clayMat(P.orange)
+);
+arch.position.set(0, archH / 2, -1.8);
+arch.castShadow = true;
+buildingGroup.add(arch);
+
+// Arch top (semicircle approximation)
+const archTop = new THREE.Mesh(
+  new THREE.CylinderGeometry(archW / 2, archW / 2, bodyD + 0.15, 16, 1, false, 0, Math.PI),
+  clayMat(P.orange)
+);
+archTop.rotation.x = Math.PI / 2;
+archTop.rotation.z = Math.PI / 2;
+archTop.position.set(0, archH, -1.8);
+buildingGroup.add(archTop);
+
+// Windows (4 on each side of entrance)
+for (let side = -1; side <= 1; side += 2) {
+  for (let i = 0; i < 2; i++) {
+    const win = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.6, 0.08),
+      clayMat(P.charcoal, { roughness: 0.4 })
+    );
+    win.position.set(
+      side * (1.1 + i * 0.65),
+      1.8,
+      -1.8 + bodyD / 2 + 0.04
+    );
+    buildingGroup.add(win);
+
+    // Window frame
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.52, 0.67, 0.04),
+      clayMat(P.warmWhiteR)
+    );
+    frame.position.copy(win.position);
+    frame.position.z += 0.03;
+    buildingGroup.add(frame);
+  }
+}
+
+// Roof ledge
+const roof = new THREE.Mesh(
+  new THREE.BoxGeometry(bodyW + 0.2, 0.18, bodyD + 0.2),
+  clayMat(P.orangeRim)
+);
+roof.position.set(0, bodyH + 0.09, -1.8);
+roof.castShadow = true;
+buildingGroup.add(roof);
+
+// Sign board
+const sign = new THREE.Mesh(
+  new THREE.BoxGeometry(2.0, 0.45, 0.08),
+  clayMat(P.orange)
+);
+sign.position.set(0, bodyH - 0.35, -1.8 + bodyD / 2 + 0.08);
+sign.castShadow = true;
+buildingGroup.add(sign);
+
+// "FUMIRA" text placeholder blocks
+const textBlocks = [
+  [-0.6, 0], [-0.35, 0], [-0.1, 0], [0.15, 0], [0.4, 0], [0.65, 0]
+];
+textBlocks.forEach(([x]) => {
+  const letter = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.22, 0.04),
+    clayMat(P.charcoal)
+  );
+  letter.position.set(x, bodyH - 0.35, -1.8 + bodyD / 2 + 0.12);
+  buildingGroup.add(letter);
+});
+
+// Pillars
+for (let side = -1; side <= 1; side += 2) {
+  const pillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.14, bodyH, 8),
+    clayMat(P.warmWhiteR)
+  );
+  pillar.position.set(side * (bodyW / 2 - 0.15), bodyH / 2, -1.8 + bodyD / 2 + 0.08);
+  pillar.castShadow = true;
+  buildingGroup.add(pillar);
+}
+
+scene.add(buildingGroup);
+
+// ============================================================
+// §9  TREES
+// ============================================================
+function createTree(x, z, scale = 1, trunkH = 1.0, crownR = 0.7) {
+  const tree = new THREE.Group();
+  tree.userData = { category: 'vegetation', id: `tree_${x.toFixed(1)}_${z.toFixed(1)}` };
+
+  // Trunk
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06 * scale, 0.1 * scale, trunkH * scale, 8),
+    clayMat(P.trunk)
+  );
+  trunk.position.y = trunkH * scale / 2;
+  trunk.castShadow = true;
+  tree.add(trunk);
+
+  // Crown blobs
+  const blobCount = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < blobCount; i++) {
+    const r = crownR * scale * (0.6 + Math.random() * 0.5);
+    const blob = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 12, 10),
+      clayMat(i % 2 === 0 ? P.foliage1 : P.foliage2)
+    );
+    blob.position.set(
+      (Math.random() - 0.5) * crownR * scale * 0.6,
+      trunkH * scale + crownR * scale * 0.3 + (Math.random() - 0.3) * crownR * scale * 0.5,
+      (Math.random() - 0.5) * crownR * scale * 0.6
+    );
+    blob.scale.y = 0.7 + Math.random() * 0.3;
+    blob.castShadow = true;
+    tree.add(blob);
+  }
+
+  tree.position.set(x, 0.06, z);
+  return tree;
+}
+
+const trees = [
+  createTree(-2.0, -0.8, 1.0, 1.1, 0.65),
+  createTree(2.2, -0.5, 0.85, 0.9, 0.55),
+  createTree(-1.5, 2.5, 1.2, 1.3, 0.8),
+  createTree(2.8, 2.0, 0.7, 0.8, 0.5),
+];
+trees.forEach(t => scene.add(t));
+
+// ============================================================
+// §10  CHARACTERS (clay figurines)
+// ============================================================
+function createCharacter(x, z, rotation = 0, opts = {}) {
+  const char = new THREE.Group();
+  char.userData = { category: 'character', id: opts.id || `person_${x.toFixed(1)}` };
+
+  const s = opts.scale || 0.38;
+  const clothColor = opts.cloth || P.cloth1;
+
+  // Legs
+  for (let side = -1; side <= 1; side += 2) {
+    const leg = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.08 * s, 0.35 * s, 4, 8),
+      clayMat(P.cloth2)
+    );
+    leg.position.set(side * 0.1 * s, 0.2 * s, 0);
+    char.add(leg);
+  }
+
+  // Body
+  const torso = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.18 * s, 0.3 * s, 4, 8),
+    clayMat(clothColor)
+  );
+  torso.position.y = 0.55 * s;
+  torso.castShadow = true;
+  char.add(torso);
+
+  // Arms
+  for (let side = -1; side <= 1; side += 2) {
+    const arm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.055 * s, 0.28 * s, 4, 8),
+      clayMat(clothColor, { roughness: 0.9 })
+    );
+    arm.position.set(side * 0.24 * s, 0.52 * s, 0);
+    arm.rotation.z = side * 0.15;
+    char.add(arm);
+  }
+
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15 * s, 10, 8),
+    clayMat(P.skin)
+  );
+  head.position.y = 0.88 * s;
+  head.scale.y = 1.05;
+  head.castShadow = true;
+  char.add(head);
+
+  // Hair
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.6),
+    clayMat(P.charcoal)
+  );
+  hair.position.y = 0.9 * s;
+  char.add(hair);
+
+  char.position.set(x, 0.06, z);
+  char.rotation.y = rotation;
+  return char;
+}
+
+const people = [
+  createCharacter(0.5, 0.4, 0.3, { cloth: P.cloth1, id: 'person_01' }),
+  createCharacter(-0.7, 0.8, -0.8, { cloth: P.lime, id: 'person_02', scale: 0.34 }),
+  createCharacter(1.2, 1.5, 2.5, { cloth: P.yellow, id: 'person_03', scale: 0.3 }),
+];
+people.forEach(p => scene.add(p));
+
+// ============================================================
+// §11  PROPS (bench, sign, bicycle)
+// ============================================================
+const propsGroup = new THREE.Group();
+
+// Bench
+function createBench(x, z, rot = 0) {
+  const bench = new THREE.Group();
+  // Seat
+  const seat = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.06, 0.3),
+    clayMat(P.trunk)
+  );
+  seat.position.y = 0.32;
+  bench.add(seat);
+  // Back
+  const back = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.35, 0.05),
+    clayMat(P.trunk)
+  );
+  back.position.set(0, 0.48, -0.12);
+  bench.add(back);
+  // Legs
+  for (let lx = -1; lx <= 1; lx += 2) {
+    const leg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.32, 0.25),
+      clayMat(P.warmWhiteR)
+    );
+    leg.position.set(lx * 0.32, 0.16, 0);
+    bench.add(leg);
+  }
+  bench.position.set(x, 0.06, z);
+  bench.rotation.y = rot;
+  return bench;
+}
+propsGroup.add(createBench(-2.0, 0.5, 0));
+
+// Street sign
+function createSign(x, z) {
+  const sign = new THREE.Group();
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 1.2, 6),
+    clayMat(P.warmWhiteR)
+  );
+  pole.position.y = 0.6;
+  sign.add(pole);
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.25, 0.04),
+    clayMat(P.orange)
+  );
+  board.position.y = 1.1;
+  board.castShadow = true;
+  sign.add(board);
+  sign.position.set(x, 0.06, z);
+  return sign;
+}
+propsGroup.add(createSign(2.4, 1.2));
+
+// Bicycle (simplified)
+function createBicycle(x, z, rot = 0) {
+  const bike = new THREE.Group();
+  const wheelR = 0.18;
+  // Wheels
+  for (let wx = -1; wx <= 1; wx += 2) {
+    const wheel = new THREE.Mesh(
+      new THREE.TorusGeometry(wheelR, 0.025, 8, 16),
+      clayMat(P.charcoal)
+    );
+    wheel.rotation.y = Math.PI / 2;
+    wheel.position.set(wx * 0.25, wheelR, 0);
+    bike.add(wheel);
+  }
+  // Frame
+  const frame = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6),
+    clayMat(P.lime)
+  );
+  frame.position.set(0, wheelR + 0.1, 0);
+  frame.rotation.z = 0.3;
+  bike.add(frame);
+  // Handlebar
+  const bar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 0.2, 6),
+    clayMat(P.warmWhiteR)
+  );
+  bar.position.set(0.2, wheelR + 0.25, 0);
+  bar.rotation.z = Math.PI / 2;
+  bike.add(bar);
+  bike.position.set(x, 0.06, z);
+  bike.rotation.y = rot;
+  bike.scale.setScalar(0.8);
+  return bike;
+}
+propsGroup.add(createBicycle(1.8, 0.3, 0.5));
+
+scene.add(propsGroup);
+
+// ============================================================
+// §12  TEMPORAL CLAY WORLD MODEL
+// ============================================================
+// One canonical world. Stable entity IDs. Three transition types.
+// Anchor years + timeline intervals + delta patches.
+
+const timeSlider = document.getElementById('time-slider');
+const timeLabelEl = document.getElementById('time-label');
+
+// ── Canonical Entity Registry ──────────────────────────────
+// Every object in the scene has a stable entityId that persists
+// across all years. The world never rebuilds from scratch.
+
+const canonicalEntities = {
+  gate_01:   { group: buildingGroup, category: 'building',   label: 'Campus Gate' },
+  tree_01:   { group: trees[0],      category: 'vegetation', label: 'Left Tree' },
+  tree_02:   { group: trees[1],      category: 'vegetation', label: 'Right Tree' },
+  tree_03:   { group: trees[2],      category: 'vegetation', label: 'Far Left Tree' },
+  tree_04:   { group: trees[3],      category: 'vegetation', label: 'Far Right Tree' },
+  person_01: { group: people[0],     category: 'character',  label: 'Student' },
+  person_02: { group: people[1],     category: 'character',  label: 'Walking Person' },
+  person_03: { group: people[2],     category: 'character',  label: 'Distant Figure' },
+  road_01:   { group: road,          category: 'terrain',    label: 'Main Road' },
+};
+
+// ── Anchor Years: TemporalAnchorSpec ───────────────────────
+// Key years with explicit entity states. NOT separate worlds —
+// patches applied to the same canonical scene.
+
+const anchorYears = [
+  {
+    year: 2016,
+    entities: {
+      gate_01:   { weathering: 0,   structuralVariant: 'original', wear: 0.0 },
+      tree_01:   { growth: 0.7,  crownVolume: 0.7,  seasonFoliage: 1.0 },
+      tree_02:   { growth: 0.65, crownVolume: 0.65, seasonFoliage: 1.0 },
+      person_01: { bodyStage: 'child',     height: 0.7,  presence: 1, outfit: 'school-uniform' },
+      person_02: { bodyStage: 'young-adult', height: 1.0,  presence: 1, outfit: 'casual' },
+    }
+  },
+  {
+    year: 2026, // NOW — canonical baseline
+    entities: {
+      gate_01:   { weathering: 0,   structuralVariant: 'original', wear: 0.0 },
+      tree_01:   { growth: 1.0,  crownVolume: 1.0,  seasonFoliage: 1.0 },
+      tree_02:   { growth: 1.0,  crownVolume: 1.0,  seasonFoliage: 1.0 },
+      person_01: { bodyStage: 'young-adult', height: 1.0,  presence: 1, outfit: 'student' },
+      person_02: { bodyStage: 'middle-aged',  height: 1.0,  presence: 1, outfit: 'casual' },
+      person_03: { bodyStage: 'young-adult',  height: 0.9,  presence: 0, outfit: 'distant' },
+    }
+  },
+  {
+    year: 2036,
+    entities: {
+      gate_01:   { weathering: 0.3, structuralVariant: 'renovated', wear: 0.15, newWindows: true, newSignage: true },
+      tree_01:   { growth: 1.3,  crownVolume: 1.35, seasonFoliage: 1.0 },
+      tree_02:   { growth: 1.25, crownVolume: 1.3,  seasonFoliage: 1.0 },
+      person_01: { bodyStage: 'young-adult', height: 1.1,  presence: 1, outfit: 'professional', positionOffset: [0.3, 0, 0.2] },
+      person_02: { bodyStage: 'middle-aged',  height: 1.0,  presence: 1, outfit: 'formal' },
+      person_03: { bodyStage: 'young-adult',  height: 0.95, presence: 1, outfit: 'casual-return' },
+      charging_station_01: { presence: 1, position: [2.0, 0, 1.0] },
+    }
+  },
+  {
+    year: 2046,
+    entities: {
+      gate_01:   { weathering: 0.5, structuralVariant: 'renovated', wear: 0.3, newWindows: true, newSignage: true, greenRoof: true },
+      tree_01:   { growth: 1.5,  crownVolume: 1.6,  seasonFoliage: 1.0 },
+      tree_02:   { growth: 1.45, crownVolume: 1.5,  seasonFoliage: 1.0 },
+      person_01: { bodyStage: 'middle-aged',  height: 1.1,  presence: 1, outfit: 'senior', positionOffset: [0.1, 0, 0.5] },
+      person_02: { bodyStage: 'elder',        height: 0.95, presence: 1, outfit: 'elderly' },
+      person_03: { bodyStage: 'middle-aged',  height: 1.0,  presence: 1, outfit: 'professional' },
+      charging_station_01: { presence: 1 },
+      solar_panel_01: { presence: 1, position: [0, 0, -2.5] },
+    }
+  }
+];
+
+// ── Timeline Intervals ─────────────────────────────────────
+// Not just points — the timeline has rhythm: stable, gradual,
+// event, transition, settled modes.
+
+const timelineIntervals = [
+  { startYear: 2016, endYear: 2020, mode: 'stable',     narrative: 'Campus life is steady. Trees grow slowly.' },
+  { startYear: 2020, endYear: 2026, mode: 'gradual',    narrative: 'The area develops. New pedestrian paths appear.' },
+  { startYear: 2026, endYear: 2028, mode: 'stable',     narrative: 'Current moment. Everything is familiar.' },
+  { startYear: 2028, endYear: 2032, mode: 'event',      narrative: 'Building renovation begins. Scaffolding appears.' },
+  { startYear: 2032, endYear: 2036, mode: 'transition',  narrative: 'New facade revealed. The student returns.' },
+  { startYear: 2036, endYear: 2042, mode: 'settled',     narrative: 'A greener, quieter campus. Solar panels installed.' },
+  { startYear: 2042, endYear: 2056, mode: 'stable',      narrative: 'The world has matured. Only subtle seasonal changes.' },
+];
+
+// ── Utility ────────────────────────────────────────────────
+
+function formatTime(p) {
+  if (Math.abs(p) < 0.03) return 'NOW';
+  const days = Math.sign(p) * 36525 * Math.pow(Math.abs(p), 2.35);
+  const years = days / 365.25;
+  if (Math.abs(years) < 1) {
+    const months = Math.round(years * 12);
+    return months > 0 ? `+${months}mo` : `${months}mo`;
+  }
+  const y = Math.round(years);
+  return y > 0 ? `+${y}y` : `${y}y`;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp01(t) { return Math.max(0, Math.min(1, t)); }
+
+function pToYears(p) {
+  return Math.sign(p) * 36525 * Math.pow(Math.abs(p), 2.35) / 365.25;
+}
+
+function yearsToP(years) {
+  const days = years * 365.25;
+  const raw = Math.pow(Math.abs(days) / 36525, 1 / 2.35);
+  return Math.sign(years) * raw;
+}
+
+// ── Temporal Patch Interpolation ───────────────────────────
+// Given a target year, find the two surrounding anchors and
+// interpolate all entity states.
+
+function getInterpolatedState(targetYear) {
+  // Find surrounding anchors
+  let lower = anchorYears[0];
+  let upper = anchorYears[anchorYears.length - 1];
+
+  for (let i = 0; i < anchorYears.length - 1; i++) {
+    if (anchorYears[i].year <= targetYear && anchorYears[i + 1].year >= targetYear) {
+      lower = anchorYears[i];
+      upper = anchorYears[i + 1];
+      break;
+    }
+  }
+
+  const span = upper.year - lower.year;
+  const progress = span > 0 ? clamp01((targetYear - lower.year) / span) : 0;
+
+  // Get all entity IDs from both anchors
+  const allIds = new Set([
+    ...Object.keys(lower.entities),
+    ...Object.keys(upper.entities)
+  ]);
+
+  const result = {};
+  for (const id of allIds) {
+    const a = lower.entities[id] || {};
+    const b = upper.entities[id] || {};
+    result[id] = interpolateEntityState(a, b, progress, id);
+  }
+
+  return { states: result, progress, lowerYear: lower.year, upperYear: upper.year };
+}
+
+function interpolateEntityState(a, b, t, entityId) {
+  const out = {};
+
+  // Existence: 0 → 1 or 1 → 0
+  const existA = a.presence ?? 1;
+  const existB = b.presence ?? 1;
+  out.presence = lerp(existA, existB, t);
+
+  // Numeric parameters: direct interpolation
+  for (const key of ['growth', 'crownVolume', 'seasonFoliage', 'weathering',
+    'wear', 'height', 'trunkRadius']) {
+    if (a[key] !== undefined || b[key] !== undefined) {
+      out[key] = lerp(a[key] ?? b[key] ?? 0, b[key] ?? a[key] ?? 0, t);
+    }
+  }
+
+  // Variant switches: snap at midpoint
+  if (a.structuralVariant !== b.structuralVariant) {
+    out.structuralVariant = t < 0.5 ? (a.structuralVariant || 'original') : (b.structuralVariant || 'original');
+    out.variantTransition = t; // for animation
+  } else {
+    out.structuralVariant = a.structuralVariant || b.structuralVariant || 'original';
+  }
+
+  // Boolean features: snap at 0.7
+  for (const key of ['newWindows', 'newSignage', 'greenRoof']) {
+    out[key] = t >= 0.7 ? (b[key] || false) : (a[key] || false);
+  }
+
+  // Body stage: snap at midpoint
+  if (a.bodyStage !== b.bodyStage) {
+    out.bodyStage = t < 0.5 ? (a.bodyStage || 'adult') : (b.bodyStage || 'adult');
+    out.bodyStageTransition = t;
+  } else {
+    out.bodyStage = a.bodyStage || b.bodyStage || 'adult';
+  }
+
+  // Position offset
+  if (b.positionOffset) {
+    out.positionOffset = b.positionOffset.map((v, i) => lerp(0, v, t));
+  } else {
+    out.positionOffset = [0, 0, 0];
+  }
+
+  // Outfit: snap at midpoint
+  out.outfit = t < 0.5 ? (a.outfit || 'default') : (b.outfit || 'default');
+
+  return out;
+}
+
+// ── Apply Temporal State to 3D Scene ───────────────────────
+
+function applyTemporalState(targetYear) {
+  const { states, progress, lowerYear, upperYear } = getInterpolatedState(targetYear);
+  const seasonCycle = ((targetYear % 1) + 1) % 1;
+
+  // ── Building ───────────────────────────────────────────
+  const bs = states.gate_01;
+  if (bs && buildingGroup) {
+    // Weathering: gradual color shift
+    const weathering = bs.weathering || 0;
+    buildingGroup.children.forEach(child => {
+      if (child.material?.userData?.baseColor && child !== baseRim && child !== roof) {
+        const baseColor = child.material.userData.baseColor;
+        const targetColor = new THREE.Color(P.warmWhiteR);
+        child.material.color.copy(baseColor.clone().lerp(targetColor, weathering));
+      }
+    });
+
+    // Variant switch: window style (parameter interpolation)
+    if (bs.newWindows) {
+      // Make windows slightly larger / brighter for "energy-efficient"
+      buildingGroup.children.forEach(child => {
+        if (child.geometry?.type === 'BoxGeometry' &&
+            child.material?.color?.getHex() === P.charcoal) {
+          // This is a window
+          const windowScale = lerp(1.0, 1.1, clamp01((bs.variantTransition || 0) * 2));
+          child.scale.setScalar(windowScale);
+        }
+      });
+    }
+  }
+
+  // ── Trees (parameter interpolation — truly continuous) ──
+  trees.forEach((tree, i) => {
+    const treeId = `tree_${i + 1}`;
+    const ts = states[treeId];
+    if (!ts) return;
+
+    const growthFactor = ts.growth || 1.0;
+    const crownVol = ts.crownVolume || 1.0;
+
+    tree.children.forEach(child => {
+      if (child.geometry?.type === 'CylinderGeometry') {
+        // Trunk: parameter interpolation
+        child.scale.set(growthFactor, growthFactor, growthFactor);
+      } else if (child.geometry?.type === 'SphereGeometry') {
+        // Crown: parameter interpolation + seasonal color
+        child.scale.setScalar(growthFactor * crownVol * (ts.seasonFoliage || 1.0));
+
+        // Seasonal color
+        const baseFoliage = child.material.userData?.baseColor || new THREE.Color(P.foliage2);
+        const autumnColor = new THREE.Color(P.yellowRim);
+        const winterColor = new THREE.Color(P.warmWhiteR);
+        let targetColor;
+        if (seasonCycle < 0.25) {
+          targetColor = baseFoliage.clone().lerp(winterColor, seasonCycle * 4);
+        } else if (seasonCycle < 0.5) {
+          targetColor = winterColor.clone().lerp(baseFoliage, (seasonCycle - 0.25) * 4);
+        } else if (seasonCycle < 0.75) {
+          targetColor = baseFoliage.clone().lerp(autumnColor, (seasonCycle - 0.5) * 4);
+        } else {
+          targetColor = autumnColor.clone().lerp(winterColor, (seasonCycle - 0.75) * 4);
+        }
+        child.material.color.copy(targetColor);
+      }
+    });
+  });
+
+  // ── Characters (variant switching + parameter interpolation) ──
+  people.forEach((person, i) => {
+    const personId = `person_${i + 1}`;
+    const ps = states[personId];
+    if (!ps) return;
+
+    // Presence
+    person.visible = (ps.presence || 0) > 0.1;
+    if (!person.visible) return;
+
+    // Height (age-related growth)
+    person.scale.setScalar(ps.height || 1.0);
+
+    // Position offset (movement over time)
+    const baseX = [0.5, -0.7, 1.2][i];
+    const baseZ = [0.4, 0.8, 1.5][i];
+    const offset = ps.positionOffset || [0, 0, 0];
+    person.position.x = baseX + offset[0];
+    person.position.z = baseZ + offset[2];
+
+    // Variant switch: body stage changes
+    // (In production, this would swap mesh variants)
+    // For demo, we just scale and color-shift
+    if (ps.bodyStageTransition !== undefined && ps.bodyStageTransition > 0.3) {
+      // Mid-transition: slight compression effect
+      const t = ps.bodyStageTransition;
+      const squash = 1.0 - Math.sin(t * Math.PI) * 0.05;
+      person.scale.y = (ps.height || 1.0) * squash;
+    }
+  });
+
+  // ── Ground color (seasonal) ────────────────────────────
+  const grassGreen = new THREE.Color(P.grass);
+  const grassAutumn = new THREE.Color(P.yellowRim);
+  const seasonShift = (Math.sin(seasonCycle * Math.PI * 2) + 1) / 2 * 0.4;
+  const grassTarget = grassGreen.clone().lerp(grassAutumn, seasonShift);
+  if (grassLeft.material.userData?.baseColor) {
+    grassLeft.material.color.copy(grassTarget);
+  }
+  if (grassRight.material.userData?.baseColor) {
+    grassRight.material.color.copy(grassTarget);
+  }
+
+  // ── Light warmth (seasonal) ────────────────────────────
+  const warmLight = new THREE.Color(0xFFF5E8);
+  const coolLight = new THREE.Color(0xE8F0FF);
+  const seasonWarmth = 0.5 + 0.5 * Math.sin(seasonCycle * Math.PI * 2);
+  key.color.copy(coolLight.clone().lerp(warmLight, seasonWarmth));
+  key.intensity = lerp(1.0, 1.5, seasonWarmth);
+
+  // ── Update timeline interval display ───────────────────
+  updateIntervalDisplay(targetYear);
+}
+
+// ── Timeline Interval Display ──────────────────────────────
+
+const intervalLabelEl = document.getElementById('scene-info');
+
+function updateIntervalDisplay(targetYear) {
+  const interval = timelineIntervals.find(
+    iv => targetYear >= iv.startYear && targetYear <= iv.endYear
+  );
+  if (interval && intervalLabelEl) {
+    const modeIcons = {
+      stable: '●', gradual: '◐', event: '⚡', transition: '◑', settled: '○'
+    };
+    const icon = modeIcons[interval.mode] || '●';
+    intervalLabelEl.innerHTML = `
+      <strong>CLAY DIORAMA</strong><br>
+      Campus Gate<br>
+      <span style="color:#FF672A">${icon} ${interval.mode.toUpperCase()}</span><br>
+      <span style="opacity:0.6">${interval.narrative}</span>
+    `;
+  }
+}
+
+// ── Slider Event ───────────────────────────────────────────
+
+timeSlider.addEventListener('input', () => {
+  const p = parseFloat(timeSlider.value);
+  const years = pToYears(p);
+  timeLabelEl.textContent = formatTime(p);
+  applyTemporalState(2026 + years);
+});
+
+// ── Initialize ─────────────────────────────────────────────
+
+applyTemporalState(2026);
+
+// ============================================================
+// §12.5  NATIVE BRIDGE (Swift ↔ Three.js)
+// ============================================================
+
+// Called from Swift via evaluateJavaScript
+window.updateTimeFromNative = function(p) {
+  timeSlider.value = p;
+  const years = pToYears(p);
+  timeLabelEl.textContent = formatTime(p);
+  applyTemporalState(2026 + years);
+};
+
+window.selectEntityFromNative = function(entityId) {
+  scene.traverse(obj => {
+    if (obj.userData?.id === entityId) {
+      highlightObject(obj);
+    }
+  });
+};
+
+window.clearSelectionFromNative = function() {
+  clearHighlight();
+};
+
+function postToNative(payload) {
+  if (window.webkit?.messageHandlers?.fumiraBridge) {
+    window.webkit.messageHandlers.fumiraBridge.postMessage(payload);
+  }
+}
+
+// Override time slider to also notify native
+timeSlider.addEventListener('input', () => {
+  const p = parseFloat(timeSlider.value);
+  postToNative({ type: 'timeChanged', value: p });
+});
+
+// Override click to also notify native
+canvas.addEventListener('click', () => {
+  setTimeout(() => {
+    if (selectedObject?.userData?.id) {
+      postToNative({
+        type: 'entitySelected',
+        entityId: selectedObject.userData.id
+      });
+    }
+  }, 50);
+}, true);
+
+// ============================================================
+// §13  ANIMATION LOOP
+// ============================================================
+const clock = new THREE.Clock();
+let frameCount = 0;
+let lastInteraction = 0;
+
+// Track user interaction
+canvas.addEventListener('pointerdown', () => { lastInteraction = performance.now(); });
+canvas.addEventListener('wheel', () => { lastInteraction = performance.now(); });
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+  frameCount++;
+
+  // Auto-rotate when idle for 5+ seconds
+  const idleTime = (performance.now() - lastInteraction) / 1000;
+  if (idleTime > 5) {
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.4;
+  } else {
+    controls.autoRotate = false;
+  }
+
+  controls.update();
+
+  // Subtle idle animation — people sway
+  people.forEach((person, i) => {
+    if (person.visible) {
+      person.children.forEach(child => {
+        if (child.geometry?.type === 'CapsuleGeometry' && child.position.y > 0.3) {
+          child.rotation.z += Math.sin(t * 1.5 + i) * 0.0003;
+        }
+      });
+    }
+  });
+
+  // Tree sway
+  trees.forEach((tree, i) => {
+    tree.children.forEach(child => {
+      if (child.geometry?.type === 'SphereGeometry') {
+        child.position.x += Math.sin(t * 0.8 + i * 1.5) * 0.0002;
+        child.position.z += Math.cos(t * 0.6 + i * 2) * 0.0001;
+      }
+    });
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ============================================================
+// §14  RESIZE & INIT
+// ============================================================
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ============================================================
+// §15  CLICK TO SELECT OBJECT
+// ============================================================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selectedObject = null;
+let originalMaterials = new Map();
+
+// Selection highlight overlay
+const selectOverlay = document.createElement('div');
+selectOverlay.id = 'select-info';
+selectOverlay.style.cssText = `
+  position: fixed; top: 24px; right: 24px;
+  background: rgba(32,36,37,0.92); backdrop-filter: blur(12px);
+  border: 1px solid rgba(242,238,229,0.12); border-radius: 16px;
+  padding: 16px 20px; font-size: 12px; letter-spacing: 0.5px;
+  line-height: 1.8; opacity: 0; transition: opacity 0.3s ease;
+  pointer-events: none; z-index: 10; min-width: 180px;
+`;
+document.body.appendChild(selectOverlay);
+
+function highlightObject(obj) {
+  // Find parent group with userData
+  let target = obj;
+  while (target && !target.userData?.category) {
+    target = target.parent;
+  }
+  if (!target || !target.userData?.category) return;
+
+  clearHighlight();
+  selectedObject = target;
+
+  // Show info
+  const cat = target.userData.category;
+  const id = target.userData.id;
+  const icons = { building: '🏛', vegetation: '🌳', character: '🧑' };
+  selectOverlay.innerHTML = `
+    <div style="color:#FF672A;font-weight:800;font-size:14px;margin-bottom:4px">
+      ${icons[cat] || '◆'} ${id}
+    </div>
+    <div style="opacity:0.5">${cat}</div>
+    <div style="margin-top:6px;font-size:11px;opacity:0.35">Click elsewhere to deselect</div>
+  `;
+  selectOverlay.style.opacity = '1';
+
+  // Highlight meshes
+  target.traverse(child => {
+    if (child.isMesh) {
+      originalMaterials.set(child.uuid, child.material);
+      child.material = child.material.clone();
+      child.material.emissive = new THREE.Color(0xFF672A);
+      child.material.emissiveIntensity = 0.15;
+    }
+  });
+}
+
+function clearHighlight() {
+  if (selectedObject) {
+    selectedObject.traverse(child => {
+      if (child.isMesh && originalMaterials.has(child.uuid)) {
+        child.material.dispose();
+        child.material = originalMaterials.get(child.uuid);
+      }
+    });
+    originalMaterials.clear();
+    selectedObject = null;
+  }
+  selectOverlay.style.opacity = '0';
+}
+
+canvas.addEventListener('click', (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(scene.children, true);
+  if (intersects.length > 0) {
+    highlightObject(intersects[0].object);
+  } else {
+    clearHighlight();
+  }
+});
+
+// Initial time state
+updateTime(0);
+
+// Start
+animate();
+
+// Hide loading screen
+setTimeout(() => {
+  document.getElementById('loading').classList.add('hidden');
+}, 800);
+</script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: #F7F5EF;
+  overflow: hidden;
+  font-family: 'SF Pro Rounded', -apple-system, system-ui, sans-serif;
+  color: #202425;
+  height: 100%;
+  height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+#canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Top bar */
+#top-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 32px; z-index: 10;
+  background: linear-gradient(to bottom, rgba(247,245,239,0.95) 0%, rgba(247,245,239,0) 100%);
+  pointer-events: none;
+}
+#top-bar > * { pointer-events: all; }
+.brand { font-size: 14px; font-weight: 800; letter-spacing: 2px; color: #202425; }
+.brand span { color: #FF672A; }
+
+/* QR panel */
+#qr-panel {
+  position: fixed; top: 20px; right: 32px;
+  background: #FFFFFF; border-radius: 20px; padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  text-align: center; z-index: 20;
+  transition: all 0.3s ease;
+}
+#qr-panel.connected { border: 2px solid #B7D83D; }
+#qr-panel.waiting { border: 2px solid #FFC52A; }
+#qr-panel.hidden { opacity: 0; pointer-events: none; transform: translateY(-10px); }
+#qr-code { margin: 8px 0; }
+#qr-status {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; margin-top: 8px;
+}
+#qr-status.waiting { color: #FFC52A; }
+#qr-status.connected { color: #B7D83D; }
+#session-id { font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #202425; margin: 8px 0 4px; }
+
+/* Time display */
+#time-display {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: #FFFFFF; border-radius: 24px; padding: 16px 32px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  display: flex; align-items: center; gap: 20px; z-index: 10;
+  min-width: 400px; justify-content: center;
+}
+#time-display .year-label {
+  font-size: 28px; font-weight: 900; color: #FF672A;
+  font-variant-numeric: tabular-nums; min-width: 100px; text-align: center;
+}
+#time-display .era-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: #202425; opacity: 0.4;
+}
+
+/* Interval card */
+#interval-card {
+  position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+  background: rgba(32,36,37,0.92); color: #F2EEE5;
+  border-radius: 16px; padding: 12px 24px;
+  font-size: 12px; letter-spacing: 0.5px;
+  opacity: 0; transition: opacity 0.3s ease;
+  z-index: 10; text-align: center; max-width: 500px;
+}
+#interval-card.visible { opacity: 1; }
+
+/* Status indicator */
+#connection-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 8px;
+}
+#connection-dot.connected { background: #B7D83D; }
+#connection-dot.disconnected { background: #FFC52A; }
+#connection-dot.offline { background: #9E9688; }
+
+/* Loading */
+#loading {
+  position: fixed; inset: 0; background: #F7F5EF;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 100; transition: opacity 0.6s ease;
+}
+#loading.done { opacity: 0; pointer-events: none; }
+#loading h1 { font-size: 32px; font-weight: 900; letter-spacing: 3px; }
+#loading h1 span { color: #FF672A; }
+#loading p { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.4; margin-top: 8px; }

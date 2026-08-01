@@ -1,13 +1,13 @@
 import SwiftUI
 
 struct PosterScreenContainer<Content: View>: View {
-    var background: Color = PosterPalette.canvas
+    var background: Color = ClayPalette.charcoal
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ZStack {
-            // Full-bleed fill — never leave a reserved white home-indicator band.
-            background.ignoresSafeArea()
+            ClayAppBackground(color: background)
+                .ignoresSafeArea()
 
             GeometryReader { proxy in
                 ScrollView {
@@ -17,14 +17,14 @@ struct PosterScreenContainer<Content: View>: View {
                             minHeight: max(
                                 0,
                                 proxy.size.height
-                                    - PosterSpacing.md * 2
+                                    - ClaySpacing.sm * 2
                                     - proxy.safeAreaInsets.top
                                     - proxy.safeAreaInsets.bottom
                             ),
                             alignment: .top
                         )
-                        .padding(.horizontal, PosterSpacing.lg)
-                        .padding(.vertical, PosterSpacing.md)
+                        .padding(.horizontal, ClaySpacing.xxl)
+                        .padding(.vertical, ClaySpacing.sm)
                         .safeAreaPadding(.top)
                         .safeAreaPadding(.bottom)
                 }

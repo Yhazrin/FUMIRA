@@ -1,0 +1,50 @@
+:root {
+  /* Core Palette */
+  --fumira-charcoal: #202425;
+  --fumira-charcoal-light: #3A3E3F;
+  --fumira-warm-white: #F2EEE5;
+  --fumira-warm-white-rim: #CEC7B8;
+
+  /* Accent */
+  --fumira-orange: #FF672A;
+  --fumira-orange-rim: #C9441D;
+  --fumira-time-blue: #4A90D9;
+  --fumira-time-blue-rim: #3570A8;
+  --fumira-park-green: #8FCB7E;
+  --fumira-lime: #B7D83D;
+  --fumira-yellow: #FFC52A;
+
+  /* Semantic */
+  --fumira-primary: var(--fumira-orange);
+  --fumira-primary-rim: var(--fumira-orange-rim);
+  --fumira-accent: var(--fumira-time-blue);
+  --fumira-success: var(--fumira-lime);
+  --fumira-progress: var(--fumira-yellow);
+
+  /* Surface */
+  --fumira-bg: #F7F5EF;
+  --fumira-surface-light: var(--fumira-warm-white);
+  --fumira-surface-dark: var(--fumira-charcoal);
+  --fumira-surface-raised: #E8E4DB;
+  --fumira-surface-border: #D5D0C5;
+  --fumira-surface-subtle: #C9C4B8;
+  --fumira-muted: #9E9688;
+
+  /* Spacing */
+  --fumira-space-xs: 4px;
+  --fumira-space-sm: 8px;
+  --fumira-space-md: 16px;
+  --fumira-space-lg: 24px;
+  --fumira-space-xl: 32px;
+
+  /* Radius */
+  --fumira-radius-sm: 8px;
+  --fumira-radius-md: 12px;
+  --fumira-radius-lg: 16px;
+  --fumira-radius-xl: 24px;
+
+  /* Shadow */
+  --fumira-shadow-small: 0 2px 8px rgba(32, 36, 37, 0.08);
+  --fumira-shadow-medium: 0 4px 16px rgba(32, 36, 37, 0.12);
+  --fumira-shadow-large: 0 8px 32px rgba(32, 36, 37, 0.16);
+}

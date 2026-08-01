@@ -5,31 +5,37 @@ struct BluetoothPermissionView: View {
 
     var body: some View {
         PosterScreenContainer {
-            VStack(spacing: PosterSpacing.lg) {
-                Spacer(minLength: PosterSpacing.xl)
+            VStack(spacing: ClaySpacing.xxl) {
+                Spacer(minLength: ClaySpacing.xxxl)
 
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 34, weight: .medium))
-                    .foregroundStyle(PosterPalette.skyDeep)
+                    .foregroundStyle(ClayPalette.orange)
                     .frame(width: 64, height: 64)
-                    .background(PosterPalette.sky.opacity(0.18))
-                    .clipShape(Circle())
+                    .background {
+                        Circle()
+                            .fill(ClayPalette.orange.opacity(0.18))
+                    }
                     .accessibilityHidden(true)
 
                 Text("连接 FutureCam")
-                    .font(PosterTypography.screenTitle)
-                    .foregroundStyle(PosterPalette.ink)
+                    .font(ClayTypography.displaySmall)
+                    .foregroundStyle(ClayPalette.textOnDark)
                     .multilineTextAlignment(.center)
 
-                PosterCapsuleButton(
-                    title: "继续",
-                    accessibilityHint: "授权后开始连接硬件"
-                ) {
+                Button {
                     Task { await model.grantBluetoothAndConnect() }
+                } label: {
+                    Text("继续")
+                        .font(ClayTypography.bodyBold)
+                        .foregroundStyle(ClayPalette.charcoal)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
                 }
+                .clayButtonStyle()
                 .frame(maxWidth: 280)
 
-                Spacer(minLength: PosterSpacing.xl)
+                Spacer(minLength: ClaySpacing.xxxl)
             }
             .frame(maxWidth: .infinity)
         }

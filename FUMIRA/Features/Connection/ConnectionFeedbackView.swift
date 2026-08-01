@@ -9,110 +9,93 @@ struct ConnectionFeedbackView: View {
 
     var body: some View {
         ZStack {
-            PosterPalette.canvas.ignoresSafeArea()
+            ClayAppBackground()
+                .ignoresSafeArea()
 
-            LinearGradient(
-                colors: [
-                    PosterPalette.sky.opacity(0.42),
-                    PosterPalette.canvas,
-                    PosterPalette.grassLight.opacity(0.28)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            VStack(spacing: ClaySpacing.xxxl) {
+                Spacer(minLength: ClaySpacing.xxl)
 
-            VStack(spacing: PosterSpacing.xl) {
-                Spacer(minLength: PosterSpacing.lg)
-
-                PosterKeywordHero(
-                    moment: .connecting,
-                    fontSize: 32,
-                    showsScriptLabel: false
-                )
-                    .padding(.horizontal, PosterSpacing.lg)
+                Text("已连接")
+                    .font(ClayTypography.displaySmall)
+                    .foregroundStyle(ClayPalette.textOnDark)
 
                 connectionCard
-                    .padding(.horizontal, PosterSpacing.lg)
+                    .padding(.horizontal, ClaySpacing.xxl)
 
                 Spacer()
 
-                PosterCapsuleButton(
-                    title: "继续",
-                    accessibilityHint: "进入相机权限步骤"
-                ) {
+                Button {
                     model.continueFromConnection()
+                } label: {
+                    Text("继续")
+                        .font(ClayTypography.bodyBold)
+                        .foregroundStyle(ClayPalette.charcoal)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
                 }
-                .padding(.horizontal, PosterSpacing.lg)
-                .padding(.bottom, PosterSpacing.xl)
+                .clayButtonStyle()
+                .padding(.horizontal, ClaySpacing.xxl)
+                .padding(.bottom, ClaySpacing.xxxl)
             }
         }
         .animation(
             reduceMotion
-                ? .linear(duration: PosterMotion.reduced)
-                : .spring(response: PosterMotion.poster, dampingFraction: 0.86),
+                ? .linear(duration: ClayMotion.durationFast)
+                : ClayMotion.panelSpring,
             value: snapshot.batteryLevel
         )
     }
 
     private var connectionCard: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: PosterSpacing.md) {
-                    HStack(alignment: .firstTextBaseline, spacing: PosterSpacing.sm) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(PosterPalette.actionBlueDeep)
+        ClayPanel {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: ClaySpacing.lg) {
+                        HStack(alignment: .firstTextBaseline, spacing: ClaySpacing.sm) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(ClayPalette.lime)
 
-                        Text(displayNameParts.primary)
-                            .foregroundStyle(PosterPalette.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.55)
-                    }
-                    .font(.headline.weight(.bold))
-
-                    HStack(spacing: PosterSpacing.sm) {
-                        if let secondary = displayNameParts.secondary {
-                            Text(secondary)
-                                .font(.body.weight(.semibold))
+                            Text(displayNameParts.primary)
+                                .foregroundStyle(ClayPalette.textPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.55)
                         }
+                        .font(.headline.weight(.bold))
 
-                        Spacer(minLength: 0)
+                        HStack(spacing: ClaySpacing.sm) {
+                            if let secondary = displayNameParts.secondary {
+                                Text(secondary)
+                                    .font(.body.weight(.semibold))
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Label("\(snapshot.batteryLevel)%", systemImage: "battery.75")
+                                .font(.body.monospacedDigit().weight(.semibold))
+                        }
+                        .foregroundStyle(ClayPalette.textPrimary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(spacing: ClaySpacing.lg) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(ClayPalette.lime)
+
+                        Text(displayName)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(ClayPalette.textPrimary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: ClaySpacing.sm)
 
                         Label("\(snapshot.batteryLevel)%", systemImage: "battery.75")
-                            .font(.body.monospacedDigit().weight(.semibold))
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(ClayPalette.textPrimary)
                     }
-                    .foregroundStyle(PosterPalette.ink)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                HStack(spacing: PosterSpacing.md) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(PosterPalette.actionBlueDeep)
-
-                    Text(displayName)
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(PosterPalette.ink)
-                        .lineLimit(1)
-
-                    Spacer(minLength: PosterSpacing.sm)
-
-                    Label("\(snapshot.batteryLevel)%", systemImage: "battery.75")
-                        .font(.headline.monospacedDigit())
-                        .foregroundStyle(PosterPalette.ink)
                 }
             }
         }
-        .padding(PosterSpacing.lg)
-        .frame(maxWidth: .infinity, minHeight: 84)
-        .background(PosterPalette.cardActive)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: PosterRadius.card,
-                style: .continuous
-            )
-        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(snapshot.name) 已连接，电量 \(snapshot.batteryLevel)%"

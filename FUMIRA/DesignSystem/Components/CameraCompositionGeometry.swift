@@ -108,7 +108,7 @@ enum CameraCompositionGeometry {
     ) -> ControlPlacement {
         let controlHeight = CameraChromeMetrics.waveRailHeight
         let safeDeckBottom = size.height
-            - max(bottomSafeAreaInset + PosterSpacing.sm, PosterSpacing.xl)
+            - max(bottomSafeAreaInset + ClaySpacing.sm, ClaySpacing.xxxl)
         // Measure the full blue body to the screen edge. 16:9 already exposes
         // enough deck to host the rail; only compare against the rail height
         // itself, not an extra padding cushion that forced a false float.

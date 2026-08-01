@@ -36,18 +36,41 @@ struct FUMIRAApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(model: model)
-                .preferredColorScheme(model.phase == .viewfinder ? .dark : .light)
-                .task {
-                    await model.prepare()
-                    #if DEBUG
-                    await runDebugAuditTransitionIfNeeded()
-                    #endif
-                }
-                .onOpenURL { url in
-                    model.handleDeepLink(url)
-                }
+            ZStack {
+                // Window-level floor color. The default UIWindow background
+                // is white; any sub-pixel gap at the status bar or home
+                // indicator reveals a white seam. Placing a full-bleed fill
+                // below RootView guarantees the seam matches our palette.
+                ClayPalette.charcoal
+                    .ignoresSafeArea()
+
+                RootView(model: model)
+            }
+            .preferredColorScheme(model.phase == .viewfinder ? .dark : .light)
+            .task {
+                await model.prepare()
+                setWindowBackgroundToMatchTheme()
+                #if DEBUG
+                await runDebugAuditTransitionIfNeeded()
+                #endif
+            }
+            .onOpenURL { url in
+                model.handleDeepLink(url)
+            }
         }
+    }
+
+    /// Clears the UIKit window background so the SwiftUI ZStack floor
+    /// (ClayPalette.charcoal) is the only color visible behind safe-area
+    /// seams. Without this, the default white UIWindow background peeks
+    /// through at the status bar and home indicator on some devices.
+    @MainActor
+    private func setWindowBackgroundToMatchTheme() {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow })
+        else { return }
+        window.backgroundColor = .clear
     }
 
     #if DEBUG

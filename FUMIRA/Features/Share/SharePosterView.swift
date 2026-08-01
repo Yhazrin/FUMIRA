@@ -40,11 +40,11 @@ struct SharePosterView: View {
     }
 
     var body: some View {
-        PosterScreenContainer(background: PosterPalette.canvas) {
-            VStack(spacing: PosterSpacing.lg) {
+        PosterScreenContainer(background: ClayPalette.charcoal) {
+            VStack(spacing: ClaySpacing.xxl) {
                 PosterTitleView(
                     segments: ["带走", "这段", "时间"],
-                    color: PosterPalette.sky,
+                    color: ClayPalette.orange,
                     fontSize: 36
                 )
 
@@ -56,14 +56,14 @@ struct SharePosterView: View {
                     sceneImage: sceneImage,
                     interpretationTrace: interpretationTrace
                 )
-                .shadow(color: PosterEffects.floating, radius: 16, y: 8)
+                .shadow(color: ClayShadow.rest.color, radius: 16, y: 8)
                 .flatDecorationRotation(model.motionField)
 
                 feedbackRow
 
-                Spacer(minLength: PosterSpacing.sm)
+                Spacer(minLength: ClaySpacing.sm)
 
-                VStack(spacing: PosterSpacing.md) {
+                VStack(spacing: ClaySpacing.lg) {
                     PosterCapsuleButton(
                         title: model.isSavingPoster ? "正在保存…" : "保存到相册",
                         accessibilityHint: "将合成海报写入系统相册"
@@ -122,14 +122,14 @@ struct SharePosterView: View {
             ) {
                 Text("分享海报")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(PosterPalette.ink)
+                    .foregroundStyle(ClayPalette.charcoal)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 56)
-                    .background(PosterPalette.canvas)
+                    .background(ClayPalette.charcoal)
                     .clipShape(Capsule())
                     .overlay {
                         Capsule()
-                            .stroke(PosterPalette.ink, lineWidth: 2)
+                            .stroke(ClayPalette.charcoal, lineWidth: 2)
                     }
             }
             .simultaneousGesture(TapGesture().onEnded {

@@ -25,13 +25,15 @@ struct ViewfinderView: View {
             )
 
             ZStack {
-                // Body blue matches the connection liquid fill (`actionBlue`)
-                // so entry never flashes a deeper deck color under the card.
-                PosterPalette.cameraBody
+                ClayPalette.orange
                     .ignoresSafeArea()
+                    .overlay {
+                        ClayNoiseTexture(opacity: 0.08)
+                            .ignoresSafeArea()
+                    }
 
                 cardShape
-                    .fill(PosterPalette.ink)
+                    .fill(ClayPalette.charcoal)
                     .frame(
                         width: layout.heroFrame.width,
                         height: layout.heroFrame.height
@@ -97,6 +99,7 @@ struct ViewfinderChromeOverlay: View {
     @State private var aspectBadgeDismissTask: Task<Void, Never>?
     @State private var systemTopInset: CGFloat = 0
     @State private var systemBottomInset: CGFloat = 0
+    @State private var isSettingsPresented = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -110,12 +113,12 @@ struct ViewfinderChromeOverlay: View {
                 bottomSafeAreaInset: systemBottomInset
             )
             let topChromeTopY = max(
-                compositionFrame.minY + PosterSpacing.sm,
-                systemTopInset + PosterSpacing.sm
+                compositionFrame.minY + ClaySpacing.sm,
+                systemTopInset + ClaySpacing.sm
             )
             let feedbackCenterY = topChromeTopY
                 + CameraChromeMetrics.topRowHeight
-                + PosterSpacing.sm
+                + ClaySpacing.sm
                 + CameraChromeMetrics.compactFeedbackHeight * 0.5
 
             ZStack(alignment: .top) {
@@ -165,7 +168,7 @@ struct ViewfinderChromeOverlay: View {
                 }
 
                 bottomChrome
-                    .frame(width: proxy.size.width - PosterSpacing.md * 2)
+                    .frame(width: proxy.size.width - ClaySpacing.sm * 2)
                     .waveRailFlatIntro(
                         progress: railIntroProgress,
                         reduceMotion: reduceMotion
@@ -176,10 +179,10 @@ struct ViewfinderChromeOverlay: View {
                     )
                     .shadow(
                         color: controlPlacement.overlaysPreview
-                            ? PosterEffects.cameraFloatingWaveShadow
+                            ? ClayPalette.charcoal.opacity(0.24)
                             : .clear,
-                        radius: PosterEffects.cameraFloatingWaveShadowRadius,
-                        y: PosterEffects.cameraFloatingWaveShadowOffset
+                        radius: 10,
+                        y: 3
                     )
                     .allowsHitTesting(controlsAreReady && railIntroProgress > 0.85)
 
@@ -204,7 +207,7 @@ struct ViewfinderChromeOverlay: View {
                     aspectRatioBadge
                         .position(
                             x: compositionFrame.midX,
-                            y: compositionFrame.maxY - PosterSpacing.xl
+                            y: compositionFrame.maxY - ClaySpacing.xxxl
                         )
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
@@ -220,7 +223,7 @@ struct ViewfinderChromeOverlay: View {
 
                 if let feedback = model.cameraActivityFeedback {
                     liveActivityFeedback(feedback)
-                        .frame(maxWidth: compositionFrame.width - PosterSpacing.xl * 2)
+                        .frame(maxWidth: compositionFrame.width - ClaySpacing.xxxl * 2)
                         .position(
                             x: compositionFrame.midX,
                             y: feedbackCenterY
@@ -274,6 +277,11 @@ struct ViewfinderChromeOverlay: View {
                 : PosterMotion.interaction,
             value: isAspectRatioBadgeVisible
         )
+        // Chrome is an invisible overlay — extending into the safe area
+        // guarantees the GeometryReader reports the full-screen size so
+        // every positioned control (top row, shutter rail) lands exactly
+        // where ViewfinderView's own full-bleed preview expects it.
+        .ignoresSafeArea()
     }
 
     /// Lower fraction of the composition card that accepts vertical aspect
@@ -321,7 +329,7 @@ struct ViewfinderChromeOverlay: View {
         _ subject: CameraTrackedSubject,
         in compositionFrame: CGRect
     ) -> CGRect {
-        let minimumExtent = PosterSpacing.lg + PosterSpacing.xs
+                let minimumExtent = ClaySpacing.xxl + ClaySpacing.xxs
         let proposedWidth = CGFloat(subject.normalizedWidth)
             * compositionFrame.width
         let proposedHeight = CGFloat(subject.normalizedHeight)
@@ -354,38 +362,38 @@ struct ViewfinderChromeOverlay: View {
     private var aspectRatioBadge: some View {
         Text(model.cameraAspectRatio.label)
             .font(.callout.weight(.bold))
-            .foregroundStyle(PosterEffects.cameraChromeSolidForeground)
-            .padding(.horizontal, PosterSpacing.md)
+            .foregroundStyle(ClayPalette.warmWhite)
+            .padding(.horizontal, ClaySpacing.lg)
             .frame(minHeight: CameraChromeMetrics.compactFeedbackHeight)
-            .background(PosterEffects.cameraChromeSolidFill, in: Capsule())
+            .background(ClayPalette.orangeRim, in: Capsule())
             .overlay {
                 Capsule()
-                    .stroke(PosterEffects.cameraChromeSolidStroke, lineWidth: 1)
+                    .stroke(ClayPalette.orange.opacity(0.72), lineWidth: 1)
             }
             .shadow(
-                color: PosterEffects.control,
-                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
-                y: PosterEffects.cameraChromeFeedbackShadowOffset
+                color: ClayShadow.small.color,
+                radius: ClayShadow.small.radius,
+                y: ClayShadow.small.y
             )
     }
 
     private func liveActivityFeedback(_ text: String) -> some View {
         Label(text, systemImage: "wave.3.right.circle.fill")
             .font(.caption.weight(.bold))
-            .foregroundStyle(PosterEffects.cameraChromeSolidForeground)
+            .foregroundStyle(ClayPalette.warmWhite)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
-            .padding(.horizontal, PosterSpacing.md)
+            .padding(.horizontal, ClaySpacing.lg)
             .frame(minHeight: CameraChromeMetrics.compactFeedbackHeight)
-            .background(PosterEffects.cameraChromeSolidFill, in: Capsule())
+            .background(ClayPalette.orangeRim, in: Capsule())
             .overlay {
                 Capsule()
-                    .stroke(PosterEffects.cameraChromeSolidStroke, lineWidth: 1)
+                    .stroke(ClayPalette.orange.opacity(0.72), lineWidth: 1)
             }
             .shadow(
-                color: PosterEffects.control,
-                radius: PosterEffects.cameraChromeFeedbackShadowRadius,
-                y: PosterEffects.cameraChromeFeedbackShadowOffset
+                color: ClayShadow.small.color,
+                radius: ClayShadow.small.radius,
+                y: ClayShadow.small.y
             )
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("viewfinder.live-activity-feedback")
@@ -419,17 +427,20 @@ struct ViewfinderChromeOverlay: View {
             albumPickerButton
             Spacer(minLength: 0)
             CameraChromeButton(
-                systemImage: "arrow.triangle.2.circlepath",
-                isEnabled: model.canSwitchCamera && !model.isPipelineBusy,
+                systemImage: "gearshape",
+                isEnabled: true,
                 rotation: chromeRotation,
-                accessibilityLabelText: "翻转摄像头",
-                accessibilityHintText: "在前后摄像头之间切换"
+                accessibilityLabelText: "设置",
+                accessibilityHintText: "打开设置页面"
             ) {
-                Task { await model.switchCameraLens() }
+                isSettingsPresented = true
             }
         }
-        .padding(.horizontal, PosterSpacing.md)
-        .frame(height: CameraChromeMetrics.topRowHeight, alignment: .top)
+        .padding(.horizontal, ClaySpacing.lg)
+        .frame(height: CameraChromeMetrics.topRowHeight, alignment: .center)
+        .sheet(isPresented: $isSettingsPresented) {
+            ViewfinderSettingsView(model: model)
+        }
     }
 
     #if DEBUG
@@ -642,7 +653,7 @@ private struct CameraCompositionGrid: View {
             }
             context.stroke(
                 path,
-                with: .color(PosterPalette.paperWhite.opacity(0.32)),
+                with: .color(ClayPalette.warmWhite.opacity(0.32)),
                 lineWidth: 1
             )
         }

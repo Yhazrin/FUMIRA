@@ -51,3 +51,28 @@ Package.resolved
 artifacts/
 tools/__pycache__/
 **/__pycache__/
+
+# Node
+node_modules/
+dist/
+coverage/
+.cache/
+*.tsbuildinfo
+
+# Build artifacts (demo workspace)
+demo/*/dist/
+demo/*/node_modules/
+demo/*/.vite/
+
+# Temporary
+*.tmp
+
+# Screenshots (test artifacts)
+screenshots/
+test-screenshots/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

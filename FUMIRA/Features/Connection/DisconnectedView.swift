@@ -6,47 +6,57 @@ struct DisconnectedView: View {
 
     var body: some View {
         PosterScreenContainer {
-            VStack(spacing: PosterSpacing.xl) {
+            VStack(spacing: ClaySpacing.xxxl) {
                 Spacer()
 
                 ZStack {
                     Circle()
-                        .fill(PosterPalette.errorCoral.opacity(0.15))
+                        .fill(ClayPalette.error.opacity(0.15))
                         .frame(width: 120, height: 120)
                     Image(systemName: "wifi.slash")
                         .font(.system(size: 48, weight: .medium))
-                        .foregroundStyle(PosterPalette.errorCoral)
+                        .foregroundStyle(ClayPalette.error)
                 }
                 .accessibilityHidden(true)
 
-                PosterTitleView(
-                    segments: ["连接", "已断开"],
-                    color: PosterPalette.errorCoral,
-                    fontSize: 38
-                )
+                Text("连接已断开")
+                    .font(ClayTypography.displaySmall)
+                    .foregroundStyle(ClayPalette.textOnDark)
 
                 if let message {
                     Text(message)
-                        .font(.body)
-                        .foregroundStyle(PosterPalette.ink)
+                        .font(ClayTypography.body)
+                        .foregroundStyle(ClayPalette.textOnDark.opacity(0.72))
                         .multilineTextAlignment(.leading)
                 }
 
                 Spacer()
 
-                VStack(spacing: PosterSpacing.md) {
-                    PosterCapsuleButton(
-                        title: "重新连接",
-                        accessibilityHint: "返回连接页面"
-                    ) {
+                VStack(spacing: ClaySpacing.lg) {
+                    Button {
                         model.recoverConnection()
+                    } label: {
+                        Text("重新连接")
+                            .font(ClayTypography.bodyBold)
+                            .foregroundStyle(ClayPalette.charcoal)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
                     }
+                    .clayButtonStyle()
 
-                    PosterCapsuleButton(
-                        title: "仅用手机体验",
-                        style: .secondary
-                    ) {
+                    Button {
                         model.beginPhoneOnlyPath()
+                    } label: {
+                        Text("仅用手机体验")
+                            .font(ClayTypography.bodyBold)
+                            .foregroundStyle(ClayPalette.textOnDark)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                    }
+                    .buttonStyle(.plain)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: ClayShape.button, style: .continuous)
+                            .stroke(ClayPalette.warmWhite.opacity(0.24), lineWidth: 1.5)
                     }
                 }
             }

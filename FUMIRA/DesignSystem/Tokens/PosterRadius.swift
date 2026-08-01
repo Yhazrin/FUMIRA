@@ -1,11 +1,10 @@
 import Foundation
 
 enum PosterRadius {
-    /// A compact radius ladder keeps cards friendly without every surface
-    /// becoming a pill. All values use continuous corners.
-    static let control: CGFloat = 18
-    static let card: CGFloat = 26
-    static let photoPaper: CGFloat = 20
-    static let screen: CGFloat = 32
-    static let waveBar: CGFloat = 2
+    /// Clay OS 圆角 — 全部使用连续圆角。
+    static let control: CGFloat = ClayShape.md
+    static let card: CGFloat = ClayShape.card
+    static let photoPaper: CGFloat = ClayShape.lg
+    static let screen: CGFloat = ClayShape.xl
+    static let waveBar: CGFloat = ClayShape.xs
 }

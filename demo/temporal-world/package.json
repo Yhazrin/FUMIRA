@@ -1,0 +1,25 @@
+{
+  "name": "fumira-temporal-world",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "node server/index.js",
+    "dev:server": "node --watch server/index.js",
+    "dev:display": "npm run dev --workspace=@fumira/display",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:display\"",
+    "build:display": "npm run build --workspace=@fumira/display",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/websocket": "^11.0.0",
+    "@fastify/static": "^8.0.0",
+    "nanoid": "^5.0.9"
+  }
+}

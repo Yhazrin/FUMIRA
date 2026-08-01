@@ -42,11 +42,13 @@
 		207BC9E92DD11E93753B86AB /* TemporalFutureForkViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4C3D6039D691DD08FE1795 /* TemporalFutureForkViewTests.swift */; };
 		2222364B7375F868BBCD47E5 /* LXGWMarkerGothic-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5FCBA06CEC982F2F81600320 /* LXGWMarkerGothic-Regular.ttf */; };
 		23CCFD4E047B40C404BD4F16 /* ImageUnderstandingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A45305C154BB18C7AE5BDEB /* ImageUnderstandingProvider.swift */; };
+		2492DB961C4DB44860245379 /* ClayPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9FE839637F8327631993FCE /* ClayPalette.swift */; };
 		25FD331A91B912CA7B07E466 /* doraemon_time_machine_travel_turbulence_04.png in Resources */ = {isa = PBXBuildFile; fileRef = 1A0065348AD798CC3CF40689 /* doraemon_time_machine_travel_turbulence_04.png */; };
 		283BD0A056F1860814BCDD0E /* PosterExportCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97AAEF798A063ED932262263 /* PosterExportCard.swift */; };
 		29D9DC65D7062DCCB884557B /* TimePositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 965576AD9AA198B9925C4116 /* TimePositionTests.swift */; };
 		2A0C7D26FE595F0DBAA5264C /* TemporalFingerprintMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 920768381E9898ACF87ACEEF /* TemporalFingerprintMark.swift */; };
 		2AC66E478A223D411F35A9E6 /* doraemon_time_machine_travel_doraemon_controls_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 9BCEA1CCA8105DAE8F4E1F3E /* doraemon_time_machine_travel_doraemon_controls_03.png */; };
+		2B4C84781EAA28BC2022748F /* ClayIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C3E9957A6E8EDED4943594 /* ClayIndicator.swift */; };
 		2B830D00B603C23888404BBD /* ResultRevealUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6FC703372F3750F1381293 /* ResultRevealUITests.swift */; };
 		2B8B38265A0F2F5795D4DB87 /* doraemon_time_machine_travel_cruise_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 35E10F14170358A0319D2AD5 /* doraemon_time_machine_travel_cruise_00.png */; };
 		2C6FB6E61541F4F2EC4DC441 /* doraemon_time_machine_travel_turbulence_05.png in Resources */ = {isa = PBXBuildFile; fileRef = 8827F88821AF19F454BE8B8A /* doraemon_time_machine_travel_turbulence_05.png */; };
@@ -72,17 +74,20 @@
 		42EB4E4148977DA31981D58D /* doraemon_inspiration_camera_pocket_pull_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 9E665DDF00B3522C1512829E /* doraemon_inspiration_camera_pocket_pull_01.png */; };
 		43CB71532DD51D6FCF5D79DE /* TemporalBlinkComparatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9228A14A8F377D7B3C13A27C /* TemporalBlinkComparatorTests.swift */; };
 		447C435C71BFDC06F0E277F4 /* TiltTimeNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AB4052AF9CDC36726F2A587 /* TiltTimeNavigatorTests.swift */; };
+		44A522226F896004C6A02679 /* ClayStylePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865857A1040B1179A806887 /* ClayStylePreview.swift */; };
 		453E45CA81C676086F6F562D /* FUMIRA-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A92CCCC2BA1757C3B2B820D8 /* FUMIRA-icon.icon */; };
 		4703F97A2A735586256C0748 /* TemporalParkScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC40CE8A4FDD8D6BF6714AB /* TemporalParkScene.swift */; };
 		471CB52A9E6D9398A217FDBC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DCD765D349D795C07B9A771 /* Assets.xcassets */; };
 		4804585C954CD7F3779B5DAD /* FUMIRALiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 87642B857DE795DFCEA95B4D /* FUMIRALiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4879FF0213249ACC4AB791ED /* FlatMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3910C0B76C6DCBE6C3FC287 /* FlatMotion.swift */; };
 		48D60CF0C87B08310E1D84AE /* CoreMotionFieldService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B87CAC950CA323970DFBE50 /* CoreMotionFieldService.swift */; };
+		49CBA4A64A187785B587F02E /* ClaySurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40D031B25633CD52FB31536F /* ClaySurface.swift */; };
 		4B137517196AD141E139AE97 /* CameraLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DBE5E6011F2A13CDFEE4D9 /* CameraLiveActivityAttributes.swift */; };
 		4BB5ADE7A8802AF56F7B6218 /* doraemon_time_machine_travel_nobita_points_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 42B61DDC665FEFA25E620769 /* doraemon_time_machine_travel_nobita_points_01.png */; };
 		4C3525192A07537652B7B5B5 /* doraemon_time_machine_travel_cruise_05.png in Resources */ = {isa = PBXBuildFile; fileRef = D3D3FBBFE72F6289D322493F /* doraemon_time_machine_travel_cruise_05.png */; };
 		4C6B1AB910D17FA656776A7B /* SceneLayerAnalyzing.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA587D6C9E9E262090BBAE69 /* SceneLayerAnalyzing.swift */; };
 		4CB2299257735711AAD95022 /* PosterComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1D21376F5EC41FF13568E4 /* PosterComposer.swift */; };
+		4D3AC67B92C33C3DAD01392A /* ClayShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0012F0E4E3A6623F0BFB9B9 /* ClayShape.swift */; };
 		4E26490CC1A2F57B62812901 /* SharePosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C17BFDA29992D70384CE0E3 /* SharePosterView.swift */; };
 		4FCA40A3A47EACB39B2A03A1 /* FlatMotionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB27943F8B0DFA1835942A55 /* FlatMotionTests.swift */; };
 		51BAA8856D5C54E63C1BA02C /* RealityDevelopingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D26869E24506B6C960F34D1 /* RealityDevelopingUITests.swift */; };
@@ -93,6 +98,7 @@
 		550384EF66F46E394353594C /* TemporalShakeDeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43119E21A6EF4CA9D1C9869 /* TemporalShakeDeviceService.swift */; };
 		55FD4A836D87F4FDD4E2EE97 /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE41698ABAA3DB4B8FB3DB7F /* ResultView.swift */; };
 		583EE574E6A1116210347351 /* PosterTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1C46339D067C8F2F24BEB7 /* PosterTypography.swift */; };
+		5A26580C0DD3A75B3F7A04FB /* ClayProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC23724A1F9B9BD8BFCA6475 /* ClayProgress.swift */; };
 		5B85BAE627312FA9F792564B /* ApertureTransitionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AE458687454A187F7CE6DCE /* ApertureTransitionOverlay.swift */; };
 		5BC02EFF8AA4AA6ACF7E5003 /* doraemon_time_machine_travel_shared_delight_00.png in Resources */ = {isa = PBXBuildFile; fileRef = B0DB72E5B071CB1E25E6499C /* doraemon_time_machine_travel_shared_delight_00.png */; };
 		5C54C36398A3A2B2217F524E /* doraemon_inspiration_camera_pocket_pull_04.png in Resources */ = {isa = PBXBuildFile; fileRef = A1047D756BD92F6BF256BCF3 /* doraemon_inspiration_camera_pocket_pull_04.png */; };
@@ -102,8 +108,10 @@
 		5DAF0C420C2C998697504856 /* TimePosition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DB1CEF2A388FCB57CEF5828 /* TimePosition.swift */; };
 		5E8F23CBBE7194A21C8F25C2 /* RemoteGenerationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347409433F0C42AEE808590E /* RemoteGenerationProviderTests.swift */; };
 		6016CF20B8C54165A8F11F82 /* fumira_doraemon_sequences.json in Resources */ = {isa = PBXBuildFile; fileRef = F65FF939A38F52C68FAF0A72 /* fumira_doraemon_sequences.json */; };
+		609602F269F5C7FF970F8800 /* ClayChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42F2DF45493128587AABFDB0 /* ClayChip.swift */; };
 		61CFA8E20BD704C3C5C87A4C /* ConnectionFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B3EFE914BB920EA3A5D9353 /* ConnectionFeedbackView.swift */; };
 		639014B879DD69B085685704 /* doraemon_inspiration_camera_aim_shoot_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 8C98D6D5CCDA22562A3E2BF5 /* doraemon_inspiration_camera_aim_shoot_03.png */; };
+		64DFB00800893F6244ADC753 /* ClaySpacing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E732543D0BF83A5BEB7408A /* ClaySpacing.swift */; };
 		67CEAFFFB4F728E029B955AF /* HardwareController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6EAFC12F5589EFDF64C7596 /* HardwareController.swift */; };
 		68CD0D4CE1424C6724923DB3 /* CoreCaptureMotionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5424EB8310CD47651E69E68 /* CoreCaptureMotionService.swift */; };
 		6B9F437DA2C42C355157BE52 /* HeroPhotoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1201C603B55FFB051E84EE9 /* HeroPhotoSurface.swift */; };
@@ -114,6 +122,7 @@
 		6D91F0E1E118471B177FDC14 /* doraemon_time_machine_travel_nobita_points_05.png in Resources */ = {isa = PBXBuildFile; fileRef = 261395A874C2A0C324E9DC96 /* doraemon_time_machine_travel_nobita_points_05.png */; };
 		6E687B38ACD5602C1741AFBE /* MotionTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C3FF3398A5E1071A44D1179 /* MotionTimeline.swift */; };
 		6E80904616558D4AEE30F001 /* doraemon_time_machine_travel_turbulence_00.png in Resources */ = {isa = PBXBuildFile; fileRef = A28693256C0BBA803B488C86 /* doraemon_time_machine_travel_turbulence_00.png */; };
+		6F76581923F5399FE062DEAF /* ClayButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CFF639A9F35F2D023185A5 /* ClayButton.swift */; };
 		7098042EC676833F21DE70EE /* AppPhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7679B4DA494ADD2A005C24BF /* AppPhase.swift */; };
 		712440EB96D62CDF09B0E02E /* StoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426AD81CA8813B1754B8E854 /* StoryProvider.swift */; };
 		71545CA1C3154C6ED91EE0E9 /* ShutterFeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32DC55D3AB69BA24981B65BA /* ShutterFeedbackView.swift */; };
@@ -127,6 +136,7 @@
 		76EA13255D436214BDC7113E /* AIModelConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */; };
 		772B0DB49A96FE33D3144F04 /* TemporalBlowRevealSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23EC7D31E6476DD5F0BBE27 /* TemporalBlowRevealSurface.swift */; };
 		790C43F80CBE7459040C84C2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91DBB78BA18D4224BAAA62DB /* AppModel.swift */; };
+		790C9F2BB83F010E6DDA4094 /* Clay3DStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949EAC7FBDD553C866643207 /* Clay3DStyle.swift */; };
 		79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */; };
 		7D3938DD2CBC4077C250EA98 /* doraemon_inspiration_camera_idea_bloom_04.png in Resources */ = {isa = PBXBuildFile; fileRef = C5C5544A55525C71DA510B16 /* doraemon_inspiration_camera_idea_bloom_04.png */; };
 		7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEB5A8653918B8E3544BFC /* RemoteStoryProvider.swift */; };
@@ -134,6 +144,7 @@
 		7F39561E1031DD0D1D9CFA24 /* PosterSensory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */; };
 		81316B6079F4AF30F594819F /* GenerationReflectionPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BD32BA7A5B49CC7FE83EA4 /* GenerationReflectionPromptTests.swift */; };
 		82C3C4C17E45AC4D8BBDB510 /* doraemon_time_machine_travel_shared_delight_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 8849D8D91354C3EBC54EF9D7 /* doraemon_time_machine_travel_shared_delight_03.png */; };
+		875A426463396769F098091F /* ClayTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357615EE5D40710B939BC611 /* ClayTerminal.swift */; };
 		893ED3BD26DACA8A44490226 /* ShutterWaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */; };
 		8C5210F6A4824ADAB536FCE5 /* MockGenerationProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D6F020741E0704165CAA8D /* MockGenerationProviderTests.swift */; };
 		8D7C09A0F492086A8085D30A /* SettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FE326D223B9F51279B0C89 /* SettingsUITests.swift */; };
@@ -141,6 +152,7 @@
 		942B6DE24F1C52068B963912 /* PosterSymbolBounce.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B1367803A4250AF37CC0BB2 /* PosterSymbolBounce.swift */; };
 		9439436B4518F9945C334FB1 /* TimeRevealMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 814CD11F5464ECC9CA91421E /* TimeRevealMask.swift */; };
 		954771287DE14B96830501BB /* doraemon_inspiration_camera_aim_shoot_02.png in Resources */ = {isa = PBXBuildFile; fileRef = 69FB5355C01816385FB3B724 /* doraemon_inspiration_camera_aim_shoot_02.png */; };
+		9608C83D37087D5749AECBDD /* DioramaWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941911A01BC1537BB03A3349 /* DioramaWebView.swift */; };
 		9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */; };
 		980D4299B93AD7FD75419F55 /* MotionFieldProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34902E8D8AD5DD5B2AA85E04 /* MotionFieldProviding.swift */; };
 		994F2E2E21A94CDB59350F12 /* CameraLiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B7E4813F1E32365A8517A4 /* CameraLiveActivityService.swift */; };
@@ -155,11 +167,13 @@
 		A1427FB05CE0F83DA5D1B137 /* GenerationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 243297E75BDC73D76502065F /* GenerationProvider.swift */; };
 		A1DD27F97D22DA6F27F57D0C /* MockBlowInputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF85C1E60B5EB27B0784642 /* MockBlowInputService.swift */; };
 		A20E9649B4306CC69280976A /* PosterScrollReveal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4285F02A53FEE7C33EB1C3B2 /* PosterScrollReveal.swift */; };
+		A25BF9E3466FB434D5850B22 /* diorama.html in Resources */ = {isa = PBXBuildFile; fileRef = DF1B5C1F4DF4CD1F19A79F98 /* diorama.html */; };
 		A26BFB54FCF279A2E3838A68 /* TemporalCapturePacket.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2240F0724F77FCB5239C8CDF /* TemporalCapturePacket.swift */; };
 		A358249B4BF005FEDDA8A127 /* doraemon_inspiration_camera_aim_shoot_05.png in Resources */ = {isa = PBXBuildFile; fileRef = A475FC36D446AC80C065949E /* doraemon_inspiration_camera_aim_shoot_05.png */; };
 		A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B260D67CBA74B0AE4A3754 /* FUMIRAAPIConfiguration.swift */; };
 		A706A126545D0A9BEFF5B36A /* TemporalShakeModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B905745553DA4CF4E68433 /* TemporalShakeModelTests.swift */; };
 		A717F6623B1629BF5821DDFE /* PosterGlassButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76B5F94A3104D40C544DFABA /* PosterGlassButton.swift */; };
+		A821DF0B6D5E89B2B403DF8E /* ClayNoiseTexture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 090452F1897B67AF772C8D68 /* ClayNoiseTexture.swift */; };
 		A88C4EBCC48BD3A0E52293EF /* doraemon_time_machine_travel_nobita_points_03.png in Resources */ = {isa = PBXBuildFile; fileRef = B174DA444F24B9C125656BBC /* doraemon_time_machine_travel_nobita_points_03.png */; };
 		AA5E22B1B0737A2AEF6C4B5C /* doraemon_inspiration_camera_idea_bloom_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 859B1116B2321E22DA09CC6B /* doraemon_inspiration_camera_idea_bloom_01.png */; };
 		AC3DE3CD08F90EB6BBDD424C /* PosterCapsuleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A795369647DCD3796D878054 /* PosterCapsuleButton.swift */; };
@@ -168,6 +182,7 @@
 		AF43A53238E2D9F11175AABF /* doraemon_time_machine_travel_nobita_points_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 4C7D4F18703923A4B079875F /* doraemon_time_machine_travel_nobita_points_00.png */; };
 		AFD5BCB8B9940D3CEAA0F7E5 /* TemporalBlinkComparatorEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 042E12ECBB9C87F4E71ADDEE /* TemporalBlinkComparatorEngine.swift */; };
 		B136E911C8319B079CD18F7B /* PhaseTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */; };
+		B230F88A764D44B18DE46B38 /* ClayCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6689D80170D312F9BEB121A9 /* ClayCard.swift */; };
 		B2910E063DBA36B7ABF159FF /* TemporalShakeProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38B62F5E824DE206A0A9B48 /* TemporalShakeProviding.swift */; };
 		B2BB6D120859B9973A9EDAF4 /* SpatialTransformModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 937A9257B4C43E001A86978A /* SpatialTransformModifier.swift */; };
 		B3BFAB25E38F1198A447D1C2 /* doraemon_time_machine_travel_cruise_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 077F5421F7BF01FD17ED7F45 /* doraemon_time_machine_travel_cruise_01.png */; };
@@ -188,14 +203,17 @@
 		C7550451D00AC37690DFA631 /* PixelSequencePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C68CE7A3ABDFE7017E8AB333 /* PixelSequencePlayer.swift */; };
 		C87135B1EDA2D6AF18ACB175 /* PerformanceFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A778B6EFDF02D450B730773 /* PerformanceFlowUITests.swift */; };
 		CA1EECF1AE84DD47A74AB589 /* doraemon_inspiration_camera_pocket_pull_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 588C405C754EC042F44D8980 /* doraemon_inspiration_camera_pocket_pull_00.png */; };
+		CA9E9F8ABF94986F0EB5B7E5 /* ClayAppBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FF17A17B07693E817624304 /* ClayAppBackground.swift */; };
 		CAF2D2057ECE7EA5A68C9455 /* PosterStaggerEntrance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4091E258118976ACAAE58F5 /* PosterStaggerEntrance.swift */; };
 		CC9564F3F5A7240742019CC3 /* ViewfinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */; };
 		CE5D95265A2BF7879F4F543F /* doraemon_inspiration_camera_aim_shoot_00.png in Resources */ = {isa = PBXBuildFile; fileRef = F7C0D068BF34066A889699D3 /* doraemon_inspiration_camera_aim_shoot_00.png */; };
 		CF935D1C605D4A958722E458 /* TemporalFutureForkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F3370ECC0569DEB59DDB5D /* TemporalFutureForkView.swift */; };
+		CFF2F7C619EBEE62CB80DECB /* ClayShadow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 910F9858AAC9AFC76559F893 /* ClayShadow.swift */; };
 		D018B31EC5070A13F4126956 /* TemporalInterpretationTraceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60570A0499417A7042D335A0 /* TemporalInterpretationTraceTests.swift */; };
 		D056F5007D1D203A10F60A19 /* doraemon_time_machine_travel_turbulence_02.png in Resources */ = {isa = PBXBuildFile; fileRef = 0BFB9E6BA9F519AE0A75A816 /* doraemon_time_machine_travel_turbulence_02.png */; };
 		D0BA2028CA6E88BDC14C1229 /* FlatParallaxModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */; };
 		D0C5C8C7D4EBF638749B5CD4 /* BlowRevealModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A68CFE2EEA73733AD15601C1 /* BlowRevealModelTests.swift */; };
+		D3DE3FF7C6ABCF5D985DD5A4 /* ClayTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEF4C82B3018BCA74F12A7A /* ClayTypography.swift */; };
 		D53218E1871819A4094990DD /* PixelSequenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85C11B8F0992FDEEAB6EA24D /* PixelSequenceTests.swift */; };
 		D5D7D29F0CE2D8BBE3249FDA /* CameraLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89DBE5E6011F2A13CDFEE4D9 /* CameraLiveActivityAttributes.swift */; };
 		D634280455F3F1B7470120B4 /* StatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0A9D8D00C482FFD912D66F /* StatusPill.swift */; };
@@ -204,9 +222,11 @@
 		D95241D281492B368518AA4D /* PosterKeywordHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */; };
 		DAC276DB674D1491F9A60A9A /* PhotoImportAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F2F7FE7C4895729281A4B67 /* PhotoImportAdapter.swift */; };
 		DAC5CF90465E60FE3F7964FA /* TimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4DBEB01EEBBFABC55442D7 /* TimeRail.swift */; };
+		DAF803F1FEF01E7917B3C99B /* ClayMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C729097BCEE645124E954E /* ClayMotion.swift */; };
 		DB1FFB0E6083B353899FA1E0 /* BluetoothPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E18BF1C7346B1EED368BA24 /* BluetoothPermissionView.swift */; };
 		DFCD7FC6521A828AF2F05D17 /* CaptureMotionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E9DE0F1CBECF89E9ABD317 /* CaptureMotionModelTests.swift */; };
 		E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD55939FA9AED9CA1F176218 /* RootView.swift */; };
+		E1BE31E5AD99AEBECD5318C4 /* ClayTimeDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C68601F3013EF87571DA4E /* ClayTimeDial.swift */; };
 		E234B574678CF28B21321117 /* PosterTitleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */; };
 		E246CC9D0E73A9BD63C7C7C9 /* MockSceneLayerAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43230620E5CFF5185E452A35 /* MockSceneLayerAnalyzer.swift */; };
 		E37BC06098613AAFAD117F89 /* WaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8765ECEB8AD104AC0655B09E /* WaveTimeRail.swift */; };
@@ -215,6 +235,7 @@
 		E643B35DBFA5D2CD65B1837C /* TemporalDarkroomProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83A7750786CAB185C72662C /* TemporalDarkroomProviding.swift */; };
 		E7AC67E3770D79B048AE9C23 /* doraemon_time_machine_travel_turbulence_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 3316FC49256D17C44E2FA262 /* doraemon_time_machine_travel_turbulence_03.png */; };
 		E7CA7A3020E74820B74A9EE5 /* TemporalShakeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840375F4E3EBB33374081EC6 /* TemporalShakeModel.swift */; };
+		E7EE9CF267D35AC2104A05B7 /* ClayIconButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689D7EF93B7D8075642CBA50 /* ClayIconButton.swift */; };
 		E89C6C5986B1D6E997F61A3B /* doraemon_inspiration_camera_pocket_pull_02.png in Resources */ = {isa = PBXBuildFile; fileRef = E8A86FA65A55C5A368BE7B4C /* doraemon_inspiration_camera_pocket_pull_02.png */; };
 		E91338FA2E52A651B7390836 /* PosterGlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525BF872240DE30FC15422F4 /* PosterGlassCard.swift */; };
 		E95B5222C5D0752B2DB089E2 /* doraemon_inspiration_camera_calm_breathe_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 42F303760EEB0B8E03DE84A9 /* doraemon_inspiration_camera_calm_breathe_03.png */; };
@@ -232,13 +253,16 @@
 		F3A064B6FCA1C2D795F91FC5 /* GenerationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09DDDE905B093FADE1CBA842 /* GenerationState.swift */; };
 		F3AC440A5D50A2E5E5086E5C /* TemporalBlinkComparator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76071178A4B8AE43D590DAE /* TemporalBlinkComparator.swift */; };
 		F3D7C2F72FE0114AFE0FE1CB /* RemoteStoryProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062A223835C17A86E7E1B7E1 /* RemoteStoryProviderTests.swift */; };
+		F488C69C73FE7ABB0C3B30CE /* DioramaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED34A456D6BF4FC58816345 /* DioramaView.swift */; };
 		F4F3244AEDAFBD874E8A516E /* PosterScreenContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */; };
 		F52BB40AD845207CF1B3A517 /* PosterPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */; };
 		F5D830954FE27BBD2EA46D38 /* doraemon_time_machine_travel_doraemon_controls_04.png in Resources */ = {isa = PBXBuildFile; fileRef = BF6BF7BFD5CC64637F95771A /* doraemon_time_machine_travel_doraemon_controls_04.png */; };
 		F6B7AE94AF7E3431AA213088 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */; };
+		F71995D4813B7D66FF9D3D3E /* ClaySegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F22E066D3A251E68A0D9B7 /* ClaySegmentedControl.swift */; };
 		F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */; };
 		FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */; };
 		FAAF0EB4DF4846A2B6443956 /* doraemon_time_machine_travel_cruise_04.png in Resources */ = {isa = PBXBuildFile; fileRef = 7523FCC241BC79DBEB85C18C /* doraemon_time_machine_travel_cruise_04.png */; };
+		FAC19704E7E75019B7A976FB /* ClayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD952CC2BA37447CBD4E087 /* ClayPanel.swift */; };
 		FB29E68E938C0261ECF87D3C /* RealityDevelopingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974B4B8EAE1907005571375A /* RealityDevelopingView.swift */; };
 		FD84F6326AE5F6F88DC908D3 /* PosterBreath.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8058176375A98A66217D33A /* PosterBreath.swift */; };
 		FEF351B99250275C35CED432 /* TemporalShakeReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD356BB54693A1428599E8A8 /* TemporalShakeReducerTests.swift */; };
@@ -292,11 +316,14 @@
 		062A223835C17A86E7E1B7E1 /* RemoteStoryProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteStoryProviderTests.swift; sourceTree = "<group>"; };
 		077F5421F7BF01FD17ED7F45 /* doraemon_time_machine_travel_cruise_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_cruise_01.png; sourceTree = "<group>"; };
 		0827B783C9AB999B8B2F7667 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+		090452F1897B67AF772C8D68 /* ClayNoiseTexture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayNoiseTexture.swift; sourceTree = "<group>"; };
 		0990E536B99911BE4BF32A02 /* TemporalWitnessRibbon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalWitnessRibbon.swift; sourceTree = "<group>"; };
+		09C729097BCEE645124E954E /* ClayMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayMotion.swift; sourceTree = "<group>"; };
 		09DDDE905B093FADE1CBA842 /* GenerationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationState.swift; sourceTree = "<group>"; };
 		0A778B6EFDF02D450B730773 /* PerformanceFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFlowUITests.swift; sourceTree = "<group>"; };
 		0BFB9E6BA9F519AE0A75A816 /* doraemon_time_machine_travel_turbulence_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_turbulence_02.png; sourceTree = "<group>"; };
 		0E4C3D6039D691DD08FE1795 /* TemporalFutureForkViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFutureForkViewTests.swift; sourceTree = "<group>"; };
+		16C68601F3013EF87571DA4E /* ClayTimeDial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayTimeDial.swift; sourceTree = "<group>"; };
 		16E9D03FA7F330E9515568DA /* BlowInputProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlowInputProviding.swift; sourceTree = "<group>"; };
 		17FE326D223B9F51279B0C89 /* SettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsUITests.swift; sourceTree = "<group>"; };
 		197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShutterWaveTimeRail.swift; sourceTree = "<group>"; };
@@ -328,19 +355,26 @@
 		336C51691FF6240A996B3050 /* BlowRevealEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlowRevealEngine.swift; sourceTree = "<group>"; };
 		347409433F0C42AEE808590E /* RemoteGenerationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGenerationProviderTests.swift; sourceTree = "<group>"; };
 		34902E8D8AD5DD5B2AA85E04 /* MotionFieldProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionFieldProviding.swift; sourceTree = "<group>"; };
+		357615EE5D40710B939BC611 /* ClayTerminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayTerminal.swift; sourceTree = "<group>"; };
 		35E10F14170358A0319D2AD5 /* doraemon_time_machine_travel_cruise_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_cruise_00.png; sourceTree = "<group>"; };
+		3865857A1040B1179A806887 /* ClayStylePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayStylePreview.swift; sourceTree = "<group>"; };
 		38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhaseTransition.swift; sourceTree = "<group>"; };
 		39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSensory.swift; sourceTree = "<group>"; };
 		3B3EFE914BB920EA3A5D9353 /* ConnectionFeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionFeedbackView.swift; sourceTree = "<group>"; };
 		3C17BFDA29992D70384CE0E3 /* SharePosterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharePosterView.swift; sourceTree = "<group>"; };
 		3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterPalette.swift; sourceTree = "<group>"; };
+		3E732543D0BF83A5BEB7408A /* ClaySpacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaySpacing.swift; sourceTree = "<group>"; };
+		3EEF4C82B3018BCA74F12A7A /* ClayTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayTypography.swift; sourceTree = "<group>"; };
 		3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterScreenContainer.swift; sourceTree = "<group>"; };
 		3F9F6B961BAA532E0F0034BB /* PosterKeywordHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterKeywordHero.swift; sourceTree = "<group>"; };
+		3FF17A17B07693E817624304 /* ClayAppBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayAppBackground.swift; sourceTree = "<group>"; };
+		40D031B25633CD52FB31536F /* ClaySurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaySurface.swift; sourceTree = "<group>"; };
 		41CA81EFBD85C8A98C9F622A /* PhotoImportAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoImportAdapterTests.swift; sourceTree = "<group>"; };
 		422AD39779F43E2D65A911F8 /* PosterEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterEffects.swift; sourceTree = "<group>"; };
 		426AD81CA8813B1754B8E854 /* StoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryProvider.swift; sourceTree = "<group>"; };
 		4285F02A53FEE7C33EB1C3B2 /* PosterScrollReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterScrollReveal.swift; sourceTree = "<group>"; };
 		42B61DDC665FEFA25E620769 /* doraemon_time_machine_travel_nobita_points_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_nobita_points_01.png; sourceTree = "<group>"; };
+		42F2DF45493128587AABFDB0 /* ClayChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayChip.swift; sourceTree = "<group>"; };
 		42F303760EEB0B8E03DE84A9 /* doraemon_inspiration_camera_calm_breathe_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_calm_breathe_03.png; sourceTree = "<group>"; };
 		43230620E5CFF5185E452A35 /* MockSceneLayerAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockSceneLayerAnalyzer.swift; sourceTree = "<group>"; };
 		4413587F9231E9C2A6869908 /* doraemon_inspiration_camera_idea_bloom_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_idea_bloom_02.png; sourceTree = "<group>"; };
@@ -377,8 +411,12 @@
 		60B8804566A58E674766E925 /* MockCaptureMotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockCaptureMotionService.swift; sourceTree = "<group>"; };
 		61B7E4813F1E32365A8517A4 /* CameraLiveActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraLiveActivityService.swift; sourceTree = "<group>"; };
 		6304AA53D8BB6FC8DDCCB738 /* TemporalFutureForkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFutureForkTests.swift; sourceTree = "<group>"; };
+		65C3E9957A6E8EDED4943594 /* ClayIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayIndicator.swift; sourceTree = "<group>"; };
+		65CFF639A9F35F2D023185A5 /* ClayButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayButton.swift; sourceTree = "<group>"; };
+		6689D80170D312F9BEB121A9 /* ClayCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayCard.swift; sourceTree = "<group>"; };
 		670990386321679E71318ECF /* GenerationProgressRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationProgressRow.swift; sourceTree = "<group>"; };
 		6755348B723E1E2090544371 /* CameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraService.swift; sourceTree = "<group>"; };
+		689D7EF93B7D8075642CBA50 /* ClayIconButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayIconButton.swift; sourceTree = "<group>"; };
 		69FB5355C01816385FB3B724 /* doraemon_inspiration_camera_aim_shoot_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_aim_shoot_02.png; sourceTree = "<group>"; };
 		6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewFixtures.swift; sourceTree = "<group>"; };
 		6AE458687454A187F7CE6DCE /* ApertureTransitionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApertureTransitionOverlay.swift; sourceTree = "<group>"; };
@@ -400,6 +438,7 @@
 		7E0B060E918608EBA1721981 /* MotionFieldModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionFieldModel.swift; sourceTree = "<group>"; };
 		7E6248B687417278B0214882 /* doraemon_time_machine_travel_shared_delight_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_shared_delight_02.png; sourceTree = "<group>"; };
 		7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGenerationProvider.swift; sourceTree = "<group>"; };
+		7ED34A456D6BF4FC58816345 /* DioramaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DioramaView.swift; sourceTree = "<group>"; };
 		7F2E4583BE754E45975EDC9B /* CameraCompositionCorners.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCompositionCorners.swift; sourceTree = "<group>"; };
 		8031BC5C221FD8B69A35917F /* FUMIRATests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FUMIRATests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		814CD11F5464ECC9CA91421E /* TimeRevealMask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeRevealMask.swift; sourceTree = "<group>"; };
@@ -422,12 +461,15 @@
 		8EF77E2A66A4FD9A6183F059 /* CameraLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraLiveActivityWidget.swift; sourceTree = "<group>"; };
 		8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelConfiguration.swift; sourceTree = "<group>"; };
 		90314E852788ABF1D6EBA7E3 /* CameraCompositionGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCompositionGeometry.swift; sourceTree = "<group>"; };
+		910F9858AAC9AFC76559F893 /* ClayShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayShadow.swift; sourceTree = "<group>"; };
 		91DBB78BA18D4224BAAA62DB /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		920768381E9898ACF87ACEEF /* TemporalFingerprintMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFingerprintMark.swift; sourceTree = "<group>"; };
 		9228A14A8F377D7B3C13A27C /* TemporalBlinkComparatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlinkComparatorTests.swift; sourceTree = "<group>"; };
 		92A1E412E1C3188F58E64045 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		937A9257B4C43E001A86978A /* SpatialTransformModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpatialTransformModifier.swift; sourceTree = "<group>"; };
 		93D6F020741E0704165CAA8D /* MockGenerationProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockGenerationProviderTests.swift; sourceTree = "<group>"; };
+		941911A01BC1537BB03A3349 /* DioramaWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DioramaWebView.swift; sourceTree = "<group>"; };
+		949EAC7FBDD553C866643207 /* Clay3DStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clay3DStyle.swift; sourceTree = "<group>"; };
 		964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationError.swift; sourceTree = "<group>"; };
 		96508660A32D8D2BE297D41E /* doraemon_time_machine_travel_doraemon_controls_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_05.png; sourceTree = "<group>"; };
 		965576AD9AA198B9925C4116 /* TimePositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimePositionTests.swift; sourceTree = "<group>"; };
@@ -472,15 +514,18 @@
 		BEA2A9A9092D954539CE47D8 /* PosterSpacing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterSpacing.swift; sourceTree = "<group>"; };
 		BF6BF7BFD5CC64637F95771A /* doraemon_time_machine_travel_doraemon_controls_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_04.png; sourceTree = "<group>"; };
 		C07F63FE6C3A1582391397E6 /* FUMIRA.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FUMIRA.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1F22E066D3A251E68A0D9B7 /* ClaySegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaySegmentedControl.swift; sourceTree = "<group>"; };
 		C23EC7D31E6476DD5F0BBE27 /* TemporalBlowRevealSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlowRevealSurface.swift; sourceTree = "<group>"; };
 		C5424EB8310CD47651E69E68 /* CoreCaptureMotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreCaptureMotionService.swift; sourceTree = "<group>"; };
 		C5C5544A55525C71DA510B16 /* doraemon_inspiration_camera_idea_bloom_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_idea_bloom_04.png; sourceTree = "<group>"; };
 		C68CE7A3ABDFE7017E8AB333 /* PixelSequencePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelSequencePlayer.swift; sourceTree = "<group>"; };
 		C97AAAFCA7F6DD265A50779C /* VisionSceneLayerAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionSceneLayerAnalyzer.swift; sourceTree = "<group>"; };
 		CC0DD24C3E7F09BF37DE05C0 /* doraemon_inspiration_camera_calm_breathe_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_calm_breathe_02.png; sourceTree = "<group>"; };
+		CC23724A1F9B9BD8BFCA6475 /* ClayProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayProgress.swift; sourceTree = "<group>"; };
 		CD55939FA9AED9CA1F176218 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSession.swift; sourceTree = "<group>"; };
 		CFA63D07BCA6E707EA1B6DDC /* doraemon_inspiration_camera_pocket_pull_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_pocket_pull_05.png; sourceTree = "<group>"; };
+		D0012F0E4E3A6623F0BFB9B9 /* ClayShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayShape.swift; sourceTree = "<group>"; };
 		D103D0C1AF8A48734B8F7158 /* TemporalBlowRevealSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlowRevealSurfaceTests.swift; sourceTree = "<group>"; };
 		D2303A0C4CDB44B2CDBE543B /* ViewfinderAspectGestureUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewfinderAspectGestureUITests.swift; sourceTree = "<group>"; };
 		D3D3FBBFE72F6289D322493F /* doraemon_time_machine_travel_cruise_05.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_cruise_05.png; sourceTree = "<group>"; };
@@ -490,9 +535,11 @@
 		D683A651C97E874D071FA197 /* DeviceTemporalDarkroomService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceTemporalDarkroomService.swift; sourceTree = "<group>"; };
 		D8058176375A98A66217D33A /* PosterBreath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterBreath.swift; sourceTree = "<group>"; };
 		D8150F52A1C4941F989D843E /* CameraEntryPortal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraEntryPortal.swift; sourceTree = "<group>"; };
+		D9FE839637F8327631993FCE /* ClayPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayPalette.swift; sourceTree = "<group>"; };
 		DBACAFA814AB57C110EB19AD /* doraemon_time_machine_travel_doraemon_controls_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_00.png; sourceTree = "<group>"; };
 		DD356BB54693A1428599E8A8 /* TemporalShakeReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalShakeReducerTests.swift; sourceTree = "<group>"; };
 		DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlatParallaxModifier.swift; sourceTree = "<group>"; };
+		DF1B5C1F4DF4CD1F19A79F98 /* diorama.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = diorama.html; sourceTree = "<group>"; };
 		DF6FC703372F3750F1381293 /* ResultRevealUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultRevealUITests.swift; sourceTree = "<group>"; };
 		E39E84C5D38FBD2F94A20BD0 /* FUMIRAApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRAApp.swift; sourceTree = "<group>"; };
 		E83A7750786CAB185C72662C /* TemporalDarkroomProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalDarkroomProviding.swift; sourceTree = "<group>"; };
@@ -501,6 +548,7 @@
 		EA94F00A4320644B80411889 /* TemporalFutureFork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFutureFork.swift; sourceTree = "<group>"; };
 		EAA4DB3CFFF1F679238DE6A8 /* FUMIRAUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FUMIRAUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EB1C46339D067C8F2F24BEB7 /* PosterTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTypography.swift; sourceTree = "<group>"; };
+		EDD952CC2BA37447CBD4E087 /* ClayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayPanel.swift; sourceTree = "<group>"; };
 		F1201C603B55FFB051E84EE9 /* HeroPhotoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroPhotoSurface.swift; sourceTree = "<group>"; };
 		F2222BEE7C91A6D016D36592 /* doraemon_inspiration_camera_calm_breathe_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_calm_breathe_04.png; sourceTree = "<group>"; };
 		F38B62F5E824DE206A0A9B48 /* TemporalShakeProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalShakeProviding.swift; sourceTree = "<group>"; };
@@ -643,6 +691,15 @@
 			path = Generation;
 			sourceTree = "<group>";
 		};
+		45226552308500F57DED0BC9 /* Clay */ = {
+			isa = PBXGroup;
+			children = (
+				E36287F0A76BCB6BBC6BA834 /* Components */,
+				66B49307386E90F35C47D3DF /* Foundation */,
+			);
+			path = Clay;
+			sourceTree = "<group>";
+		};
 		4BAEA53ED19F773B3279CF12 /* Root */ = {
 			isa = PBXGroup;
 			children = (
@@ -677,6 +734,15 @@
 			path = Domain;
 			sourceTree = "<group>";
 		};
+		5CB2009BFF842CE6D1435340 /* Diorama */ = {
+			isa = PBXGroup;
+			children = (
+				7ED34A456D6BF4FC58816345 /* DioramaView.swift */,
+				941911A01BC1537BB03A3349 /* DioramaWebView.swift */,
+			);
+			path = Diorama;
+			sourceTree = "<group>";
+		};
 		624A61DD2B8368B4D0767A0A /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -696,6 +762,20 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		66B49307386E90F35C47D3DF /* Foundation */ = {
+			isa = PBXGroup;
+			children = (
+				949EAC7FBDD553C866643207 /* Clay3DStyle.swift */,
+				09C729097BCEE645124E954E /* ClayMotion.swift */,
+				D9FE839637F8327631993FCE /* ClayPalette.swift */,
+				910F9858AAC9AFC76559F893 /* ClayShadow.swift */,
+				D0012F0E4E3A6623F0BFB9B9 /* ClayShape.swift */,
+				3E732543D0BF83A5BEB7408A /* ClaySpacing.swift */,
+				3EEF4C82B3018BCA74F12A7A /* ClayTypography.swift */,
+			);
+			path = Foundation;
+			sourceTree = "<group>";
+		};
 		66C22752F71C5C2491C80110 /* FUMIRALiveActivity */ = {
 			isa = PBXGroup;
 			children = (
@@ -710,6 +790,7 @@
 			children = (
 				1104BF925845907C54BB8789 /* Camera */,
 				C82CABC7BE463BFF477F0F13 /* Connection */,
+				5CB2009BFF842CE6D1435340 /* Diorama */,
 				CC3960E7D3112D370252664F /* Generation */,
 				30E031966E7B89AB5D26C0C9 /* Result */,
 				4BAEA53ED19F773B3279CF12 /* Root */,
@@ -778,6 +859,14 @@
 				91B4EB5802DCE9D4A9AD7848 /* DoraemonSequences */,
 			);
 			path = Animations;
+			sourceTree = "<group>";
+		};
+		907F9927B004196CCE7A6EB6 /* diorama */ = {
+			isa = PBXGroup;
+			children = (
+				DF1B5C1F4DF4CD1F19A79F98 /* diorama.html */,
+			);
+			path = diorama;
 			sourceTree = "<group>";
 		};
 		91B4EB5802DCE9D4A9AD7848 /* DoraemonSequences */ = {
@@ -888,6 +977,7 @@
 		A32F7C1D632E4D903AF3DAC5 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				45226552308500F57DED0BC9 /* Clay */,
 				D1EB2FE27089FA0240971C55 /* Components */,
 				9F15BF5FF458759282A03571 /* Motion */,
 				8D2194512521835EBC95498F /* Tokens */,
@@ -1037,6 +1127,27 @@
 			path = PreviewSupport;
 			sourceTree = "<group>";
 		};
+		E36287F0A76BCB6BBC6BA834 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				3FF17A17B07693E817624304 /* ClayAppBackground.swift */,
+				65CFF639A9F35F2D023185A5 /* ClayButton.swift */,
+				6689D80170D312F9BEB121A9 /* ClayCard.swift */,
+				42F2DF45493128587AABFDB0 /* ClayChip.swift */,
+				689D7EF93B7D8075642CBA50 /* ClayIconButton.swift */,
+				65C3E9957A6E8EDED4943594 /* ClayIndicator.swift */,
+				090452F1897B67AF772C8D68 /* ClayNoiseTexture.swift */,
+				EDD952CC2BA37447CBD4E087 /* ClayPanel.swift */,
+				CC23724A1F9B9BD8BFCA6475 /* ClayProgress.swift */,
+				C1F22E066D3A251E68A0D9B7 /* ClaySegmentedControl.swift */,
+				3865857A1040B1179A806887 /* ClayStylePreview.swift */,
+				40D031B25633CD52FB31536F /* ClaySurface.swift */,
+				357615EE5D40710B939BC611 /* ClayTerminal.swift */,
+				16C68601F3013EF87571DA4E /* ClayTimeDial.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		E4366CE9151E400A52FD913D = {
 			isa = PBXGroup;
 			children = (
@@ -1067,6 +1178,7 @@
 			children = (
 				6DCD765D349D795C07B9A771 /* Assets.xcassets */,
 				8F91DF4998E79DD239C791FB /* Animations */,
+				907F9927B004196CCE7A6EB6 /* diorama */,
 			);
 			name = Resources;
 			path = FUMIRA/Resources;
@@ -1225,6 +1337,7 @@
 				371000FE4A8DB47AE23BEA50 /* CaveatBrush-Regular.ttf in Resources */,
 				453E45CA81C676086F6F562D /* FUMIRA-icon.icon in Resources */,
 				2222364B7375F868BBCD47E5 /* LXGWMarkerGothic-Regular.ttf in Resources */,
+				A25BF9E3466FB434D5850B22 /* diorama.html in Resources */,
 				CE5D95265A2BF7879F4F543F /* doraemon_inspiration_camera_aim_shoot_00.png in Resources */,
 				0D31A951E384B8BE3DD54F3E /* doraemon_inspiration_camera_aim_shoot_01.png in Resources */,
 				954771287DE14B96830501BB /* doraemon_inspiration_camera_aim_shoot_02.png in Resources */,
@@ -1354,11 +1467,34 @@
 				2CC731C7ECA5160DA534F449 /* CaptureMotionProviding.swift in Sources */,
 				F6B7AE94AF7E3431AA213088 /* CaptureSession.swift in Sources */,
 				79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */,
+				790C9F2BB83F010E6DDA4094 /* Clay3DStyle.swift in Sources */,
+				CA9E9F8ABF94986F0EB5B7E5 /* ClayAppBackground.swift in Sources */,
+				6F76581923F5399FE062DEAF /* ClayButton.swift in Sources */,
+				B230F88A764D44B18DE46B38 /* ClayCard.swift in Sources */,
+				609602F269F5C7FF970F8800 /* ClayChip.swift in Sources */,
+				E7EE9CF267D35AC2104A05B7 /* ClayIconButton.swift in Sources */,
+				2B4C84781EAA28BC2022748F /* ClayIndicator.swift in Sources */,
+				DAF803F1FEF01E7917B3C99B /* ClayMotion.swift in Sources */,
+				A821DF0B6D5E89B2B403DF8E /* ClayNoiseTexture.swift in Sources */,
+				2492DB961C4DB44860245379 /* ClayPalette.swift in Sources */,
+				FAC19704E7E75019B7A976FB /* ClayPanel.swift in Sources */,
+				5A26580C0DD3A75B3F7A04FB /* ClayProgress.swift in Sources */,
+				F71995D4813B7D66FF9D3D3E /* ClaySegmentedControl.swift in Sources */,
+				CFF2F7C619EBEE62CB80DECB /* ClayShadow.swift in Sources */,
+				4D3AC67B92C33C3DAD01392A /* ClayShape.swift in Sources */,
+				64DFB00800893F6244ADC753 /* ClaySpacing.swift in Sources */,
+				44A522226F896004C6A02679 /* ClayStylePreview.swift in Sources */,
+				49CBA4A64A187785B587F02E /* ClaySurface.swift in Sources */,
+				875A426463396769F098091F /* ClayTerminal.swift in Sources */,
+				E1BE31E5AD99AEBECD5318C4 /* ClayTimeDial.swift in Sources */,
+				D3DE3FF7C6ABCF5D985DD5A4 /* ClayTypography.swift in Sources */,
 				61CFA8E20BD704C3C5C87A4C /* ConnectionFeedbackView.swift in Sources */,
 				EB3F790DACC707A6A7CDE9FD /* ConnectionView.swift in Sources */,
 				68CD0D4CE1424C6724923DB3 /* CoreCaptureMotionService.swift in Sources */,
 				48D60CF0C87B08310E1D84AE /* CoreMotionFieldService.swift in Sources */,
 				0C715E81C8F479C362CCC241 /* DeviceTemporalDarkroomService.swift in Sources */,
+				F488C69C73FE7ABB0C3B30CE /* DioramaView.swift in Sources */,
+				9608C83D37087D5749AECBDD /* DioramaWebView.swift in Sources */,
 				1530F190F2B4FA42E6129688 /* DisconnectedView.swift in Sources */,
 				A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */,
 				1245BDCD7EC1C8CB446A703A /* FUMIRAApp.swift in Sources */,

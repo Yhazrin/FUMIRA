@@ -1,125 +1,142 @@
 import SwiftUI
 
-/// Direction H — 公园时间海报版
+/// Clay OS — 全局色板桥接。
+/// 所有原色值只允许出现在本文件和 Clay/Foundation/ClayPalette.swift；
+/// Feature / Component 通过语义 token 取色。
 ///
-/// 纯白画布 · 青蓝天空 · 草地分层 · 深松绿 · 手写墨色 · 清新叶绿点睛。
-/// 米色 `paper` 仅保留给海报合成 / 公园装饰形的局部纸感，不再作 App 主背景。
-/// 原色值只允许出现在本文件；Feature / Component 必须通过语义 token 取色。
+/// 本文件将旧 Direction H 名称映射到 Clay 色系，
+/// 使现有调用点无需逐一修改即可获得新配色。
 enum PosterPalette {
 
     // MARK: - Core semantic
 
-    /// 纯白画布 — App chrome、设置、结果留白、默认页背景
-    static let canvas = Color(red: 1, green: 1, blue: 1) // #FFFFFF
+    /// 主背景 — Clay 深炭
+    static let canvas = ClayPalette.charcoal
 
-    /// 页面背景别名 — 与 ``canvas`` 同值，便于语义阅读
+    /// 页面背景别名
     static let pageBackground = canvas
 
-    /// 米白纸张 — **仅**海报合成区、公园装饰形、场景叠色的局部纸感
-    static let paper = Color(red: 246 / 255, green: 243 / 255, blue: 232 / 255) // #F6F3E8
+    /// 米白纸张 — Clay 暖白
+    static let paper = ClayPalette.warmWhite
 
-    /// 浅色控件 / 卡片填充 — 纯白；白底上靠描边或阴影建立层级
-    static let paperWhite = canvas
+    /// 浅色控件 / 卡片填充
+    static let paperWhite = ClayPalette.warmWhite
 
-    /// 浅色信息卡 — 必须保持完全不透明，避免照片透过卡片干扰阅读
-    static let cardLight = canvas
+    /// 浅色信息卡
+    static let cardLight = ClayPalette.warmWhite
 
-    /// 深色信息卡 — 必须保持完全不透明；空间透明度只留给画面遮罩
-    static let cardDark = ink
+    /// 深色信息卡
+    static let cardDark = ClayPalette.charcoal
 
-    /// 天空青蓝 — Connection 气质基准：大面积天空、相机叠层、时间强调
-    static let sky = Color(red: 123 / 255, green: 200 / 255, blue: 235 / 255) // #7BC8EB
+    // MARK: - Blue → Time Blue
 
-    /// 天空近地 / 底部渐变
-    static let skySoft = Color(red: 184 / 255, green: 224 / 255, blue: 245 / 255) // #B8E0F5
+    /// 天空青蓝 → Time Blue
+    static let sky = ClayPalette.timeBlue
 
-    /// 选中态信息卡 — 纯色浅蓝，不使用半透明蓝叠在页面上
-    static let cardActive = skySoft
+    /// 天空近地 → Time Blue 暗面
+    static let skySoft = ClayPalette.timeBlueRim
 
-    /// 深青蓝 — 叠层、生成标题、深色天空面
-    static let skyDeep = Color(red: 61 / 255, green: 139 / 255, blue: 181 / 255) // #3D8BB5
+    /// 选中态信息卡
+    static let cardActive = ClayPalette.timeBlue
 
-    /// 相机快门蓝 — 蓝白轻拟物快门外壳；仅用于拍摄主按钮
-    static let cameraShutterBlue = Color(red: 0 / 255, green: 153 / 255, blue: 255 / 255) // #0099FF
+    /// 深青蓝 → Time Blue 暗面
+    static let skyDeep = ClayPalette.timeBlueRim
 
-    /// 相机快门蓝暗面 — 快门底座与极短投影
-    static let cameraShutterBlueDeep = Color(red: 0 / 255, green: 116 / 255, blue: 194 / 255) // #0074C2
+    /// 相机快门蓝 → Time Blue
+    static let cameraShutterBlue = ClayPalette.timeBlue
 
-    /// 取景器实体圆钮蓝 — 轻微深于快门面，保证白色 SF Symbol 超过 3:1
-    static let cameraChromeBlue = Color(red: 0 / 255, green: 150 / 255, blue: 250 / 255) // #0096FA
+    /// 相机快门蓝暗面
+    static let cameraShutterBlueDeep = ClayPalette.timeBlueRim
 
-    /// 主题蓝 — 所有可操作主按钮、进度与时间选中态
-    static let actionBlue = cameraShutterBlue
+    /// 取景器圆钮蓝
+    static let cameraChromeBlue = ClayPalette.timeBlue
 
-    /// 主题蓝暗面 — 按压、描边与高对比文字
-    static let actionBlueDeep = cameraShutterBlueDeep
+    /// 主题蓝 → Time Blue
+    static let actionBlue = ClayPalette.timeBlue
 
-    /// 相机机身蓝 — 取景卡后方的实体底层与控制甲板。
-    /// 与首屏液体扩散终点统一为 ``actionBlue``，避免阶段切换色差。
-    static let cameraBody = actionBlue
+    /// 主题蓝暗面
+    static let actionBlueDeep = ClayPalette.timeBlueRim
 
-    /// 相机机身亮面 — 快门、选中态与短促反馈
-    static let cameraBodyAccent = actionBlue
+    /// 相机机身蓝
+    static let cameraBody = ClayPalette.timeBlue
 
-    /// 玩具红 — 首屏镜头口袋 / 快门点睛，不用于错误状态
-    static let toyRed = Color(red: 232 / 255, green: 42 / 255, blue: 52 / 255)
+    /// 相机机身亮面
+    static let cameraBodyAccent = ClayPalette.timeBlue
 
-    /// 铃铛黄 — 首屏启动镜头的温暖点睛色
-    static let bellYellow = Color(red: 255 / 255, green: 211 / 255, blue: 58 / 255)
+    /// 主题蓝暗线
+    static let actionBlueShadow = ClayPalette.timeBlueRim
 
-    /// 主题蓝暗线 — 首屏圆形镜头的阴影与外描边
-    static let actionBlueShadow = Color(red: 0 / 255, green: 92 / 255, blue: 153 / 255) // #005C99
+    // MARK: - Warm accents
 
-    /// 草地浅绿 — 分层地形近层、浅色自然面
-    static let grassLight = Color(red: 143 / 255, green: 203 / 255, blue: 126 / 255) // #8FCB7E
+    /// 玩具红 → Clay 橙（保持活力）
+    static let toyRed = ClayPalette.orange
 
-    /// 深松绿 — 仅用于自然场景的地形深部与插画结构
-    static let pine = Color(red: 42 / 255, green: 90 / 255, blue: 60 / 255) // #2A5A3C
+    /// 铃铛黄 → Clay 黄
+    static let bellYellow = ClayPalette.yellow
 
-    /// 清新叶绿 — 仅用于自然场景与品牌下划线，不用于交互状态
-    static let leafGreen = Color(red: 95 / 255, green: 168 / 255, blue: 104 / 255) // #5FA868
+    // MARK: - Green tones
 
-    /// 深墨黑 — 标题与重要操作
-    static let ink = Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255) // #111111
+    /// 草地浅绿 → Park Green
+    static let grassLight = ClayPalette.parkGreen
 
-    /// 次要墨色 — 白底辅助标签（约 4.6:1，满足 WCAG AA）
-    static let mutedInk = Color(red: 110 / 255, green: 108 / 255, blue: 100 / 255) // #6E6C64
+    /// 深松绿 → Park Green 暗面
+    static let pine = ClayPalette.parkGreenRim
 
-    /// 波形时间轴非选中竖条 — 低对比，可叠在白底或软渐层上
-    static let waveIdle = ink.opacity(0.18)
+    /// 清新叶绿 → Park Green
+    static let leafGreen = ClayPalette.parkGreen
+
+    // MARK: - Neutral
+
+    /// 深墨黑 → Clay charcoal
+    static let ink = ClayPalette.charcoal
+
+    /// 次要墨色
+    static let mutedInk = ClayPalette.textMuted
+
+    /// 波形时间轴非选中竖条
+    static let waveIdle = ClayPalette.charcoal.opacity(0.18)
 
     /// 可恢复错误
-    static let errorCoral = Color(red: 233 / 255, green: 94 / 255, blue: 82 / 255) // #E95E52
+    static let errorCoral = ClayPalette.error
 
-    /// 分割线 / 细描边 — 白底卡片边缘
-    static let line = Color(red: 210 / 255, green: 208 / 255, blue: 200 / 255) // #D2D0C8
+    /// 分割线 / 细描边
+    static let line = ClayPalette.warmWhiteRim
 
-    // MARK: - Scene temporal variants (park interpolation)
+    // MARK: - Scene temporal variants
 
     /// 过去天空顶 — 暖纸感
-    static let skyPastTop = Color(red: 209 / 255, green: 184 / 255, blue: 148 / 255) // #D1B894
+    static let skyPastTop = ClayPalette.warmWhite
 
     /// 过去天空底
-    static let skyPastBottom = Color(red: 230 / 255, green: 209 / 255, blue: 179 / 255) // #E6D1B3
+    static let skyPastBottom = ClayPalette.warmWhiteRim
 
-    /// 未来天空顶 — 更冷的青蓝
-    static let skyFutureTop = Color(red: 107 / 255, green: 140 / 255, blue: 209 / 255) // #6B8CD1
+    /// 未来天空顶 — Time Blue 色调
+    static let skyFutureTop = ClayPalette.timeBlue
 
     /// 未来天空底
-    static let skyFutureBottom = Color(red: 148 / 255, green: 179 / 255, blue: 230 / 255) // #94B3E6
+    static let skyFutureBottom = ClayPalette.timeBlueRim
 
-    // MARK: - Compatibility aliases (legacy names → Direction H)
+    // MARK: - Compatibility aliases
 
-    /// - Important: Prefer ``sky``. Kept so existing call sites compile.
     static let timeBlue = sky
-
-    /// - Important: Prefer ``skyDeep``.
     static let deepTimeBlue = skyDeep
-
-    /// - Important: Prefer ``pine``.
     static let parkGreen = pine
-
-    /// - Important: Prefer ``pine`` for natural scene surfaces.
     static let growthGreen = pine
 
+    // MARK: - New Clay tokens (for gradual migration)
+
+    /// Clay lime — 成功 / 激活
+    static let lime = ClayPalette.lime
+
+    /// Clay yellow — 进度 / 警告
+    static let yellow = ClayPalette.yellow
+
+    /// Clay orange — 强调色 / 玩具红系
+    static let orange = ClayPalette.orange
+
+    /// Clay warmWhite — 文字在深色上
+    static let warmWhite = ClayPalette.warmWhite
+
+    /// Clay charcoal — 文字在浅色上
+    static let charcoal = ClayPalette.charcoal
 }

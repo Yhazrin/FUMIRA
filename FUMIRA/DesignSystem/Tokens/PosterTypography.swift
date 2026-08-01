@@ -3,35 +3,29 @@ import SwiftUI
 import UIKit
 
 enum PosterTypography {
-    /// Semantic Apple type styles for interface copy. These scale with the
-    /// user's Dynamic Type setting and keep FUMIRA aligned with iOS hierarchy.
-    /// FUMIRA's functional UI deliberately uses the normal SF family. It is
-    /// quieter beside imagery, reads like an Apple interface, and keeps the
-    /// display lettering reserved for the moments that need poster character.
-    static let screenTitle = Font.system(.title2, weight: .semibold)
-    static let sectionTitle = Font.system(.headline, weight: .semibold)
-    static let cardTitle = Font.system(.title3, weight: .semibold)
-    static let metric = Font.system(.title2, weight: .semibold)
-    static let body = Font.system(.body, weight: .regular)
-    static let supporting = Font.system(.subheadline, weight: .regular)
-    static let label = Font.system(.subheadline, weight: .semibold)
-    static let caption = Font.system(.caption, weight: .medium)
-    static let button = Font.system(.body, weight: .semibold)
+    /// Clay OS 字体 — SF Pro Rounded 主要语言，等宽用于时间值和终端状态。
+    static let screenTitle = ClayTypography.displaySmall
+    static let sectionTitle = ClayTypography.subheading
+    static let cardTitle = ClayTypography.heading
+    static let metric = ClayTypography.displaySmall
+    static let body = ClayTypography.body
+    static let supporting = ClayTypography.bodySmall
+    static let label = ClayTypography.label
+    static let caption = ClayTypography.labelSmall
+    static let button = ClayTypography.bodyBold
 
-    /// Connection-screen brand mark — Caveat Brush when the bundled face loads,
-    /// otherwise rounded SF so the invite never falls back to an empty glyph.
+    /// 品牌标识
     static let wordmark = script(68)
-    static let accent = Font.system(.title3, design: .rounded, weight: .semibold)
+    static let accent = ClayTypography.heading
     static let handwrittenTitle = display(26)
 
-    /// Fixed sizing is reserved for artwork that must preserve its poster
-    /// composition, such as exports and multicolour keyword lettering.
+    /// 固定尺寸用于海报导出
     static func display(_ size: CGFloat) -> Font {
         _ = BundledFonts.registration
         if BundledFonts.markerGothicAvailable {
             return .custom(BundledFonts.markerGothicName, size: size)
         }
-        return .system(size: size, weight: .semibold, design: .rounded)
+        return .system(size: size, weight: .bold, design: .rounded)
     }
 
     static func script(_ size: CGFloat) -> Font {
@@ -39,7 +33,7 @@ enum PosterTypography {
         if BundledFonts.caveatBrushAvailable {
             return .custom(BundledFonts.caveatBrushName, size: size)
         }
-        return .system(size: size, weight: .semibold, design: .rounded)
+        return .system(size: size, weight: .bold, design: .rounded)
     }
 }
 
