@@ -14,6 +14,8 @@ export default defineConfig({
     },
   },
   server: {
+    // The phone must be able to reach the dev display on the same LAN.
+    host: '0.0.0.0',
     port: VITE_PORT,
     proxy: {
       '/api': `http://localhost:${API_PORT}`,

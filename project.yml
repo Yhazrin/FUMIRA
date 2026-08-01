@@ -64,6 +64,7 @@ targets:
         # Build-setting expanded. Debug defaults to local backend; Release stays empty = Mock.
         # Never put MINIMAX_API_KEY here — only the FUMIRA backend base URL.
         FUMIRA_API_BASE_URL: "$(FUMIRA_API_BASE_URL)"
+        FUMIRA_PAIRING_BASE_URL: "$(FUMIRA_PAIRING_BASE_URL)"
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
           # Debug relay runs on the developer Mac over private LAN HTTP.
@@ -85,8 +86,10 @@ targets:
           # Current developer Mac relay. This works on both the simulator and
           # the paired iPhone; change it when the Mac's LAN address changes.
           FUMIRA_API_BASE_URL: "http://10.220.32.125:8787"
+          FUMIRA_PAIRING_BASE_URL: "http://10.220.32.125:3210"
         Release:
           FUMIRA_API_BASE_URL: ""
+          FUMIRA_PAIRING_BASE_URL: ""
     dependencies:
       - package: Pow
       - target: FUMIRALiveActivity

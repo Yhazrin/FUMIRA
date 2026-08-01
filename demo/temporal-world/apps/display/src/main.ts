@@ -6,7 +6,8 @@ import {
   type AnimationController,
 } from '@fumira/scene-runtime';
 import QRCode from 'qrcode';
-import fixtureData from '../../../fixtures/campus-gate/scene.json';
+// import fixtureData from '../../../fixtures/campus-gate/scene.json';
+import fixtureData from '../../../fixtures/reconstruct-demo/scene.json';
 
 // ── Config ─────────────────────────────────────────────────
 const API_BASE = window.location.origin;
@@ -53,6 +54,7 @@ function updateUI(year: number, intervals: TimelineInterval[]): void {
 let ws: WebSocket | null = null;
 let sessionId: string | null = null;
 let animationController: AnimationController | null = null;
+let heartbeatTimer: number | null = null;
 
 async function initSession(fixture: SceneFixture): Promise<void> {
   try {
@@ -62,7 +64,9 @@ async function initSession(fixture: SceneFixture): Promise<void> {
     const sessionIdEl = document.getElementById('session-id');
     if (sessionIdEl) sessionIdEl.textContent = sessionId;
 
-    const mobileUrl = `${API_BASE}/mobile.html?session=${sessionId}`;
+    const mobileUrl = typeof data.pairingURL === 'string'
+      ? data.pairingURL
+      : `${API_BASE}/mobile.html?session=${sessionId}`;
     const qrEl = document.getElementById('qr-code');
     if (qrEl) {
       await QRCode.toCanvas(qrEl as HTMLCanvasElement, mobileUrl, {
@@ -84,6 +88,10 @@ function connectWebSocket(fixture: SceneFixture): void {
 
   ws.onopen = () => {
     console.log('Desktop WebSocket connected');
+    ws?.send(JSON.stringify({ type: 'hello', role: 'desktop', protocolVersion: 1 }));
+    heartbeatTimer = window.setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    }, 10_000);
   };
 
   ws.onmessage = (event) => {
@@ -92,15 +100,29 @@ function connectWebSocket(fixture: SceneFixture): void {
   };
 
   ws.onclose = () => {
+    if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
     updateConnectionStatus('disconnected');
     setTimeout(() => connectWebSocket(fixture), 3000);
   };
 }
 
-function handleWSMessage(msg: { type: string; value?: number; entityId?: string; sessionId?: string }, fixture: SceneFixture): void {
+function handleWSMessage(msg: {
+  type: string;
+  value?: number;
+  entityId?: string;
+  sessionId?: string;
+  state?: 'paired' | 'waiting_for_phone' | 'waiting_for_desktop' | 'idle';
+}, fixture: SceneFixture): void {
   switch (msg.type) {
     case 'connected':
       console.log('Desktop registered for session', msg.sessionId);
+      break;
+    case 'handshake.accepted':
+      updateConnectionStatus('waiting');
+      break;
+    case 'pairing.status':
+      updatePairingStatus(msg.state ?? 'idle');
       break;
     case 'peer.connected':
       updateConnectionStatus('connected');
@@ -130,14 +152,33 @@ function handleWSMessage(msg: { type: string; value?: number; entityId?: string;
   }
 }
 
+function updatePairingStatus(state: 'paired' | 'waiting_for_phone' | 'waiting_for_desktop' | 'idle'): void {
+  const panel = document.getElementById('qr-panel');
+  const statusEl = document.getElementById('qr-status');
+  if (!panel || !statusEl) return;
+
+  const paired = state === 'paired';
+  panel.classList.toggle('connected', paired);
+  panel.classList.toggle('waiting', !paired);
+  statusEl.className = paired ? 'connected' : 'waiting';
+  statusEl.textContent = paired
+    ? 'PHONE PAIRED · HANDSHAKE OK'
+    : state === 'waiting_for_phone'
+      ? 'WAITING FOR PHONE'
+      : state === 'waiting_for_desktop'
+        ? 'PHONE WAITING FOR DESKTOP'
+        : 'PAIRING SERVER READY';
+  updateConnectionStatus(paired ? 'connected' : 'waiting');
+}
+
 function updateConnectionStatus(status: string): void {
   const dot = document.getElementById('connection-dot');
   const label = document.getElementById('connection-label');
-  if (dot) dot.className = status;
+  if (dot) dot.className = status === 'connected' ? 'connected' : status === 'disconnected' ? 'disconnected' : 'offline';
   if (label) {
     label.textContent =
       status === 'connected' ? 'PHONE CONNECTED' :
-      status === 'disconnected' ? 'PHONE DISCONNECTED' : 'STANDALONE';
+      status === 'disconnected' ? 'SERVER DISCONNECTED' : 'WAITING FOR PHONE';
   }
 }
 

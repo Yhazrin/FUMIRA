@@ -373,6 +373,39 @@ function createFlowerBed(entity: EntitySpec, palette: Palette): THREE.Group {
   return bed;
 }
 
+// ── Cube ─────────────────────────────────────────────────────
+
+function createCube(entity: EntitySpec, palette: Palette): THREE.Group {
+  const group = new THREE.Group();
+  group.userData = { category: 'prop', id: entity.id };
+
+  const w = (entity.size as number[])?.[0] ?? 1;
+  const h = (entity.size as number[])?.[1] ?? 1;
+  const d = (entity.size as number[])?.[2] ?? 1;
+
+  // Resolve material color: if entity has a material.color, use it;
+  // otherwise fall back to palette lookup or default warmWhite.
+  const mat = entity.material as unknown as Record<string, unknown> | undefined;
+  const matColor = mat?.color
+    ? hex(mat.color as string)
+    : hex(palette.warmWhite);
+
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d, 2, 2, 2),
+    clayMat(matColor, {
+      roughness: (mat?.roughness as number) ?? 0.52,
+      metalness: (mat?.metalness as number) ?? 0,
+    }),
+  );
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+
+  group.position.set(entity.position[0], entity.position[1], entity.position[2]);
+  group.rotation.y = entity.rotation ?? 0;
+  return group;
+}
+
 // ── Dispatch ──────────────────────────────────────────────────
 
 export type EntityBuilder = (entity: EntitySpec, palette: Palette) => THREE.Group;
@@ -386,6 +419,7 @@ const builders: Record<string, EntityBuilder> = {
   bicycle: createBicycle,
   lampPost: createLampPost,
   flowerBed: createFlowerBed,
+  cube: createCube,
 };
 
 export function buildEntity(entity: EntitySpec, palette: Palette): THREE.Group | null {

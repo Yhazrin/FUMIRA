@@ -94,6 +94,7 @@ function setSceneState(state, detail) {
 let sessionId = null;
 let ws = null;
 let isConnectedToMobile = false;
+let heartbeatTimer = null;
 
 // ── Initialize Session ─────────────────────────────────────
 async function initSession() {
@@ -103,7 +104,7 @@ async function initSession() {
     sessionId = data.sessionId;
     document.getElementById('session-id').textContent = sessionId;
 
-    const mobileUrl = `${API_BASE}/mobile.html?session=${sessionId}`;
+    const mobileUrl = data.pairingURL || `${API_BASE}/mobile.html?session=${sessionId}`;
     const qrEl = document.getElementById('qr-code');
     QRCode.toCanvas(qrEl, mobileUrl, {
       width: 160, margin: 1,
@@ -156,9 +157,12 @@ function manifestToFixture(manifest) {
   for (const [entityId, compiled] of Object.entries(manifest.entities || {})) {
     const node = nodesById[compiled.sceneNodeId] || {};
     const spec = compiled.spec || {};
-    entities.push({
+    const entityType = spec.type || 'prop';
+
+    const entity = {
       id: entityId,
-      type: spec.type || 'prop',
+      type: entityType,
+      category: entityType,
       label: spec.label || entityId,
       position: node.position || [0, 0, 0],
       rotation: node.rotation || [0, 0, 0],
@@ -173,7 +177,17 @@ function manifestToFixture(manifest) {
       },
       material: node.material || { color: '#C4A882', roughness: 0.65 },
       confidence: 1.0,
-    });
+    };
+
+    // Pass through tree-specific properties
+    if (entityType === 'vegetation' || entityType === 'tree') {
+      entity.trunkHeight = node.geometry?.args?.[1] ?? 1.0;
+      entity.crownRadius = node.geometry?.args?.[0] ?? 0.7;
+      entity.type = 'tree';
+      entity.category = 'vegetation';
+    }
+
+    entities.push(entity);
   }
 
   return {
@@ -212,7 +226,13 @@ function startPollingForScene() {
 function connectWebSocket() {
   ws = new WebSocket(`${WS_BASE}/ws?session=${sessionId}&role=desktop`);
 
-  ws.onopen = () => { console.log('Desktop WebSocket connected'); };
+  ws.onopen = () => {
+    console.log('Desktop WebSocket connected');
+    ws.send(JSON.stringify({ type: 'hello', role: 'desktop', protocolVersion: 1 }));
+    heartbeatTimer = window.setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    }, 10000);
+  };
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
@@ -220,6 +240,8 @@ function connectWebSocket() {
   };
 
   ws.onclose = () => {
+    if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
     updateConnectionStatus('disconnected');
     setTimeout(connectWebSocket, 3000);
   };
@@ -229,6 +251,12 @@ function handleWSMessage(msg) {
   switch (msg.type) {
     case 'connected':
       console.log('Desktop registered for session', msg.sessionId);
+      break;
+    case 'handshake.accepted':
+      updateConnectionStatus('waiting');
+      break;
+    case 'pairing.status':
+      updatePairingStatus(msg.state || 'idle');
       break;
     case 'peer.connected':
       isConnectedToMobile = true;
@@ -260,12 +288,30 @@ function handleWSMessage(msg) {
   }
 }
 
+function updatePairingStatus(state) {
+  const panel = document.getElementById('qr-panel');
+  const status = document.getElementById('qr-status');
+  if (!panel || !status) return;
+  const paired = state === 'paired';
+  panel.classList.toggle('connected', paired);
+  panel.classList.toggle('waiting', !paired);
+  status.className = paired ? 'connected' : 'waiting';
+  status.textContent = paired
+    ? 'PHONE PAIRED · HANDSHAKE OK'
+    : state === 'waiting_for_phone'
+      ? 'WAITING FOR PHONE'
+      : state === 'waiting_for_desktop'
+        ? 'PHONE WAITING FOR DESKTOP'
+        : 'PAIRING SERVER READY';
+  updateConnectionStatus(paired ? 'connected' : 'waiting');
+}
+
 function updateConnectionStatus(status) {
   const dot = document.getElementById('connection-dot');
   const label = document.getElementById('connection-label');
-  dot.className = status;
+  dot.className = status === 'connected' ? 'connected' : status === 'disconnected' ? 'disconnected' : 'offline';
   label.textContent = status === 'connected' ? 'PHONE CONNECTED' :
-    status === 'disconnected' ? 'PHONE DISCONNECTED' : 'STANDALONE';
+    status === 'disconnected' ? 'SERVER DISCONNECTED' : 'WAITING FOR PHONE';
 }
 
 // ── Three.js Scene ─────────────────────────────────────────

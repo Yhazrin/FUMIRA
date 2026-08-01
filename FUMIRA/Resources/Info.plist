@@ -35,6 +35,8 @@
 	<string>1</string>
 	<key>FUMIRA_API_BASE_URL</key>
 	<string>$(FUMIRA_API_BASE_URL)</string>
+	<key>FUMIRA_PAIRING_BASE_URL</key>
+	<string>$(FUMIRA_PAIRING_BASE_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

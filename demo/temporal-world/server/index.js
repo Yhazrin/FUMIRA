@@ -8,11 +8,14 @@ import { JobDispatcher } from './job-dispatcher.js';
 import { SceneCompiler } from './scene-compiler.js';
 import { XiaomiProvider } from './xiaomi-provider.js';
 import { ClaudeWorker } from './claude-worker.js';
+import { ClayWorker } from './clay-worker.js';
 import { JobOrchestrator } from './orchestrator.js';
 import { TemporalEngine } from './temporal-engine.js';
 import { CONFIG } from '../config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const PAIRING_PROTOCOL_VERSION = 1;
 
 const app = Fastify({ logger: false });
 await app.register(fastifyWebsocket);
@@ -85,17 +88,36 @@ const xiaomiProvider = new XiaomiProvider({
   mock: !process.env.XIAOMI_API_KEY, // mock mode by default for demo
 });
 
-// ClaudeWorker needs a forge scripts dir; fall back to the scripts dir if not set
-const forgeScriptsDir = process.env.FORGE_SCRIPTS_DIR || path.resolve(__dirname, '../scripts');
-const claudeWorker = new ClaudeWorker({
-  forgeScriptsDir,
-  maxConcurrent: 1,
-  defaultTimeoutMs: 120_000,
-});
+// Clay worker paths — clay-reconstruct skill + img2threejs forge scripts
+const CLAY_SKILL_DIR = process.env.CLAY_SKILL_DIR || path.resolve(__dirname, '../../../.claude/skills/clay-reconstruct');
+const IMG2THREEJS_FORGE_DIR = process.env.IMG2THREEJS_FORGE_DIR || process.env.FORGE_SCRIPTS_DIR || path.resolve(__dirname, '../../../.claude/skills/img2threejs/forge');
+
+// ClayWorker is the preferred worker (clay style, 3-5× faster).
+// Falls back to generic ClaudeWorker if clay skill is not available.
+let claudeWorker;
+let clayWorker;
+try {
+  clayWorker = new ClayWorker({
+    skillDir: CLAY_SKILL_DIR,
+    forgeDir: IMG2THREEJS_FORGE_DIR,
+    maxConcurrent: 1,
+    defaultTimeoutMs: 90_000,
+  });
+  console.log('ClayWorker initialized (clay-reconstruct skill)');
+} catch {
+  const forgeScriptsDir = process.env.FORGE_SCRIPTS_DIR || path.resolve(__dirname, '../scripts');
+  claudeWorker = new ClaudeWorker({
+    forgeScriptsDir,
+    maxConcurrent: 1,
+    defaultTimeoutMs: 120_000,
+  });
+  console.log('ClayWorker unavailable, falling back to ClaudeWorker');
+}
 
 const orchestrator = new JobOrchestrator({
   xiaomiProvider,
   claudeWorker,
+  clayWorker,
   sceneCompiler,
   jobsDir: JOBS_DIR,
   maxConcurrent: 1,
@@ -175,6 +197,10 @@ function createSession() {
     id,
     desktop: null,
     mobile: null,
+    connections: {
+      desktop: { connectedAt: null, lastSeenAt: null, connectionId: null },
+      mobile: { connectedAt: null, lastSeenAt: null, connectionId: null },
+    },
     state: {
       timeValue: 0,
       selectedEntity: null,
@@ -188,6 +214,63 @@ function createSession() {
 
 function getSession(id) {
   return sessions.get(id);
+}
+
+function getRequestBaseURL(req) {
+  const configured = process.env.FUMIRA_PUBLIC_URL?.trim();
+  if (configured) return configured.replace(/\/$/, '');
+
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+    || req.headers.host;
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+    || 'http';
+  return host ? `${protocol}://${host}` : `http://localhost:${CONFIG.API_PORT}`;
+}
+
+function pairingStatus(session) {
+  const roleStatus = (role) => {
+    const socket = session[role];
+    const metadata = session.connections[role];
+    return {
+      connected: Boolean(socket && socket.readyState === 1),
+      connectedAt: metadata.connectedAt,
+      lastSeenAt: metadata.lastSeenAt,
+      connectionId: metadata.connectionId,
+    };
+  };
+
+  const desktop = roleStatus('desktop');
+  const mobile = roleStatus('mobile');
+  const state = desktop.connected && mobile.connected
+    ? 'paired'
+    : desktop.connected
+      ? 'waiting_for_phone'
+      : mobile.connected
+        ? 'waiting_for_desktop'
+        : 'idle';
+
+  return {
+    type: 'pairing.status',
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+    sessionId: session.id,
+    state,
+    desktop,
+    mobile,
+    serverTime: new Date().toISOString(),
+  };
+}
+
+function broadcastPairingStatus(session) {
+  const message = JSON.stringify(pairingStatus(session));
+  [session.desktop, session.mobile].forEach((socket) => {
+    if (socket && socket.readyState === 1) socket.send(message);
+  });
+}
+
+function sendPairingStatus(socket, session) {
+  if (socket && socket.readyState === 1) socket.send(JSON.stringify(pairingStatus(session)));
 }
 
 // Broadcast to all clients in a session except sender
@@ -226,7 +309,13 @@ function broadcastSceneWs(data) {
 
 app.get('/api/session', (req, reply) => {
   const session = createSession();
-  return { sessionId: session.id };
+  const baseURL = getRequestBaseURL(req);
+  return {
+    sessionId: session.id,
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+    pairingURL: `${baseURL}/mobile.html?session=${encodeURIComponent(session.id)}`,
+    status: pairingStatus(session),
+  };
 });
 
 app.get('/api/session/:id', (req, reply) => {
@@ -234,11 +323,24 @@ app.get('/api/session/:id', (req, reply) => {
   if (!session) return reply.code(404).send({ error: 'Session not found' });
   return {
     sessionId: session.id,
-    hasDesktop: !!session.desktop,
-    hasMobile: !!session.mobile,
+    hasDesktop: Boolean(session.desktop && session.desktop.readyState === 1),
+    hasMobile: Boolean(session.mobile && session.mobile.readyState === 1),
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+    status: pairingStatus(session),
     state: session.state
   };
 });
+
+app.get('/api/health', () => ({
+  ok: true,
+  service: 'fumira-temporal-world',
+  pairing: {
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+    ready: true,
+    activeSessions: sessions.size,
+  },
+  serverTime: new Date().toISOString(),
+}));
 
 // ── Reconstruction API ────────────────────────────────────
 
@@ -317,6 +419,17 @@ app.get('/api/scene', (req, reply) => {
   return manifest;
 });
 
+// Load a canonical scene spec directly into the compiler
+app.post('/api/scene/load', async (req, reply) => {
+  const spec = req.body;
+  if (!spec || !spec.entities) {
+    return reply.code(400).send({ error: 'Invalid scene spec: missing entities' });
+  }
+  const updates = sceneCompiler.loadCanonicalScene(spec);
+  broadcastGlobal({ type: 'scene.ready' });
+  return { ok: true, entities: spec.entities.length, updates: updates.length };
+});
+
 // Per-session scene endpoint — returns a SceneFixture for the desktop to render.
 // If the SceneCompiler has entities for this session, returns them as a fixture.
 // Otherwise returns 404 so the desktop shows its waiting state.
@@ -331,7 +444,7 @@ app.get('/api/scene/:sessionId', (req, reply) => {
 
   // Fall back to the compiler manifest — if it has entities, wrap as fixture
   const manifest = sceneCompiler.getSceneManifest();
-  if (manifest.entities && manifest.entities.length > 0) {
+  if (manifest.entities && Object.keys(manifest.entities).length > 0) {
     return manifest;
   }
 
@@ -353,13 +466,38 @@ app.get('/ws', { websocket: true }, (socket, req) => {
 
   // Register connection
   session[role] = socket;
-  socket.send(JSON.stringify({ type: 'connected', role, sessionId }));
+  const connectionId = nanoid(10);
+  const connectedAt = new Date().toISOString();
+  session.connections[role] = {
+    connectedAt,
+    lastSeenAt: connectedAt,
+    connectionId,
+  };
+  socket.send(JSON.stringify({
+    type: 'connected',
+    role,
+    sessionId,
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+  }));
+  socket.send(JSON.stringify({
+    type: 'handshake.accepted',
+    role,
+    sessionId,
+    connectionId,
+    protocolVersion: PAIRING_PROTOCOL_VERSION,
+    peerConnected: Boolean(
+      (role === 'desktop' ? session.mobile : session.desktop)
+        && (role === 'desktop' ? session.mobile : session.desktop).readyState === 1
+    ),
+  }));
 
   // Notify peer
   const peer = role === 'desktop' ? session.mobile : session.desktop;
   if (peer && peer.readyState === 1) {
     peer.send(JSON.stringify({ type: 'peer.connected', role }));
   }
+
+  broadcastPairingStatus(session);
 
   // If desktop connects and scene is ready
   if (role === 'desktop') {
@@ -370,6 +508,24 @@ app.get('/ws', { websocket: true }, (socket, req) => {
   socket.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw);
+      const metadata = session.connections[role];
+      metadata.lastSeenAt = new Date().toISOString();
+
+      if (msg.type === 'hello') {
+        socket.send(JSON.stringify({
+          type: 'handshake.accepted',
+          role,
+          sessionId,
+          connectionId,
+          protocolVersion: PAIRING_PROTOCOL_VERSION,
+          peerConnected: Boolean(
+            (role === 'desktop' ? session.mobile : session.desktop)
+              && (role === 'desktop' ? session.mobile : session.desktop).readyState === 1
+          ),
+        }));
+        sendPairingStatus(socket, session);
+        return;
+      }
 
       switch (msg.type) {
         case 'time.seek':
@@ -472,7 +628,12 @@ app.get('/ws', { websocket: true }, (socket, req) => {
           break;
 
         case 'ping':
-          socket.send(JSON.stringify({ type: 'pong' }));
+          socket.send(JSON.stringify({
+            type: 'pong',
+            protocolVersion: PAIRING_PROTOCOL_VERSION,
+            serverTime: new Date().toISOString(),
+          }));
+          sendPairingStatus(socket, session);
           break;
 
         default:
@@ -486,11 +647,17 @@ app.get('/ws', { websocket: true }, (socket, req) => {
 
   socket.on('close', () => {
     session[role] = null;
+    session.connections[role] = {
+      connectedAt: null,
+      lastSeenAt: new Date().toISOString(),
+      connectionId: null,
+    };
     const otherRole = role === 'desktop' ? 'mobile' : 'desktop';
     const other = session[otherRole];
     if (other && other.readyState === 1) {
       other.send(JSON.stringify({ type: 'peer.disconnected', role }));
     }
+    broadcastPairingStatus(session);
 
     // Cleanup empty sessions after 5 min
     if (!session.desktop && !session.mobile) {

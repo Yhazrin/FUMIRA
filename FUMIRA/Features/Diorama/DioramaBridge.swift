@@ -4,6 +4,7 @@ import WebKit
 // MARK: - Delegate
 
 /// Receives lifecycle and event callbacks from the Diorama Bridge.
+@MainActor
 protocol DioramaBridgeDelegate: AnyObject {
     func dioramaBridgeDidBecomeReady(_ bridge: DioramaBridge)
     func dioramaBridge(_ bridge: DioramaBridge, didSelectEntity entityId: String)
@@ -57,6 +58,7 @@ enum DioramaBridgeError: LocalizedError {
 ///
 /// Messages sent before `diorama.ready` is received are queued and
 /// flushed in order once the runtime signals readiness.
+@MainActor
 final class DioramaBridge {
 
     // MARK: - Protocol version
@@ -74,7 +76,6 @@ final class DioramaBridge {
 
     private weak var webView: WKWebView?
     private var pendingMessages: [PendingMessage] = []
-    private let queue = DispatchQueue(label: "com.fumira.diorama-bridge", qos: .userInitiated)
 
     // MARK: - Init
 
@@ -200,19 +201,13 @@ final class DioramaBridge {
         case "entity.selected":
             // entityId lives inside payload (TS: { entityId, label })
             if let entityId = payload["entityId"] as? String {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    self.delegate?.dioramaBridge(self, didSelectEntity: entityId)
-                }
+                delegate?.dioramaBridge(self, didSelectEntity: entityId)
             }
 
         case "runtime.error":
             let errorMessage = payload["message"] as? String ?? "Unknown runtime error"
             let error = DioramaBridgeError.runtimeError(errorMessage)
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.delegate?.dioramaBridge(self, didEncounterError: error)
-            }
+            delegate?.dioramaBridge(self, didEncounterError: error)
 
         default:
             break
@@ -230,29 +225,20 @@ final class DioramaBridge {
     // MARK: - Private: Message Dispatch
 
     private func enqueueOrSend(script: String, description: String) {
-        queue.async { [weak self] in
-            guard let self else { return }
-            if self.isReady {
-                self.evaluateJS(script)
-            } else {
-                self.pendingMessages.append(PendingMessage(script: script, description: description))
-            }
+        if isReady {
+            evaluateJS(script)
+        } else {
+            pendingMessages.append(PendingMessage(script: script, description: description))
         }
     }
 
     private func handleReady(version: Int) {
-        queue.async { [weak self] in
-            guard let self else { return }
-            self.isReady = true
-            self.flushPendingMessages()
-            DispatchQueue.main.async {
-                self.delegate?.dioramaBridgeDidBecomeReady(self)
-            }
-        }
+        isReady = true
+        flushPendingMessages()
+        delegate?.dioramaBridgeDidBecomeReady(self)
     }
 
     private func flushPendingMessages() {
-        // Must be called on `queue`.
         let messages = pendingMessages
         pendingMessages.removeAll()
         for message in messages {
@@ -265,26 +251,19 @@ final class DioramaBridge {
     /// Wraps `evaluateJavaScript` with structured error handling.
     /// Must be called on the main thread (WKWebView requirement).
     private func evaluateJS(_ script: String) {
-        let webView = self.webView
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let webView else {
-                if let self {
-                    let error = DioramaBridgeError.webViewDeallocated
-                    self.delegate?.dioramaBridge(self, didEncounterError: error)
-                }
-                return
-            }
-            webView.evaluateJavaScript(script) { [weak self] _, error in
-                if let error {
-                    guard let self else { return }
-                    let bridgeError = DioramaBridgeError.javaScriptEvaluationFailed(
-                        script.count > 120 ? String(script.prefix(120)) + "..." : script,
-                        underlying: error
-                    )
-                    DispatchQueue.main.async {
-                        self.delegate?.dioramaBridge(self, didEncounterError: bridgeError)
-                    }
-                }
+        guard let webView else {
+            delegate?.dioramaBridge(self, didEncounterError: DioramaBridgeError.webViewDeallocated)
+            return
+        }
+        webView.evaluateJavaScript(script) { [weak self] _, error in
+            guard let error else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let bridgeError = DioramaBridgeError.javaScriptEvaluationFailed(
+                    script.count > 120 ? String(script.prefix(120)) + "..." : script,
+                    underlying: error
+                )
+                self.delegate?.dioramaBridge(self, didEncounterError: bridgeError)
             }
         }
     }

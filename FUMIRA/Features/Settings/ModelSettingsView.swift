@@ -211,13 +211,13 @@ private struct ModelRoutingAdvancedView: View {
     }
 }
 
-/// 拍摄页面的设置视图，包含翻转摄像头和 Web Demo 连接码
+/// 拍摄页面的设置视图，包含翻转摄像头和桌面端实时配对。
 struct ViewfinderSettingsView: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var sessionCode: String = "------"
-    @State private var isLoadingSession = false
-    @State private var serverURL: String = ""
+    @StateObject private var pairing = PairingClient()
+    @State private var manualCode = ""
+    @State private var isScannerPresented = false
 
     var body: some View {
         NavigationStack {
@@ -248,44 +248,80 @@ struct ViewfinderSettingsView: View {
                 }
 
                 Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("连接码")
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            if isLoadingSession {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else {
-                                Text(sessionCode)
-                                    .font(.title3.monospaced().weight(.bold))
-                                    .foregroundStyle(ClayPalette.orange)
-                            }
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(pairing.state == .paired ? ClayPalette.parkGreen : ClayPalette.orange)
+                            .frame(width: 10, height: 10)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(pairing.state.title)
+                                .font(.subheadline.weight(.semibold))
+                            Text(pairing.state.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-
-                        if !serverURL.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("手机浏览器访问")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(serverURL)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(ClayPalette.orange)
-                                    .textSelection(.enabled)
-                            }
-                        }
-
-                        Button {
-                            Task { await fetchSessionCode() }
-                        } label: {
-                            Label("刷新连接码", systemImage: "arrow.clockwise")
-                        }
-                        .font(.subheadline)
+                        Spacer(minLength: 0)
                     }
+
+                    HStack(spacing: 12) {
+                        Image(systemName: "wand.and.stars")
+                            .foregroundStyle(
+                                pairing.generationServerState == .unavailable
+                                    ? ClayPalette.error
+                                    : ClayPalette.orange
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(pairing.generationServerState.title)
+                                .font(.subheadline.weight(.semibold))
+                            Text(pairing.generationServerState.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+
+                    Button {
+                        isScannerPresented = true
+                    } label: {
+                        Label("扫描桌面二维码", systemImage: "qrcode.viewfinder")
+                    }
+
+                    HStack(spacing: 10) {
+                        TextField("输入 6 位连接码", text: $manualCode)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: manualCode) { _, newValue in
+                                manualCode = String(newValue.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(6))
+                            }
+
+                        Button("连接") {
+                            Task { await pairing.connect(sessionCode: manualCode) }
+                        }
+                        .disabled(manualCode.count != 6)
+                    }
+
+                    if let code = pairing.sessionCode {
+                        LabeledContent("当前连接码", value: code)
+                            .font(.caption.monospaced())
+                    }
+
+                    if let endpoint = pairing.endpointDescription {
+                        Text(endpoint)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+
+                    Button {
+                        Task { await pairing.checkServer() }
+                    } label: {
+                        Label("检查配对服务器", systemImage: "server.rack")
+                    }
+                    .font(.subheadline)
                 } header: {
-                    Text("Web Demo")
+                    Text("桌面联机")
                 } footer: {
-                    Text("在电脑浏览器打开 Web Demo 后，用手机扫描二维码或输入连接码进行控制。")
+                    Text("请先在电脑打开 FUMIRA 网页端。网页端二维码出现后，用这里的扫描器完成握手；只有双方都在线才会显示“已配对”。")
                 }
 
                 Section {
@@ -305,38 +341,13 @@ struct ViewfinderSettingsView: View {
         }
         .tint(ClayPalette.orangeRim)
         .task {
-            await fetchSessionCode()
+            await pairing.checkServer()
         }
-    }
-
-    private func fetchSessionCode() async {
-        isLoadingSession = true
-        defer { isLoadingSession = false }
-
-        // 尝试从本地服务器获取 session
-        let hosts = ["localhost", "10.220.32.125"]
-        let port = 3210
-
-        for host in hosts {
-            let urlString = "http://\(host):\(port)/api/session"
-            guard let url = URL(string: urlString) else { continue }
-
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let sessionId = json["sessionId"] as? String {
-                    sessionCode = sessionId
-                    serverURL = "http://\(host):\(port)/mobile.html?session=\(sessionId)"
-                    return
-                }
-            } catch {
-                continue
+        .sheet(isPresented: $isScannerPresented) {
+            PairingQRCodeScannerView { payload in
+                Task { await pairing.connect(scannedPayload: payload) }
             }
         }
-
-        // 服务器未连接
-        sessionCode = "未连接"
-        serverURL = ""
     }
 }
 

@@ -227,6 +227,7 @@ const API_BASE = window.location.origin;
 let sessionId = null;
 let ws = null;
 let currentTimeP = 0; // [-1, 1]
+let heartbeatTimer = null;
 
 // ── Session from URL ───────────────────────────────────────
 const params = new URLSearchParams(window.location.search);
@@ -263,8 +264,12 @@ function connectWebSocket() {
   ws.onopen = () => {
     document.getElementById('connect-screen').style.display = 'none';
     document.getElementById('remote-screen').style.display = 'flex';
-    document.getElementById('ws-status').textContent = 'CONNECTED';
-    document.getElementById('ws-status').className = 'status connected';
+    document.getElementById('ws-status').textContent = 'WAITING FOR DESKTOP';
+    document.getElementById('ws-status').className = 'status disconnected';
+    ws.send(JSON.stringify({ type: 'hello', role: 'mobile', protocolVersion: 1 }));
+    heartbeatTimer = window.setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    }, 10000);
     initSlider();
   };
 
@@ -278,9 +283,21 @@ function connectWebSocket() {
       document.getElementById('ws-status').textContent = 'CONNECTED';
       document.getElementById('ws-status').className = 'status connected';
     }
+    if (msg.type === 'handshake.accepted' && !msg.peerConnected) {
+      document.getElementById('ws-status').textContent = 'WAITING FOR DESKTOP';
+      document.getElementById('ws-status').className = 'status disconnected';
+    }
+    if (msg.type === 'pairing.status') {
+      const paired = msg.state === 'paired';
+      document.getElementById('ws-status').textContent = paired ? 'PAIRED · HANDSHAKE OK' :
+        msg.state === 'waiting_for_desktop' ? 'WAITING FOR DESKTOP' : 'CONNECTED';
+      document.getElementById('ws-status').className = paired ? 'status connected' : 'status disconnected';
+    }
   };
 
   ws.onclose = () => {
+    if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
     document.getElementById('ws-status').textContent = 'RECONNECTING';
     document.getElementById('ws-status').className = 'status disconnected';
     setTimeout(connectWebSocket, 3000);
