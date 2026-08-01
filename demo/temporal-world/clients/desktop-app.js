@@ -1,6 +1,55 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// ── RoundedBoxGeometry (beveled box for clay look) ─────────
+// Minimal implementation — creates a box with rounded edges.
+class RoundedBoxGeometry extends THREE.BufferGeometry {
+  constructor(w = 1, h = 1, d = 1, segments = 2, radius = 0.1) {
+    super();
+    const hw = w/2, hh = h/2, hd = d/2;
+    radius = Math.min(radius, hw, hh, hd);
+    const shape = new THREE.Shape();
+    const r = radius;
+    shape.moveTo(-hw + r, -hh);
+    shape.lineTo(hw - r, -hh);
+    shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
+    shape.lineTo(hw, hh - r);
+    shape.quadraticCurveTo(hw, hh, hw - r, hh);
+    shape.lineTo(-hw + r, hh);
+    shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
+    shape.lineTo(-hw, -hh + r);
+    shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+
+    const extrudeSettings = {
+      steps: 1,
+      depth: d - 2*r,
+      bevelEnabled: true,
+      bevelThickness: r,
+      bevelSize: r,
+      bevelOffset: 0,
+      bevelSegments: segments,
+    };
+    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geo.translate(0, 0, -(d - 2*r)/2);
+
+    // Copy to this geometry
+    this.copy(geo);
+  }
+}
+
+// ── Contact shadow helper ──────────────────────────────────
+function addContactShadow(parent, radius, opacity = 0.1) {
+  const geo = new THREE.CircleGeometry(radius, 20);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.005;
+  parent.add(mesh);
+  return mesh;
+}
+
 // ── Config ─────────────────────────────────────────────────
 const API_BASE = window.location.origin;
 const WS_BASE = `ws://${window.location.host}`;
@@ -223,15 +272,64 @@ const fill = new THREE.DirectionalLight(0xF2EEE5, 0.3);
 fill.position.set(-3, 4, -2);
 scene.add(fill);
 
+// Rim light — subtle backlight for depth separation
+const rim = new THREE.DirectionalLight(0xFFF5E6, 0.25);
+rim.position.set(0, 6, -5);
+scene.add(rim);
+
+// ── Seeded RNG (deterministic per entity) ─────────────────
+function mulberry32(seed) {
+  let s = seed | 0;
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return h;
+}
+
 // ── Clay material helper ───────────────────────────────────
+// Soft molded vinyl / matte toy plastic look.
+// - metalness = 0 (clay doesn't reflect metal)
+// - clearcoat gives subtle vinyl sheen (0.05–0.15)
+// - roughness varies per entity via seeded random
+// - flatShading: true for faceted clay feel
 function hex(color) {
   if (typeof color === 'number') return color;
   return parseInt(String(color).replace('#', ''), 16);
 }
 
+const CLAY_RANGES = {
+  building: [0.42, 0.52],
+  tree:     [0.60, 0.75],
+  ground:   [0.70, 0.80],
+  prop:     [0.35, 0.45],
+  path:     [0.55, 0.65],
+  person:   [0.45, 0.55],
+  default:  [0.50, 0.70],
+};
+
 function clayMat(color, opts = {}) {
-  const mat = new THREE.MeshStandardMaterial({
-    color: hex(color), roughness: opts.roughness ?? 0.84, metalness: 0, flatShading: false, ...opts
+  const entityType = opts.entityType || 'default';
+  const seed = opts.seed ?? hashStr(String(color));
+  const rng = mulberry32(seed);
+  const range = CLAY_RANGES[entityType] || CLAY_RANGES.default;
+  const roughness = opts.roughness ?? (range[0] + rng() * (range[1] - range[0]));
+  const clearcoat = opts.clearcoat ?? (entityType === 'prop' ? 0.12 : entityType === 'building' ? 0.08 : 0.05);
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: hex(color),
+    roughness,
+    metalness: 0,
+    clearcoat,
+    clearcoatRoughness: 0.4,
+    flatShading: true,
+    ...opts,
   });
   mat.userData = { baseColor: new THREE.Color(hex(color)) };
   return mat;
@@ -311,10 +409,12 @@ function loadFixture(fixture) {
     if (entity.type === 'base') {
       const w = entity.size?.[0] ?? 7, d = entity.size?.[1] ?? 7, h = entity.size?.[2] ?? 0.5;
       const baseG = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, 4, 2, 4), clayMat(P.warmWhiteR ?? 0xCEC7B8));
+      const bodyGeo = new RoundedBoxGeometry(w, h, d, 3, 0.12);
+      const body = new THREE.Mesh(bodyGeo, clayMat(P.warmWhiteR ?? 0xCEC7B8, { entityType: 'ground', seed: 500 }));
       body.position.y = -h / 2; body.castShadow = true; body.receiveShadow = true;
       baseG.add(body);
-      const top = new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, 0.06, d - 0.08, 4, 1, 4), clayMat(P.warmWhite ?? 0xF2EEE5));
+      const topGeo = new RoundedBoxGeometry(w - 0.08, 0.06, d - 0.08, 2, 0.03);
+      const top = new THREE.Mesh(topGeo, clayMat(P.warmWhite ?? 0xF2EEE5, { entityType: 'ground', seed: 501 }));
       top.position.y = 0.03; top.receiveShadow = true;
       baseG.add(top);
       scene.add(baseG);
@@ -386,62 +486,184 @@ function buildEntityFromFixture(entity, P) {
 function buildGate(entity, P) {
   const g = new THREE.Group();
   const bW = entity.size?.[0] ?? 4.2, bH = entity.size?.[1] ?? 3.2, bD = entity.size?.[2] ?? 1.6;
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(bW, bH, bD, 2, 2, 2), clayMat(P.warmWhite ?? 0xF2EEE5)), { position: new THREE.Vector3(0, bH/2, 0), castShadow: true, receiveShadow: true }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(bW+0.12, 0.2, bD+0.12), clayMat(P.warmWhiteR ?? 0xCEC7B8)), { position: new THREE.Vector3(0, 0.1, 0), castShadow: true }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, bD+0.15), clayMat(P.orange ?? 0xFF672A)), { position: new THREE.Vector3(0, 1.1, 0), castShadow: true }));
-  const archTop = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, bD+0.15, 16, 1, false, 0, Math.PI), clayMat(P.orange ?? 0xFF672A));
-  archTop.rotation.x = Math.PI/2; archTop.rotation.z = Math.PI/2; archTop.position.set(0, 2.2, 0); g.add(archTop);
+  const bevel = 0.14; // rounded edge radius
+
+  // Main building body — rounded box
+  const bodyGeo = new RoundedBoxGeometry(bW, bH, bD, 3, bevel);
+  const body = new THREE.Mesh(bodyGeo, clayMat(P.warmWhite ?? 0xF2EEE5, { entityType: 'building', seed: 100 }));
+  body.position.y = bH/2; body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+
+  // Base plinth — rounded
+  const baseGeo = new RoundedBoxGeometry(bW+0.12, 0.2, bD+0.12, 2, 0.06);
+  const base = new THREE.Mesh(baseGeo, clayMat(P.warmWhiteR ?? 0xCEC7B8, { entityType: 'building', seed: 101 }));
+  base.position.y = 0.1; base.castShadow = true;
+  g.add(base);
+
+  // Door arch — orange accent
+  const doorGeo = new RoundedBoxGeometry(1.6, 2.2, bD+0.15, 2, 0.08);
+  const door = new THREE.Mesh(doorGeo, clayMat(P.orange ?? 0xFF672A, { entityType: 'building', seed: 102 }));
+  door.position.y = 1.1; door.castShadow = true;
+  g.add(door);
+
+  // Arch top
+  const archTop = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 0.8, bD+0.15, 16, 1, false, 0, Math.PI),
+    clayMat(P.orange ?? 0xFF672A, { entityType: 'building', seed: 103 })
+  );
+  archTop.rotation.x = Math.PI/2; archTop.rotation.z = Math.PI/2;
+  archTop.position.set(0, 2.2, 0);
+  g.add(archTop);
+
+  // Windows — recessed with frames
   for (let side = -1; side <= 1; side += 2) {
     for (let i = 0; i < 2; i++) {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.6, 0.08), clayMat(P.charcoal ?? 0x202425, { roughness: 0.4 }));
-      win.position.set(side*(1.1+i*0.65), 1.8, bD/2+0.04); g.add(win);
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.67, 0.04), clayMat(P.warmWhiteR ?? 0xCEC7B8));
-      frame.position.copy(win.position); frame.position.z += 0.03; g.add(frame);
+      const win = new THREE.Mesh(
+        new THREE.BoxGeometry(0.45, 0.6, 0.08),
+        clayMat(P.charcoal ?? 0x202425, { entityType: 'prop', seed: 200 + side*10 + i })
+      );
+      win.position.set(side*(1.1+i*0.65), 1.8, bD/2+0.04);
+      g.add(win);
+      const frame = new THREE.Mesh(
+        new RoundedBoxGeometry(0.52, 0.67, 0.04, 1, 0.03),
+        clayMat(P.warmWhiteR ?? 0xCEC7B8, { entityType: 'building', seed: 210 + side*10 + i })
+      );
+      frame.position.copy(win.position); frame.position.z += 0.03;
+      g.add(frame);
     }
   }
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(bW+0.2, 0.18, bD+0.2), clayMat(P.orangeRim ?? 0xC9441D)), { position: new THREE.Vector3(0, bH+0.09, 0), castShadow: true }));
-  g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.45, 0.08), clayMat(P.orange ?? 0xFF672A)), { position: new THREE.Vector3(0, bH-0.35, bD/2+0.08), castShadow: true }));
+
+  // Top cornice — rounded
+  const corniceGeo = new RoundedBoxGeometry(bW+0.2, 0.18, bD+0.2, 2, 0.05);
+  const cornice = new THREE.Mesh(corniceGeo, clayMat(P.orangeRim ?? 0xC9441D, { entityType: 'building', seed: 300 }));
+  cornice.position.y = bH+0.09; cornice.castShadow = true;
+  g.add(cornice);
+
+  // Sign plate
+  const signGeo = new RoundedBoxGeometry(2.0, 0.45, 0.08, 2, 0.04);
+  const sign = new THREE.Mesh(signGeo, clayMat(P.orange ?? 0xFF672A, { entityType: 'prop', seed: 301 }));
+  sign.position.set(0, bH-0.35, bD/2+0.08); sign.castShadow = true;
+  g.add(sign);
+
+  // Pillars
   for (let side = -1; side <= 1; side += 2) {
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, bH, 8), clayMat(P.warmWhiteR ?? 0xCEC7B8));
-    pillar.position.set(side*(bW/2-0.15), bH/2, bD/2+0.08); pillar.castShadow = true; g.add(pillar);
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.14, bH, 8),
+      clayMat(P.warmWhiteR ?? 0xCEC7B8, { entityType: 'building', seed: 400 + side })
+    );
+    pillar.position.set(side*(bW/2-0.15), bH/2, bD/2+0.08);
+    pillar.castShadow = true;
+    g.add(pillar);
   }
+
+  // Contact shadow under building
+  addContactShadow(g, Math.max(bW, bD) * 0.55, 0.15);
+
   g.position.set(entity.position?.[0] ?? 0, entity.position?.[1] ?? 0, entity.position?.[2] ?? 0);
   return g;
 }
 
 function buildTree(entity, P) {
   const scale = entity.scale || 1, tH = entity.trunkHeight || 1.0, cR = entity.crownRadius || 0.7;
+  const seed = entity.seed ?? hashStr(entity.id || 'tree');
+  const rng = mulberry32(seed);
   const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06*scale, 0.1*scale, tH*scale, 8), clayMat(P.trunk ?? 0x6B4E3D));
+
+  // Trunk — slight taper, 6-sided for organic feel
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06*scale, 0.12*scale, tH*scale, 6),
+    clayMat(P.trunk ?? 0x6B4E3D, { entityType: 'tree', seed: seed + 1 })
+  );
   trunk.position.y = tH*scale/2; trunk.castShadow = true; tree.add(trunk);
-  for (let i = 0; i < 4; i++) {
-    const r = cR*scale*(0.6+Math.random()*0.5);
-    const blob = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), clayMat(i%2===0 ? (P.foliage1 ?? 0x7E9A27) : (P.foliage2 ?? 0xB7D83D)));
-    blob.position.set((Math.random()-0.5)*cR*scale*0.6, tH*scale+cR*scale*0.3+(Math.random()-0.3)*cR*scale*0.5, (Math.random()-0.5)*cR*scale*0.6);
-    blob.scale.y = 0.7+Math.random()*0.3; blob.castShadow = true; tree.add(blob);
+
+  // Crown — organic blobs with seeded squash
+  const blobCount = 3 + Math.floor(rng() * 3);
+  for (let i = 0; i < blobCount; i++) {
+    const r = cR*scale*(0.45 + rng()*0.4);
+    // Squashed sphere = organic blob shape
+    const geo = new THREE.SphereGeometry(r, 10, 8);
+    // Displace vertices for organic feel
+    const pos = geo.attributes.position;
+    for (let v = 0; v < pos.count; v++) {
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      const noise = 0.85 + rng() * 0.3;
+      pos.setXYZ(v, x * noise, y * (0.6 + rng()*0.35), z * noise);
+    }
+    geo.computeVertexNormals();
+
+    const color = i % 3 === 0 ? (P.foliage1 ?? 0x7E9A27) :
+                  i % 3 === 1 ? (P.foliage2 ?? 0xB7D83D) :
+                                 (P.foliage3 ?? 0x5B8C3E);
+    const blob = new THREE.Mesh(geo, clayMat(color, { entityType: 'tree', seed: seed + 10 + i }));
+    blob.position.set(
+      (rng()-0.5)*cR*scale*0.5,
+      tH*scale + cR*scale*0.2 + (rng()-0.3)*cR*scale*0.4,
+      (rng()-0.5)*cR*scale*0.5
+    );
+    blob.castShadow = true;
+    tree.add(blob);
   }
+
+  // Contact shadow (dark circle under tree)
+  const shadowGeo = new THREE.CircleGeometry(cR*scale*0.9, 16);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x000000, transparent: true, opacity: 0.12, depthWrite: false
+  });
+  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.01;
+  tree.add(shadow);
+
   tree.position.set(entity.position?.[0] ?? 0, entity.position?.[1] ?? 0, entity.position?.[2] ?? 0);
   return tree;
 }
 
 function buildCharacter(entity, P) {
   const s = entity.scale || 0.38;
+  const seed = entity.seed ?? hashStr(entity.id || 'char');
   const clothColor = P[entity.clothColor] ?? P.cloth1 ?? 0xFF672A;
   const c = new THREE.Group();
+
   for (let side = -1; side <= 1; side += 2) {
-    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.08*s, 0.35*s, 4, 8), clayMat(P.cloth2 ?? 0x3A3E3F));
-    leg.position.set(side*0.1*s, 0.2*s, 0); c.add(leg);
+    const leg = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.08*s, 0.35*s, 4, 8),
+      clayMat(P.cloth2 ?? 0x3A3E3F, { entityType: 'person', seed: seed + side })
+    );
+    leg.position.set(side*0.1*s, 0.2*s, 0);
+    c.add(leg);
   }
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.18*s, 0.3*s, 4, 8), clayMat(clothColor));
-  torso.position.y = 0.55*s; torso.castShadow = true; c.add(torso);
+  const torso = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.18*s, 0.3*s, 4, 8),
+    clayMat(clothColor, { entityType: 'person', seed: seed + 10 })
+  );
+  torso.position.y = 0.55*s; torso.castShadow = true;
+  c.add(torso);
+
   for (let side = -1; side <= 1; side += 2) {
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055*s, 0.28*s, 4, 8), clayMat(clothColor));
-    arm.position.set(side*0.24*s, 0.52*s, 0); arm.rotation.z = side*0.15; c.add(arm);
+    const arm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.055*s, 0.28*s, 4, 8),
+      clayMat(clothColor, { entityType: 'person', seed: seed + 20 + side })
+    );
+    arm.position.set(side*0.24*s, 0.52*s, 0); arm.rotation.z = side*0.15;
+    c.add(arm);
   }
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15*s, 10, 8), clayMat(P.skin ?? 0xF2D5B5));
-  head.position.y = 0.88*s; head.scale.y = 1.05; head.castShadow = true; c.add(head);
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.16*s, 10, 8, 0, Math.PI*2, 0, Math.PI*0.6), clayMat(P.charcoal ?? 0x202425));
-  hair.position.y = 0.9*s; c.add(hair);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15*s, 10, 8),
+    clayMat(P.skin ?? 0xF2D5B5, { entityType: 'person', seed: seed + 30 })
+  );
+  head.position.y = 0.88*s; head.scale.y = 1.05; head.castShadow = true;
+  c.add(head);
+
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16*s, 10, 8, 0, Math.PI*2, 0, Math.PI*0.6),
+    clayMat(P.charcoal ?? 0x202425, { entityType: 'person', seed: seed + 40 })
+  );
+  hair.position.y = 0.9*s;
+  c.add(hair);
+
+  // Tiny contact shadow
+  addContactShadow(c, 0.2*s, 0.08);
+
   c.position.set(entity.position?.[0] ?? 0, entity.position?.[1] ?? 0, entity.position?.[2] ?? 0);
   c.rotation.y = entity.rotation || 0;
   return c;
