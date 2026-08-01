@@ -1,0 +1,17 @@
+{
+  "id": "39be4cca-4f38-49e6-bea8-8aa7b2b5b09f",
+  "type": "initial_reconstruction",
+  "sourceFrame": {
+    "filename": "20260801_135617_0d7220af.jpg",
+    "path": "http://localhost:19999/images/20260801_135617_0d7220af.jpg",
+    "timestamp": 1785567902822
+  },
+  "temporalTarget": 0,
+  "constraints": null,
+  "priority": "normal",
+  "status": "processing",
+  "createdAt": 1785567902824,
+  "completedAt": null,
+  "result": null,
+  "error": null
+}

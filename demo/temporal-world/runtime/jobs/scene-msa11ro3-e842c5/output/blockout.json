@@ -1,0 +1,230 @@
+{
+  "type": "scene.blockout",
+  "sceneId": "scene-msa11rod",
+  "entities": [
+    {
+      "id": "building_main",
+      "geometry": {
+        "builder": "stylized-building",
+        "parameters": {
+          "floors": 4,
+          "width": 5,
+          "depth": 2.5,
+          "cornerRadius": 0.14,
+          "windowColumns": 8
+        }
+      },
+      "material": {
+        "color": "#C4A882",
+        "roughness": 0.45,
+        "metalness": 0,
+        "clearcoat": 0.08,
+        "opacity": 1
+      },
+      "position": [
+        0,
+        0,
+        -2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "tree_oak_1",
+      "geometry": {
+        "builder": "organic-tree",
+        "parameters": {
+          "height": 3.5,
+          "crownRadius": 1.8,
+          "trunkRadius": 0.15,
+          "seed": 42
+        }
+      },
+      "material": {
+        "color": "#5B8C3E",
+        "roughness": 0.7,
+        "metalness": 0,
+        "clearcoat": 0.05,
+        "opacity": 1
+      },
+      "position": [
+        -3,
+        0,
+        -1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "tree_pine_1",
+      "geometry": {
+        "builder": "organic-tree",
+        "parameters": {
+          "height": 4,
+          "crownRadius": 1.2,
+          "trunkRadius": 0.12,
+          "seed": 77
+        }
+      },
+      "material": {
+        "color": "#3E6B2E",
+        "roughness": 0.72,
+        "metalness": 0,
+        "clearcoat": 0.05,
+        "opacity": 1
+      },
+      "position": [
+        3.5,
+        0,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "path_main",
+      "geometry": {
+        "builder": "flat-path",
+        "parameters": {
+          "width": 2,
+          "length": 8,
+          "curve": 0.1
+        }
+      },
+      "material": {
+        "color": "#D4C5A9",
+        "roughness": 0.65,
+        "metalness": 0,
+        "clearcoat": 0.04,
+        "opacity": 1
+      },
+      "position": [
+        0,
+        0.01,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "ground",
+      "geometry": {
+        "builder": "ground-plane",
+        "parameters": {
+          "width": 16,
+          "depth": 16,
+          "subdivisions": 8
+        }
+      },
+      "material": {
+        "color": "#8BC34A",
+        "roughness": 0.75,
+        "metalness": 0,
+        "clearcoat": 0.02,
+        "opacity": 1
+      },
+      "position": [
+        0,
+        -0.05,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "camera": {
+    "position": [
+      8,
+      6,
+      8
+    ],
+    "target": [
+      0,
+      0.5,
+      0
+    ],
+    "fov": 45,
+    "near": 0.1,
+    "far": 100
+  },
+  "lighting": {
+    "key": {
+      "color": "#FFE4B5",
+      "intensity": 1.2,
+      "position": [
+        5,
+        8,
+        3
+      ]
+    },
+    "fill": {
+      "color": "#E8E0D4",
+      "intensity": 0.4,
+      "position": [
+        -3,
+        4,
+        -2
+      ]
+    },
+    "rim": {
+      "color": "#FFF5E6",
+      "intensity": 0.3,
+      "position": [
+        0,
+        6,
+        -5
+      ]
+    },
+    "ambient": {
+      "color": "#F7F5EF",
+      "intensity": 0.5,
+      "position": [
+        0,
+        0,
+        0
+      ]
+    },
+    "contactShadow": true,
+    "shadowIntensity": 0.3
+  }
+}

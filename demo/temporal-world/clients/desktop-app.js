@@ -121,26 +121,20 @@ async function initSession() {
 
 async function fetchSceneData(sid) {
   setSceneState('processing');
-  try {
-    const res = await fetch(`${API_BASE}/api/scene/${sid}`);
-    if (res.status === 404) {
-      setSceneState('waiting');
+  // Try per-session scene first, then fall back to global scene
+  const urls = [`${API_BASE}/api/scene/${sid}`, `${API_BASE}/api/scene`];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) continue;
+      if (!res.ok) continue;
+      const fixture = await res.json();
+      if (!fixture || !fixture.entities || fixture.entities.length === 0) continue;
+      loadFixture(fixture);
       return;
-    }
-    if (!res.ok) {
-      setSceneState('error', { message: `Server error (${res.status})` });
-      return;
-    }
-    const fixture = await res.json();
-    if (!fixture || !fixture.entities || fixture.entities.length === 0) {
-      setSceneState('waiting');
-      return;
-    }
-    loadFixture(fixture);
-  } catch (e) {
-    console.warn('[Desktop] Failed to fetch scene:', e);
-    setSceneState('error', { message: 'Could not load scene' });
+    } catch { /* try next URL */ }
   }
+  setSceneState('waiting');
 }
 
 let pollTimer = null;
@@ -382,11 +376,13 @@ function loadFixture(fixture) {
   timelineIntervals = fixture.temporalSpec?.timelineIntervals || [];
 
   // Add ground
-  const groundEntity = fixture.entities.find(e => e.type === 'ground');
+  const groundEntity = fixture.entities.find(e => e.type === 'ground' || e.type === 'terrain');
   if (groundEntity) {
+    const gw = groundEntity.size?.[0] ?? groundEntity.geometry?.parameters?.width ?? 60;
+    const gd = groundEntity.size?.[1] ?? groundEntity.geometry?.parameters?.depth ?? 60;
     const g = new THREE.Mesh(
-      new THREE.PlaneGeometry(groundEntity.size?.[0] ?? 60, groundEntity.size?.[1] ?? 60),
-      clayMat(P.charcoal ?? 0x202425, { roughness: 1 })
+      new THREE.PlaneGeometry(gw, gd),
+      clayMat(groundEntity.material?.color ?? (P.charcoal ?? 0x202425), { entityType: 'ground', seed: 999 })
     );
     g.rotation.x = -Math.PI / 2;
     g.position.y = groundEntity.position?.[1] ?? -0.52;
@@ -405,7 +401,7 @@ function loadFixture(fixture) {
 
   // Build all entities
   for (const entity of fixture.entities) {
-    if (entity.type === 'ground') continue;
+    if (entity.type === 'ground' || entity.type === 'terrain') continue;
     if (entity.type === 'base') {
       const w = entity.size?.[0] ?? 7, d = entity.size?.[1] ?? 7, h = entity.size?.[2] ?? 0.5;
       const baseG = new THREE.Group();
@@ -465,7 +461,15 @@ function buildRoadFromFixture(entity, P) {
 }
 
 function buildEntityFromFixture(entity, P) {
-  switch (entity.type) {
+  // Map canonical scene types to desktop builder types
+  const typeMap = {
+    'building': 'gate', 'tree': 'tree', 'path': 'road', 'terrain': 'ground',
+    'road': 'road', 'vehicle': 'bicycle', 'person': 'character', 'prop': 'bench',
+    'furniture': 'bench', 'sign': 'streetSign', 'light-pole': 'lampPost',
+  };
+  const t = typeMap[entity.type] || entity.type;
+
+  switch (t) {
     case 'gate': return buildGate(entity, P);
     case 'tree': return buildTree(entity, P);
     case 'character': return buildCharacter(entity, P);
@@ -474,6 +478,7 @@ function buildEntityFromFixture(entity, P) {
     case 'bicycle': return buildBicycle(entity, P);
     case 'lampPost': return buildLampPost(entity, P);
     case 'flowerBed': return buildFlowerBed(entity, P);
+    case 'road': return buildRoadFromEntity(entity, P);
     default: {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), clayMat(P.warmWhite ?? 0xF2EEE5)));
@@ -483,14 +488,32 @@ function buildEntityFromFixture(entity, P) {
   }
 }
 
+// Build a road/path from canonical entity spec
+function buildRoadFromEntity(entity, P) {
+  const g = new THREE.Group();
+  const w = entity.geometry?.parameters?.width ?? 2;
+  const l = entity.geometry?.parameters?.length ?? 8;
+  const road = new THREE.Mesh(
+    new RoundedBoxGeometry(w, 0.04, l, 2, 0.01),
+    clayMat(entity.material?.color ?? (P.road ?? 0x9E9688), { entityType: 'path', seed: hashStr(entity.id || 'road') })
+  );
+  road.position.y = 0.02; road.receiveShadow = true;
+  g.add(road);
+  g.position.set(entity.position?.[0] ?? 0, entity.position?.[1] ?? 0, entity.position?.[2] ?? 0);
+  return g;
+}
+
 function buildGate(entity, P) {
   const g = new THREE.Group();
-  const bW = entity.size?.[0] ?? 4.2, bH = entity.size?.[1] ?? 3.2, bD = entity.size?.[2] ?? 1.6;
-  const bevel = 0.14; // rounded edge radius
+  const bW = entity.size?.[0] ?? entity.geometry?.parameters?.width ?? 4.2;
+  const bH = entity.size?.[1] ?? entity.geometry?.parameters?.height ?? 3.2;
+  const bD = entity.size?.[2] ?? entity.geometry?.parameters?.depth ?? 1.6;
+  const bevel = entity.geometry?.parameters?.cornerRadius ?? 0.14;
+  const matColor = entity.material?.color ?? (P.warmWhite ?? 0xF2EEE5);
 
   // Main building body — rounded box
   const bodyGeo = new RoundedBoxGeometry(bW, bH, bD, 3, bevel);
-  const body = new THREE.Mesh(bodyGeo, clayMat(P.warmWhite ?? 0xF2EEE5, { entityType: 'building', seed: 100 }));
+  const body = new THREE.Mesh(bodyGeo, clayMat(matColor, { entityType: 'building', seed: hashStr(entity.id || 'gate') }));
   body.position.y = bH/2; body.castShadow = true; body.receiveShadow = true;
   g.add(body);
 
@@ -564,10 +587,13 @@ function buildGate(entity, P) {
 }
 
 function buildTree(entity, P) {
-  const scale = entity.scale || 1, tH = entity.trunkHeight || 1.0, cR = entity.crownRadius || 0.7;
+  const scale = entity.scale?.[0] ?? entity.scale ?? 1;
+  const tH = entity.geometry?.parameters?.height ?? entity.trunkHeight ?? 1.0;
+  const cR = entity.geometry?.parameters?.crownRadius ?? entity.crownRadius ?? 0.7;
   const seed = entity.seed ?? hashStr(entity.id || 'tree');
   const rng = mulberry32(seed);
   const tree = new THREE.Group();
+  const matColor = entity.material?.color ?? (P.foliage2 ?? 0xB7D83D);
 
   // Trunk — slight taper, 6-sided for organic feel
   const trunk = new THREE.Mesh(
@@ -591,8 +617,8 @@ function buildTree(entity, P) {
     }
     geo.computeVertexNormals();
 
-    const color = i % 3 === 0 ? (P.foliage1 ?? 0x7E9A27) :
-                  i % 3 === 1 ? (P.foliage2 ?? 0xB7D83D) :
+    const color = i % 3 === 0 ? matColor :
+                  i % 3 === 1 ? (P.foliage1 ?? 0x7E9A27) :
                                  (P.foliage3 ?? 0x5B8C3E);
     const blob = new THREE.Mesh(geo, clayMat(color, { entityType: 'tree', seed: seed + 10 + i }));
     blob.position.set(
