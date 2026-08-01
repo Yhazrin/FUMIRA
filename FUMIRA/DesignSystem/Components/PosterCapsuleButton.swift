@@ -21,10 +21,14 @@ struct PosterCapsuleButton: View {
                 .minimumScaleFactor(0.72)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 56)
-                .background(background)
-                .clipShape(Capsule())
         }
-        .buttonStyle(PosterCapsulePressStyle())
+        .clayButtonStyle(
+            base: baseColor,
+            rim: rimColor,
+            foreground: foregroundColor,
+            cornerRadius: ClayShape.pill,
+            depth: 5
+        )
         .frame(maxWidth: .infinity)
         .accessibilityLabel(title)
         .accessibilityHint(accessibilityHint ?? "")
@@ -32,22 +36,34 @@ struct PosterCapsuleButton: View {
 
     private var foregroundColor: Color {
         switch style {
-        case .primary, .accent:
-            PosterPalette.paperWhite
+        case .primary:
+            ClayPalette.warmWhite
         case .secondary:
-            PosterPalette.actionBlueDeep
+            ClayPalette.timeBlueRim
+        case .accent:
+            ClayPalette.charcoal
         }
     }
 
-    @ViewBuilder
-    private var background: some View {
+    private var baseColor: Color {
         switch style {
         case .primary:
-            PosterPalette.actionBlue
+            ClayPalette.timeBlue
         case .secondary:
-            PosterPalette.actionBlue.opacity(0.12)
+            ClayPalette.warmWhite
         case .accent:
-            PosterPalette.actionBlueDeep
+            ClayPalette.orange
+        }
+    }
+
+    private var rimColor: Color {
+        switch style {
+        case .primary:
+            ClayPalette.timeBlueRim
+        case .secondary:
+            ClayPalette.warmWhiteRim
+        case .accent:
+            ClayPalette.orangeDepth
         }
     }
 }

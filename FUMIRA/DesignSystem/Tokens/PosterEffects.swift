@@ -18,11 +18,11 @@ enum PosterEffects {
     static let cameraChromeFill = ClayPalette.charcoal.opacity(0.42)
     static let cameraChromeStroke = ClayPalette.warmWhite.opacity(0.28)
     static let cameraActionFill = ClayPalette.orange
-    static let cameraActionForeground = ClayPalette.warmWhite
+    static let cameraActionForeground = ClayPalette.charcoal
     static let cameraActionStroke = ClayPalette.orangeRim.opacity(0.28)
 
     /// 紧凑反馈
-    static let cameraChromeSolidFill = ClayPalette.orangeRim
+    static let cameraChromeSolidFill = ClayPalette.orangeDepth
     static let cameraChromeSolidForeground = ClayPalette.warmWhite
     static let cameraChromeSolidStroke = ClayPalette.orange.opacity(0.72)
     static let cameraChromeFeedbackShadowRadius: CGFloat = 4

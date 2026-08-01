@@ -6,6 +6,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { JobDispatcher } from './job-dispatcher.js';
 import { SceneCompiler } from './scene-compiler.js';
+import { XiaomiProvider } from './xiaomi-provider.js';
+import { ClaudeWorker } from './claude-worker.js';
+import { JobOrchestrator } from './orchestrator.js';
+import { TemporalEngine } from './temporal-engine.js';
 import { CONFIG } from '../config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +73,99 @@ jobDispatcher.start().then(() => {
   console.warn('JobDispatcher failed to start:', err.message);
 });
 
+// ── Orchestrator Pipeline ──────────────────────────────────
+// The orchestrator coordinates the full two-phase pipeline:
+//   FAST PATH  : Xiaomi vision -> CanonicalSceneSpec -> Clay blockout -> instant display
+//   REFINEMENT : Claude Worker -> refined geometry -> hot swap
+
+const JOBS_DIR = path.resolve(__dirname, '../runtime/jobs');
+
+const xiaomiProvider = new XiaomiProvider({
+  apiKey: process.env.XIAOMI_API_KEY || '',
+  mock: !process.env.XIAOMI_API_KEY, // mock mode by default for demo
+});
+
+// ClaudeWorker needs a forge scripts dir; fall back to the scripts dir if not set
+const forgeScriptsDir = process.env.FORGE_SCRIPTS_DIR || path.resolve(__dirname, '../scripts');
+const claudeWorker = new ClaudeWorker({
+  forgeScriptsDir,
+  maxConcurrent: 1,
+  defaultTimeoutMs: 120_000,
+});
+
+const orchestrator = new JobOrchestrator({
+  xiaomiProvider,
+  claudeWorker,
+  sceneCompiler,
+  jobsDir: JOBS_DIR,
+  maxConcurrent: 1,
+});
+
+// Forward orchestrator events to all WebSocket clients
+orchestrator.on('blockout:ready', (data) => {
+  broadcastGlobal({
+    type: 'scene.update',
+    action: 'blockout',
+    ...data,
+  });
+  // Also broadcast on the scene WS channel
+  broadcastSceneWs({
+    type: 'scene.update',
+    action: 'blockout',
+    ...data,
+  });
+});
+
+orchestrator.on('entity:refined', (data) => {
+  broadcastGlobal({
+    type: 'scene.entity.updated',
+    action: 'refined',
+    ...data,
+  });
+  broadcastSceneWs({
+    type: 'scene.entity.updated',
+    action: 'refined',
+    ...data,
+  });
+});
+
+orchestrator.on('job:progress', (data) => {
+  broadcastGlobal({
+    type: 'scene.reconstruction.progress',
+    ...data,
+  });
+});
+
+orchestrator.on('job:completed', (data) => {
+  broadcastGlobal({
+    type: 'scene.reconstruction.progress',
+    phase: 'completed',
+    ...data,
+  });
+});
+
+orchestrator.on('job:failed', (data) => {
+  broadcastGlobal({
+    type: 'scene.reconstruction.progress',
+    phase: 'failed',
+    ...data,
+  });
+});
+
+orchestrator.on('job:refinement-error', (data) => {
+  broadcastGlobal({
+    type: 'scene.reconstruction.progress',
+    phase: 'refinement-error',
+    ...data,
+  });
+});
+
+// TemporalEngine instance (lazily created when a scene is loaded)
+let temporalEngine = null;
+
+console.log('Orchestrator pipeline initialized (mock mode:', !process.env.XIAOMI_API_KEY, ')');
+console.log('Jobs directory:', JOBS_DIR);
+
 // ── Session Store ──────────────────────────────────────────
 const sessions = new Map();
 
@@ -112,6 +209,16 @@ function broadcastGlobal(data) {
         ws.send(msg);
       }
     });
+  }
+}
+
+// Broadcast to all scene WebSocket clients
+function broadcastSceneWs(data) {
+  const msg = JSON.stringify(data);
+  for (const ws of sceneWsClients) {
+    if (ws.readyState === 1) {
+      ws.send(msg);
+    }
   }
 }
 
@@ -167,6 +274,40 @@ app.get('/api/jobs', (req, reply) => {
 
 app.get('/api/jobs/:id', (req, reply) => {
   const job = jobDispatcher.getJobStatus(req.params.id);
+  if (!job) return reply.code(404).send({ error: 'Job not found' });
+  return job;
+});
+
+// ── Orchestrator Reconstruction API ────────────────────────────
+// These endpoints use the full orchestrator pipeline (Xiaomi -> Clay -> Claude).
+
+app.post('/api/orchestrator/reconstruct', async (req, reply) => {
+  const { photoPath, source, temporalTarget, priority, constraints } = req.body || {};
+  if (!photoPath) {
+    return reply.code(400).send({ error: 'photoPath is required (absolute path to photo file)' });
+  }
+
+  try {
+    const jobId = await orchestrator.submitPhoto(photoPath, {
+      source: source || 'upload',
+      temporalTarget,
+      priority: priority || 'normal',
+      constraints,
+    });
+    return { jobId, status: 'pending' };
+  } catch (err) {
+    return reply.code(500).send({ error: err.message });
+  }
+});
+
+app.get('/api/orchestrator/jobs', (req, reply) => {
+  const { status } = req.query || {};
+  const jobs = orchestrator.listJobs({ status });
+  return { jobs };
+});
+
+app.get('/api/orchestrator/jobs/:id', (req, reply) => {
+  const job = orchestrator.getJob(req.params.id);
   if (!job) return reply.code(404).send({ error: 'Job not found' });
   return job;
 });
@@ -280,6 +421,26 @@ app.get('/ws', { websocket: true }, (socket, req) => {
             msg.priority || 'normal',
           );
           socket.send(JSON.stringify({ type: 'reconstruction.queued', jobId }));
+          break;
+        }
+
+        case 'orchestrator.reconstruct': {
+          // Full orchestrator pipeline: Xiaomi -> Clay blockout -> Claude refinement
+          const photoPath = msg.photoPath || msg.path || '';
+          if (!photoPath) {
+            socket.send(JSON.stringify({ type: 'error', message: 'photoPath is required' }));
+            break;
+          }
+          orchestrator.submitPhoto(photoPath, {
+            source: msg.source || 'ws',
+            temporalTarget: msg.temporalTarget,
+            priority: msg.priority || 'normal',
+            constraints: msg.constraints,
+          }).then(jobId => {
+            socket.send(JSON.stringify({ type: 'orchestrator.queued', jobId }));
+          }).catch(err => {
+            socket.send(JSON.stringify({ type: 'error', message: err.message }));
+          });
           break;
         }
 

@@ -15,6 +15,7 @@ enum ClayPalette {
 
     static let orange = Color(hex: 0xFF672A)
     static let orangeRim = Color(hex: 0xC9441D)
+    static let orangeDepth = Color(hex: 0xA93618)
     static let timeBlue = Color(hex: 0x4A90D9)
     static let timeBlueRim = Color(hex: 0x3570A8)
     static let parkGreen = Color(hex: 0x8FCB7E)

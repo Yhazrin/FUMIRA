@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// Animation and spring tokens for Clay OS.
-/// All clay interactions use spring-based feedback.
+/// Clay interaction timing. Direct manipulation stays quick and controlled;
+/// larger spatial transitions may still use springs.
 enum ClayMotion {
 
     // MARK: - Springs
 
     /// Button press / release feedback.
-    static let buttonSpring = Animation.spring(response: 0.23, dampingFraction: 0.62)
+    static let buttonSpring = Animation.smooth(duration: 0.18)
 
     /// Panel / card entrance.
     static let panelSpring = Animation.spring(response: 0.35, dampingFraction: 0.70)
@@ -23,8 +24,8 @@ enum ClayMotion {
 
     // MARK: - Transitions
 
-    static let pressScale: CGFloat = 0.975
-    static let pressOffsetY: CGFloat = 5
+    static let pressScale: CGFloat = 0.995
+    static let pressOffsetY: CGFloat = 4
 
     // MARK: - Duration (for non-spring animations)
 

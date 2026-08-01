@@ -10,13 +10,13 @@ enum Clay3DStyle {
     // MARK: - Material roughness (0 = mirror, 1 = fully rough)
 
     /// Default clay surface roughness — matte but not dead flat.
-    static let surfaceRoughness: Float = 0.82
+    static let surfaceRoughness: Float = 0.52
 
     /// Slightly smoother for interactive elements (buttons, dials).
-    static let interactiveRoughness: Float = 0.75
+    static let interactiveRoughness: Float = 0.44
 
     /// Very rough for background / environment surfaces.
-    static let environmentRoughness: Float = 0.95
+    static let environmentRoughness: Float = 0.76
 
     // MARK: - Material metalness
 
@@ -44,21 +44,21 @@ enum Clay3DStyle {
     static let primaryLightDirection = (x: Float(-0.4), y: Float(0.8), z: Float(0.6))
 
     /// Ambient light intensity multiplier.
-    static let ambientIntensity: Float = 0.35
+    static let ambientIntensity: Float = 0.50
 
     /// Key light intensity multiplier.
-    static let keyLightIntensity: Float = 1.0
+    static let keyLightIntensity: Float = 1.20
 
     /// Fill light intensity multiplier.
-    static let fillLightIntensity: Float = 0.25
+    static let fillLightIntensity: Float = 0.40
 
     // MARK: - Contact shadow
 
     /// Shadow softness for contact shadows in 3D scenes.
-    static let contactShadowSoftness: Float = 0.6
+    static let contactShadowSoftness: Float = 0.78
 
     /// Shadow opacity at contact point.
-    static let contactShadowOpacity: Float = 0.33
+    static let contactShadowOpacity: Float = 0.24
 
     // MARK: - Corners
 
@@ -73,10 +73,10 @@ enum Clay3DStyle {
 
     /// Grain scale — controls the density of surface noise.
     /// Lower = finer grain, higher = coarser.
-    static let grainScale: Float = 13.0
+    static let grainScale: Float = 18.0
 
     /// Grain intensity — how visible the surface texture is.
-    static let grainIntensity: Float = 0.14
+    static let grainIntensity: Float = 0.045
 
     // MARK: - Vegetation / organic shapes
 

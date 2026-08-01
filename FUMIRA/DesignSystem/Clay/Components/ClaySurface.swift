@@ -41,7 +41,7 @@ struct ClaySurface: View {
                 }
                 // Grain texture
                 .overlay {
-                    ClayNoiseTexture(opacity: 0.14)
+                    ClayNoiseTexture(opacity: 0.04)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 }
                 // Edge stroke
@@ -53,7 +53,7 @@ struct ClaySurface: View {
                                 startPoint: ClayShadow.edgeStrokeStart,
                                 endPoint: ClayShadow.edgeStrokeEnd
                             ),
-                            lineWidth: 2
+                            lineWidth: 1
                         )
                 }
         }

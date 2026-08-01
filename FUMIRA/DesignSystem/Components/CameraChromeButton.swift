@@ -34,7 +34,13 @@ struct CameraChromeButton: View {
                 rotation: rotation
             )
         }
-        .buttonStyle(ClayPressButtonStyle())
+        .clayButtonStyle(
+            base: PosterEffects.cameraActionFill,
+            rim: ClayPalette.orangeDepth,
+            foreground: PosterEffects.cameraActionForeground,
+            cornerRadius: ClayShape.pill,
+            depth: 4
+        )
         .disabled(!isEnabled)
         .frame(
             minWidth: CameraChromeMetrics.controlDiameter,
@@ -55,30 +61,15 @@ struct CameraChromeGlyph: View {
             .font(ClayTypography.label)
             .foregroundStyle(
                 isEnabled
-                    ? ClayPalette.warmWhite
-                    : ClayPalette.warmWhite.opacity(0.35)
+                    ? PosterEffects.cameraActionForeground
+                    : PosterEffects.cameraActionForeground.opacity(0.35)
             )
             .rotationEffect(rotation)
             .frame(
                 width: CameraChromeMetrics.controlDiameter,
                 height: CameraChromeMetrics.controlDiameter
             )
-            .background {
-                Circle()
-                    .fill(ClayPalette.orange)
-            }
-            .clipShape(Circle())
             .contentShape(Circle())
-    }
-}
-
-/// 按压反馈按钮样式
-private struct ClayPressButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(ClayMotion.buttonSpring, value: configuration.isPressed)
     }
 }
 

@@ -32,48 +32,14 @@ struct ClayIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size * 0.40, weight: .bold))
-                .foregroundStyle(foreground)
                 .frame(width: size, height: size)
-                .background {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(rim)
-                            .offset(y: ClayShape.rimOffset - 2)
-
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(base)
-                            .overlay {
-                                LinearGradient(
-                                    stops: ClayShadow.highlightStops,
-                                    startPoint: ClayShadow.highlightStart,
-                                    endPoint: ClayShadow.highlightEnd
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                            }
-                            .overlay {
-                                ClayNoiseTexture(opacity: 0.12)
-                                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                            }
-                            .overlay {
-                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: ClayShadow.edgeStrokeColors,
-                                            startPoint: ClayShadow.edgeStrokeStart,
-                                            endPoint: ClayShadow.edgeStrokeEnd
-                                        ),
-                                        lineWidth: 1.5
-                                    )
-                            }
-                    }
-                }
-                .shadow(
-                    color: ClayShadow.small.color,
-                    radius: ClayShadow.small.radius,
-                    x: ClayShadow.small.x,
-                    y: ClayShadow.small.y
-                )
         }
-        .buttonStyle(.plain)
+        .clayButtonStyle(
+            base: base,
+            rim: rim,
+            foreground: foreground,
+            cornerRadius: cornerRadius,
+            depth: 4
+        )
     }
 }

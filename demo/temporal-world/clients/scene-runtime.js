@@ -621,6 +621,193 @@ export class SceneRuntime {
   }
 
   /**
+   * Apply a blockout scene quickly.
+   *
+   * Creates basic Clay geometry for each entity immediately, without
+   * waiting for the full reconstruction pipeline.  This gives the user
+   * instant visual feedback from the fast path (Xiaomi vision).
+   *
+   * Blockout shape:
+   * ```
+   * {
+   *   type: 'scene.blockout',
+   *   sceneId: '...',
+   *   entities: [
+   *     { id, geometry: { type, args }, material: { color, roughness }, position, rotation, scale },
+   *     ...
+   *   ],
+   *   camera: { position, target },
+   *   lighting: { ambient: {...}, directional: {...} },
+   * }
+   * ```
+   *
+   * @param {object} blockoutData — a blockout descriptor from the orchestrator
+   */
+  applyBlockout(blockoutData) {
+    if (!blockoutData || !Array.isArray(blockoutData.entities)) return;
+
+    // Clear existing entities
+    this._entities.forEach(({ object3d }) => {
+      this.scene.remove(object3d);
+      this._disposeObject(object3d);
+    });
+    this._entities.clear();
+    this._nodesById.clear();
+
+    // Add basic lighting if provided
+    if (blockoutData.lighting) {
+      const { ambient, directional } = blockoutData.lighting;
+      if (ambient) {
+        const ambLight = new THREE.AmbientLight(
+          hexColor(ambient.color || '#F7F5EF'),
+          ambient.intensity ?? 0.5,
+        );
+        this.scene.add(ambLight);
+      }
+      if (directional) {
+        const dirLight = new THREE.DirectionalLight(
+          hexColor(directional.color || '#FFE4B5'),
+          directional.intensity ?? 0.8,
+        );
+        if (directional.position) {
+          dirLight.position.fromArray(directional.position);
+        }
+        dirLight.castShadow = true;
+        this.scene.add(dirLight);
+      }
+    }
+
+    // Create Clay geometry for each blockout entity
+    for (const entity of blockoutData.entities) {
+      const nodeId = `blockout_${entity.id}`;
+
+      // Convert blockout geometry spec to Three.js geometry
+      const geom = entity.geometry || {};
+      let geometry;
+      if (geom.type && THREE[geom.type]) {
+        const args = Array.isArray(geom.args) ? geom.args : [];
+        geometry = new THREE[geom.type](...args);
+      } else {
+        geometry = createGeometry(geom);
+      }
+
+      const material = createMaterial(entity.material);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      // Apply transform
+      if (entity.position) mesh.position.fromArray(entity.position);
+      if (entity.rotation) mesh.rotation.fromArray(entity.rotation);
+      if (entity.scale) {
+        if (typeof entity.scale === 'number') {
+          mesh.scale.setScalar(entity.scale);
+        } else {
+          mesh.scale.fromArray(entity.scale);
+        }
+      }
+
+      mesh.userData.nodeId = nodeId;
+      mesh.userData.entityId = entity.id;
+
+      this.scene.add(mesh);
+      this._nodesById.set(nodeId, mesh);
+      this._entities.set(entity.id, {
+        object3d: mesh,
+        spec: { id: entity.id, category: entity.type || 'prop' },
+        interpolationTables: {},
+      });
+    }
+
+    // Apply camera if provided
+    if (blockoutData.camera) {
+      this._emit('blockoutApplied', {
+        camera: blockoutData.camera,
+        entityCount: blockoutData.entities.length,
+      });
+    }
+
+    this._emit('manifestLoaded', {
+      type: 'scene.blockout',
+      sceneId: blockoutData.sceneId,
+      entityCount: blockoutData.entities.length,
+    });
+  }
+
+  /**
+   * Hot-swap an entity's geometry and/or material with refined data.
+   *
+   * Called when the Claude Worker finishes refining a single entity.
+   * Replaces the blockout geometry with a higher-fidelity version
+   * without disrupting other entities in the scene.
+   *
+   * @param {string} entityId — the entity to refine
+   * @param {object} refinedData — refined entity data:
+   *   ```
+   *   {
+   *     geometry: { type, args } | { builder, parameters },
+   *     material: { color, roughness, metalness, ... },
+   *     position: [x, y, z],
+   *     rotation: [x, y, z],
+   *     scale: [x, y, z] | number,
+   *   }
+   *   ```
+   */
+  refineEntity(entityId, refinedData) {
+    const entry = this._entities.get(entityId);
+    if (!entry) {
+      console.warn(`[SceneRuntime] refineEntity: unknown entity "${entityId}"`);
+      return;
+    }
+
+    const oldMesh = entry.object3d;
+
+    // Build new geometry if provided
+    if (refinedData.geometry) {
+      const geomSpec = refinedData.geometry;
+      let newGeom;
+
+      if (geomSpec.builder) {
+        // Builder-style geometry from Claude Worker — convert to basic Three.js
+        newGeom = createGeometry({
+          type: 'BoxGeometry',
+          args: [
+            geomSpec.parameters?.width ?? 1,
+            geomSpec.parameters?.height ?? 1,
+            geomSpec.parameters?.depth ?? 1,
+          ],
+        });
+      } else {
+        newGeom = createGeometry(geomSpec);
+      }
+
+      // Dispose old geometry and assign new
+      oldMesh.geometry.dispose();
+      oldMesh.geometry = newGeom;
+    }
+
+    // Swap material if provided
+    if (refinedData.material) {
+      const newMat = createMaterial(refinedData.material);
+      oldMesh.material.dispose();
+      oldMesh.material = newMat;
+    }
+
+    // Update transform if provided
+    if (refinedData.position) oldMesh.position.fromArray(refinedData.position);
+    if (refinedData.rotation) oldMesh.rotation.fromArray(refinedData.rotation);
+    if (refinedData.scale) {
+      if (typeof refinedData.scale === 'number') {
+        oldMesh.scale.setScalar(refinedData.scale);
+      } else {
+        oldMesh.scale.fromArray(refinedData.scale);
+      }
+    }
+
+    this._emit('entityUpdated', { entityId, object3d: oldMesh, refined: true });
+  }
+
+  /**
    * Dispose of all resources.
    */
   dispose() {

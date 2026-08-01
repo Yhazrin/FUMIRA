@@ -308,14 +308,19 @@ struct ResultView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(ClayPalette.orangeRim)
                 .frame(
                     width: 56,
                     height: 56
                 )
                 .contentShape(Circle())
         }
-        .buttonStyle(PosterPressStyle())
+        .clayButtonStyle(
+            base: ClayPalette.warmWhite,
+            rim: ClayPalette.warmWhiteRim,
+            foreground: ClayPalette.orangeDepth,
+            cornerRadius: ClayShape.pill,
+            depth: 4
+        )
         .accessibilityLabel(title)
     }
 
@@ -325,22 +330,22 @@ struct ResultView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(
                     isTiltTimeActive
-                        ? ClayPalette.warmWhite
-                        : ClayPalette.orangeRim
+                        ? ClayPalette.charcoal
+                        : ClayPalette.orangeDepth
                 )
                 .frame(
                     width: 56,
                     height: 56
                 )
-                .background(
-                    isTiltTimeActive
-                        ? ClayPalette.orangeRim
-                        : Color.clear,
-                    in: Circle()
-                )
                 .contentShape(Circle())
         }
-        .buttonStyle(PosterPressStyle())
+        .clayButtonStyle(
+            base: isTiltTimeActive ? ClayPalette.orange : ClayPalette.warmWhite,
+            rim: isTiltTimeActive ? ClayPalette.orangeDepth : ClayPalette.warmWhiteRim,
+            foreground: isTiltTimeActive ? ClayPalette.charcoal : ClayPalette.orangeDepth,
+            cornerRadius: ClayShape.pill,
+            depth: 4
+        )
         .disabled(model.isPreparingBrowsedTimeGeneration)
         .posterSensoryFeedback(trigger: isTiltTimeActive, .selection)
         .accessibilityIdentifier("result.tilt-time")
@@ -392,16 +397,26 @@ struct ResultView: View {
                 Label("3D 微缩场景", systemImage: "cube.transparent")
             }
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(ClayPalette.textOnDark)
-                .frame(
-                    width: 56,
-                    height: 56
-                )
-                .contentShape(Circle())
+            ClayMoldedControl(
+                base: ClayPalette.warmWhite,
+                rim: ClayPalette.warmWhiteRim,
+                foreground: ClayPalette.orangeDepth,
+                cornerRadius: ClayShape.pill,
+                depth: 4,
+                isPressed: false
+            ) {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 56, height: 56)
+            }
+            .shadow(
+                color: ClayShadow.rest.color,
+                radius: ClayShadow.rest.radius,
+                x: ClayShadow.rest.x,
+                y: ClayShadow.rest.y
+            )
+            .contentShape(Circle())
         }
-        .buttonStyle(PosterPressStyle())
         .accessibilityIdentifier("result.more-actions")
         .accessibilityLabel("更多")
         .accessibilityHint("重新生成、撤销、设置和重拍")

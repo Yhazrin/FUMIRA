@@ -15,42 +15,42 @@ enum ClayShadow {
 
     /// Default resting shadow for elevated clay surfaces.
     static let rest = ShadowSpec(
-        color: .black.opacity(0.33),
-        radius: 13, x: 0, y: 11
+        color: .black.opacity(0.22),
+        radius: 11, x: 0, y: 8
     )
 
     /// Pressed / engaged shadow — shorter, tighter.
     static let pressed = ShadowSpec(
-        color: .black.opacity(0.18),
-        radius: 4, x: 0, y: 4
+        color: .black.opacity(0.13),
+        radius: 3, x: 0, y: 2
     )
 
     /// Subtle card shadow.
     static let card = ShadowSpec(
-        color: .black.opacity(0.28),
-        radius: 8, x: 0, y: 7
+        color: .black.opacity(0.17),
+        radius: 11, x: 0, y: 7
     )
 
     /// Small indicator / chip shadow.
     static let small = ShadowSpec(
-        color: .black.opacity(0.28),
-        radius: 2, x: 0, y: 2
+        color: .black.opacity(0.18),
+        radius: 4, x: 0, y: 3
     )
 
     // MARK: - Highlight gradient (top-left light source)
 
     static let highlightColors: [Color] = [
-        .white.opacity(0.44),
-        .white.opacity(0.10),
+        .white.opacity(0.34),
+        .white.opacity(0.12),
         .clear,
-        .black.opacity(0.08)
+        .black.opacity(0.045)
     ]
 
     static let highlightStops: [Gradient.Stop] = [
-        .init(color: .white.opacity(0.44), location: 0.00),
-        .init(color: .white.opacity(0.10), location: 0.26),
-        .init(color: .clear, location: 0.62),
-        .init(color: .black.opacity(0.08), location: 1.00)
+        .init(color: .white.opacity(0.34), location: 0.00),
+        .init(color: .white.opacity(0.13), location: 0.32),
+        .init(color: .clear, location: 0.70),
+        .init(color: .black.opacity(0.045), location: 1.00)
     ]
 
     static let highlightStart = UnitPoint(x: 0.0, y: 0.0)
@@ -59,9 +59,9 @@ enum ClayShadow {
     // MARK: - Edge stroke gradient (top light, bottom dark)
 
     static let edgeStrokeColors: [Color] = [
-        .white.opacity(0.58),
-        .white.opacity(0.10),
-        .black.opacity(0.08)
+        .white.opacity(0.42),
+        .white.opacity(0.12),
+        .black.opacity(0.055)
     ]
 
     static let edgeStrokeStart = UnitPoint.top

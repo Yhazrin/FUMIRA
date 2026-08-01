@@ -76,77 +76,41 @@ private struct CameraLaunchClayButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "camera.aperture")
-                .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(ClayPalette.charcoal)
-                .frame(width: 88, height: 88)
-                .background {
-                    ZStack {
-                        Circle()
-                            .fill(ClayPalette.orangeRim)
-                            .offset(y: ClayShape.rimOffset)
+        ZStack {
+            ClayMoldedControl(
+                base: ClayPalette.warmWhite,
+                rim: ClayPalette.warmWhiteRim,
+                foreground: .clear,
+                cornerRadius: ClayShape.pill,
+                depth: 5,
+                isPressed: false
+            ) {
+                Color.clear
+                    .frame(width: 118, height: 118)
+            }
+            .shadow(
+                color: ClayShadow.card.color,
+                radius: ClayShadow.card.radius,
+                x: ClayShadow.card.x,
+                y: ClayShadow.card.y
+            )
 
-                        Circle()
-                            .fill(ClayPalette.orange)
-                            .overlay {
-                                LinearGradient(
-                                    stops: ClayShadow.highlightStops,
-                                    startPoint: ClayShadow.highlightStart,
-                                    endPoint: ClayShadow.highlightEnd
-                                )
-                                .clipShape(Circle())
-                            }
-                            .overlay {
-                                ClayNoiseTexture(opacity: 0.14)
-                                    .clipShape(Circle())
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: ClayShadow.edgeStrokeColors,
-                                            startPoint: ClayShadow.edgeStrokeStart,
-                                            endPoint: ClayShadow.edgeStrokeEnd
-                                        ),
-                                        lineWidth: 2
-                                    )
-                            }
-                    }
-                }
-                .shadow(
-                    color: ClayShadow.rest.color,
-                    radius: ClayShadow.rest.radius,
-                    x: ClayShadow.rest.x,
-                    y: ClayShadow.rest.y
-                )
-                .contentShape(Circle())
+            Button(action: action) {
+                Image(systemName: "camera.aperture")
+                    .font(.system(size: 29, weight: .bold))
+                    .frame(width: 82, height: 82)
+            }
+            .clayButtonStyle(
+                base: ClayPalette.orange,
+                rim: ClayPalette.orangeDepth,
+                foreground: ClayPalette.charcoal,
+                cornerRadius: ClayShape.pill,
+                depth: 5
+            )
+            .contentShape(Circle())
         }
-        .buttonStyle(ClayPressButtonStyle())
         .accessibilityLabel("进入时间相机")
         .accessibilityHint("打开相机，拍下一张给时间的照片")
-    }
-}
-
-/// 按压反馈按钮样式 — 下沉 + 阴影压缩
-private struct ClayPressButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? ClayMotion.pressScale : 1)
-            .offset(y: configuration.isPressed ? ClayMotion.pressOffsetY : 0)
-            .shadow(
-                color: configuration.isPressed
-                    ? ClayShadow.pressed.color
-                    : ClayShadow.rest.color,
-                radius: configuration.isPressed
-                    ? ClayShadow.pressed.radius
-                    : ClayShadow.rest.radius,
-                x: 0,
-                y: configuration.isPressed
-                    ? ClayShadow.pressed.y
-                    : ClayShadow.rest.y
-            )
-            .animation(ClayMotion.buttonSpring, value: configuration.isPressed)
     }
 }
 

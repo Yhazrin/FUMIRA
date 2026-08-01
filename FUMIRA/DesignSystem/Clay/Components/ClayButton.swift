@@ -1,38 +1,106 @@
 import SwiftUI
 
-/// Clay button style — native SwiftUI ButtonStyle with physical depth feedback.
-/// Press compresses shadow, sinks, and scales slightly.
+/// A molded toy button: the housing stays fixed while the face travels into it.
+/// The restrained highlight and soft contact shadow keep the material closer to
+/// vinyl clay than to a hard, glossy plastic slab.
 struct ClayButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let base: Color
     let rim: Color
     let foreground: Color
     let cornerRadius: CGFloat
+    let depth: CGFloat
 
     init(
         base: Color = ClayPalette.orange,
         rim: Color = ClayPalette.orangeRim,
         foreground: Color = ClayPalette.charcoal,
-        cornerRadius: CGFloat = ClayShape.button
+        cornerRadius: CGFloat = ClayShape.button,
+        depth: CGFloat = 6
     ) {
         self.base = base
         self.rim = rim
         self.foreground = foreground
         self.cornerRadius = cornerRadius
+        self.depth = depth
     }
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(foreground)
-            .background {
-                ZStack {
-                    // Rim
+        let isPressed = configuration.isPressed && isEnabled
+
+        return ClayMoldedControl(
+            base: base,
+            rim: rim,
+            foreground: foreground,
+            cornerRadius: cornerRadius,
+            depth: depth,
+            isPressed: isPressed
+        ) {
+            configuration.label
+        }
+            .shadow(
+                color: isPressed
+                    ? ClayShadow.pressed.color
+                    : ClayShadow.rest.color,
+                radius: isPressed
+                    ? ClayShadow.pressed.radius
+                    : ClayShadow.rest.radius,
+                x: 0,
+                y: isPressed
+                    ? ClayShadow.pressed.y
+                    : ClayShadow.rest.y
+            )
+            .opacity(isEnabled ? 1 : 0.46)
+            .contentShape(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            )
+            .animation(
+                reduceMotion ? .linear(duration: 0.01) : ClayMotion.buttonSpring,
+                value: isPressed
+            )
+    }
+}
+
+/// Resting or pressed molded face, also reusable by non-Button controls such as Menu labels.
+struct ClayMoldedControl<Label: View>: View {
+    let base: Color
+    let rim: Color
+    let foreground: Color
+    let cornerRadius: CGFloat
+    let depth: CGFloat
+    let isPressed: Bool
+    @ViewBuilder let label: Label
+
+    private var faceTravel: CGFloat {
+        isPressed ? max(depth - 1, 0) : 0
+    }
+
+    var body: some View {
+        ZStack {
+            label
+                .hidden()
+                .accessibilityHidden(true)
+                .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(rim)
-                        .offset(y: configuration.isPressed
-                            ? ClayShape.rimOffsetPressed
-                            : ClayShape.rimOffset)
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.08)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .clipShape(
+                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            )
+                        }
+                }
+                .offset(y: depth)
 
-                    // Face
+            label
+                .foregroundStyle(foreground)
+                .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(base)
                         .overlay {
@@ -41,40 +109,30 @@ struct ClayButtonStyle: ButtonStyle {
                                 startPoint: ClayShadow.highlightStart,
                                 endPoint: ClayShadow.highlightEnd
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                            .clipShape(
+                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            )
                         }
                         .overlay {
-                            ClayNoiseTexture(opacity: 0.17)
-                                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                            ClayNoiseTexture(opacity: 0.035)
+                                .clipShape(
+                                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                )
                         }
                         .overlay {
                             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                                .stroke(
+                                .strokeBorder(
                                     LinearGradient(
                                         colors: ClayShadow.edgeStrokeColors,
                                         startPoint: ClayShadow.edgeStrokeStart,
                                         endPoint: ClayShadow.edgeStrokeEnd
                                     ),
-                                    lineWidth: 2
+                                    lineWidth: 1
                                 )
                         }
                 }
-            }
-            .shadow(
-                color: configuration.isPressed
-                    ? ClayShadow.pressed.color
-                    : ClayShadow.rest.color,
-                radius: configuration.isPressed
-                    ? ClayShadow.pressed.radius
-                    : ClayShadow.rest.radius,
-                x: 0,
-                y: configuration.isPressed
-                    ? ClayShadow.pressed.y
-                    : ClayShadow.rest.y
-            )
-            .scaleEffect(configuration.isPressed ? ClayMotion.pressScale : 1)
-            .offset(y: configuration.isPressed ? ClayMotion.pressOffsetY : 0)
-            .animation(ClayMotion.buttonSpring, value: configuration.isPressed)
+                .offset(y: faceTravel)
+        }
     }
 }
 
@@ -85,14 +143,16 @@ extension View {
         base: Color = ClayPalette.orange,
         rim: Color = ClayPalette.orangeRim,
         foreground: Color = ClayPalette.charcoal,
-        cornerRadius: CGFloat = ClayShape.button
+        cornerRadius: CGFloat = ClayShape.button,
+        depth: CGFloat = 6
     ) -> some View {
         self.buttonStyle(
             ClayButtonStyle(
                 base: base,
                 rim: rim,
                 foreground: foreground,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                depth: depth
             )
         )
     }

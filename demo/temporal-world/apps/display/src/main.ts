@@ -38,7 +38,7 @@ function updateUI(year: number, intervals: TimelineInterval[]): void {
       settled: '○',
     };
     if (intervalCard) {
-      intervalCard.innerHTML = `<span style="color:#FF672A">${icons[iv.mode]} ${iv.mode.toUpperCase()}</span> — ${iv.narrative}`;
+      intervalCard.innerHTML = `<span style="color:var(--fumira-orange)">${icons[iv.mode]} ${iv.mode.toUpperCase()}</span> — ${iv.narrative}`;
       intervalCard.classList.add('visible');
     }
     if (intervalLabel) intervalLabel.textContent = iv.narrative;
@@ -68,7 +68,7 @@ async function initSession(fixture: SceneFixture): Promise<void> {
       await QRCode.toCanvas(qrEl as HTMLCanvasElement, mobileUrl, {
         width: 160,
         margin: 1,
-        color: { dark: '#202425', light: '#FFFFFF' },
+        color: { dark: '#202425', light: '#F2EEE5' },
       });
     }
 

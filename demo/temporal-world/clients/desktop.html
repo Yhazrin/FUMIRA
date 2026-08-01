@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>FUMIRA — Temporal Clay World</title>
+<link rel="stylesheet" href="/src/tokens.css">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
@@ -39,15 +40,16 @@
   /* QR panel — toy compartment */
   #qr-panel {
     position: fixed; top: 16px; right: 24px;
-    background: #E8E4DB;
-    border-radius: 16px; padding: 18px 20px 16px;
+    background-color: var(--fumira-warm-white);
+    background-image: var(--fumira-clay-highlight);
+    border-radius: 22px; padding: 18px 20px 16px;
     box-shadow:
-      inset 0 2px 6px rgba(0,0,0,0.12),
-      inset 0 -1px 0 rgba(255,255,255,0.5),
-      0 1px 0 rgba(255,255,255,0.6);
-    border: 1px solid #D5D0C5;
+      inset 0 1px 0 rgba(255,255,255,0.5),
+      0 6px 0 var(--fumira-warm-white-rim),
+      var(--fumira-shadow-large);
+    border: 1px solid rgba(255,255,255,0.46);
     text-align: center; z-index: 20;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease;
   }
   #qr-panel::before {
     content: '';
@@ -93,14 +95,14 @@
   /* Time display — toy dial slot */
   #time-display {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: #E8E4DB;
-    border-radius: 16px; padding: 14px 28px;
+    background-color: var(--fumira-warm-white);
+    background-image: var(--fumira-clay-highlight);
+    border-radius: 22px; padding: 14px 28px;
     box-shadow:
-      inset 0 3px 8px rgba(0,0,0,0.14),
-      inset 0 1px 2px rgba(0,0,0,0.08),
-      inset 0 -1px 0 rgba(255,255,255,0.45),
-      0 1px 0 rgba(255,255,255,0.6);
-    border: 1px solid #D5D0C5;
+      inset 0 1px 0 rgba(255,255,255,0.5),
+      0 6px 0 var(--fumira-warm-white-rim),
+      var(--fumira-shadow-large);
+    border: 1px solid rgba(255,255,255,0.46);
     display: flex; align-items: center; gap: 18px; z-index: 10;
     min-width: 420px; justify-content: center;
   }
@@ -170,13 +172,13 @@
   }
   #scene-status.hidden { opacity: 0; pointer-events: none; }
   #scene-status .status-pill {
-    background: #E8E4DB; border-radius: 12px;
+    background-color: var(--fumira-warm-white); background-image: var(--fumira-clay-highlight); border-radius: 14px;
     padding: 10px 24px;
     box-shadow:
-      inset 0 2px 5px rgba(0,0,0,0.1),
-      inset 0 -1px 0 rgba(255,255,255,0.45),
-      0 1px 0 rgba(255,255,255,0.6);
-    border: 1px solid #D5D0C5;
+      inset 0 1px 0 rgba(255,255,255,0.46),
+      0 4px 0 var(--fumira-warm-white-rim),
+      var(--fumira-shadow-medium);
+    border: 1px solid rgba(255,255,255,0.42);
     display: flex; align-items: center; gap: 10px;
   }
   #scene-status .pulse-dot {
@@ -199,6 +201,10 @@
   @keyframes pulse {
     0%, 100% { transform: scale(0.8); opacity: 0.4; }
     50% { transform: scale(1.3); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #qr-panel, #scene-status { transition-duration: 1ms; }
+    #scene-status .pulse-dot { animation: none; }
   }
 </style>
 </head>

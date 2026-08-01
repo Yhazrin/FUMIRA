@@ -146,6 +146,165 @@ export class SceneCompiler {
 
   constructor() {}
 
+  // ── Scene Loading Aliases ─────────────────────────────────
+
+  /**
+   * Alias for loadCanonicalScene — used by the orchestrator pipeline.
+   * Accepts a CanonicalSceneSpec and loads it into the compiler.
+   *
+   * @param {object} sceneSpec — a CanonicalSceneSpec object
+   * @returns {SceneUpdateMessage[]}
+   */
+  loadSceneSpec(sceneSpec) {
+    return this.loadCanonicalScene(sceneSpec);
+  }
+
+  // ── CanonicalSceneSpec Loading ─────────────────────────
+
+  /**
+   * Load a CanonicalSceneSpec (from XiaomiProvider or ClaudeWorker)
+   * into the compiler's entity registry.
+   *
+   * Converts each CanonicalSceneSpec entity into the internal format
+   * used by compileReconstructionResult, then delegates to that method.
+   *
+   * CanonicalSceneSpec entity shape (from xiaomi-provider.js):
+   * ```
+   * {
+   *   id: 'building_main',
+   *   type: 'building',
+   *   label: 'Main Building',
+   *   position: [0, 0, -2],
+   *   rotation: [0, 0, 0],
+   *   scale: [1, 1, 1],
+   *   geometry: { builder: 'stylized-building', parameters: { ... } },
+   *   material: { color: '#C4A882', roughness: 0.45, ... },
+   *   temporalBehavior: { mode: 'decay', rate: 0.01 },
+   *   variants: [],
+   *   buildStatus: 'blockout',
+   *   confidence: 0.92,
+   * }
+   * ```
+   *
+   * @param {object} sceneSpec — a CanonicalSceneSpec object
+   * @returns {SceneUpdateMessage[]} — array of scene update messages
+   */
+  loadCanonicalScene(sceneSpec) {
+    if (!sceneSpec || !Array.isArray(sceneSpec.entities)) {
+      return [];
+    }
+
+    // Convert CanonicalSceneSpec entities to the internal format
+    // expected by compileReconstructionResult.
+    const convertedEntities = sceneSpec.entities.map(entity => ({
+      id: entity.id,
+      label: entity.label ?? null,
+      temporalRange: [-1, 1],
+      time: 0,
+      mesh: {
+        geometry: this.#builderToGeometry(entity.geometry, entity.type),
+        position: entity.position ?? [0, 0, 0],
+        rotation: entity.rotation ?? [0, 0, 0],
+        scale: entity.scale ?? [1, 1, 1],
+        material: {
+          color: entity.material?.color ?? '#888888',
+          roughness: entity.material?.roughness ?? 0.7,
+          metalness: entity.material?.metalness ?? 0,
+          opacity: entity.material?.opacity ?? 1,
+          transparent: entity.material?.transparent ?? false,
+          emissive: entity.material?.emissive,
+          emissiveIntensity: entity.material?.emissiveIntensity,
+        },
+      },
+    }));
+
+    // Also load temporal anchor variants if present
+    if (Array.isArray(sceneSpec.temporalAnchors)) {
+      for (const anchor of sceneSpec.temporalAnchors) {
+        if (!anchor.entityStates) continue;
+        for (const [entityId, state] of Object.entries(anchor.entityStates)) {
+          const baseEntity = sceneSpec.entities.find(e => e.id === entityId);
+          if (!baseEntity) continue;
+
+          convertedEntities.push({
+            id: entityId,
+            label: baseEntity.label ?? null,
+            temporalRange: [-1, 1],
+            time: anchor.normalizedTime ?? 0,
+            mesh: {
+              geometry: this.#builderToGeometry(baseEntity.geometry, baseEntity.type),
+              position: state.position ?? baseEntity.position ?? [0, 0, 0],
+              rotation: baseEntity.rotation ?? [0, 0, 0],
+              scale: state.scale ?? baseEntity.scale ?? [1, 1, 1],
+              material: {
+                color: state.material?.color ?? baseEntity.material?.color ?? '#888888',
+                roughness: state.material?.roughness ?? baseEntity.material?.roughness ?? 0.7,
+                metalness: state.material?.metalness ?? baseEntity.material?.metalness ?? 0,
+                opacity: state.material?.opacity ?? baseEntity.material?.opacity ?? 1,
+              },
+            },
+          });
+        }
+      }
+    }
+
+    return this.compileReconstructionResult({
+      entities: convertedEntities,
+      camera: sceneSpec.camera ?? { position: [0, 5, 10], target: [0, 0, 0] },
+      replace: true,
+    });
+  }
+
+  /**
+   * Convert a CanonicalSceneSpec geometry builder reference into a
+   * Three.js-compatible geometry definition.
+   *
+   * Maps builder names like 'stylized-building' to concrete geometry
+   * types like 'BoxGeometry' with appropriate args.
+   */
+  #builderToGeometry(geometry, entityType) {
+    if (!geometry) {
+      return { type: 'BoxGeometry', args: [1, 1, 1] };
+    }
+
+    // If it already has a type, it's in Three.js format
+    if (geometry.type) {
+      return { type: geometry.type, args: geometry.args ?? [] };
+    }
+
+    // Map builder names to concrete geometry
+    const builder = geometry.builder || '';
+    const p = geometry.parameters || {};
+
+    switch (builder) {
+      case 'stylized-building':
+        return { type: 'BoxGeometry', args: [p.width ?? 3, (p.floors ?? 3) * 1.2, p.depth ?? 2] };
+      case 'organic-tree':
+        return { type: 'SphereGeometry', args: [p.crownRadius ?? 1, 12, 10] };
+      case 'flat-path':
+        return { type: 'BoxGeometry', args: [p.width ?? 2, 0.05, p.length ?? 8] };
+      case 'ground-plane':
+        return { type: 'BoxGeometry', args: [p.width ?? 16, 0.1, p.depth ?? 16] };
+      case 'clay-vehicle':
+        return { type: 'BoxGeometry', args: [p.width ?? 1.5, p.height ?? 0.8, p.length ?? 3] };
+      case 'clay-person':
+        return { type: 'CapsuleGeometry', args: [0.2, p.height ?? 1.2] };
+      case 'clay-bench':
+        return { type: 'BoxGeometry', args: [p.width ?? 1.5, 0.4, p.depth ?? 0.5] };
+      case 'clay-sign':
+        return { type: 'BoxGeometry', args: [0.5, p.height ?? 1.5, 0.1] };
+      default:
+        // Fall back to entity type heuristics
+        if (entityType === 'tree' || entityType === 'vegetation') {
+          return { type: 'SphereGeometry', args: [1, 12, 10] };
+        }
+        if (entityType === 'path' || entityType === 'terrain') {
+          return { type: 'BoxGeometry', args: [4, 0.1, 4] };
+        }
+        return { type: 'BoxGeometry', args: [1, 1, 1] };
+    }
+  }
+
   // ── Reconstruction Result Handling ──────────────────────
 
   /**

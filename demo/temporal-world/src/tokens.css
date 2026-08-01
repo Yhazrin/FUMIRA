@@ -8,6 +8,7 @@
   /* Accent */
   --fumira-orange: #FF672A;
   --fumira-orange-rim: #C9441D;
+  --fumira-orange-depth: #A93618;
   --fumira-time-blue: #4A90D9;
   --fumira-time-blue-rim: #3570A8;
   --fumira-park-green: #8FCB7E;
@@ -44,7 +45,9 @@
   --fumira-radius-xl: 24px;
 
   /* Shadow */
-  --fumira-shadow-small: 0 2px 8px rgba(32, 36, 37, 0.08);
-  --fumira-shadow-medium: 0 4px 16px rgba(32, 36, 37, 0.12);
-  --fumira-shadow-large: 0 8px 32px rgba(32, 36, 37, 0.16);
+  --fumira-shadow-small: 0 3px 8px rgba(32, 36, 37, 0.14);
+  --fumira-shadow-medium: 0 8px 20px rgba(32, 36, 37, 0.16);
+  --fumira-shadow-large: 0 14px 34px rgba(32, 36, 37, 0.18);
+  --fumira-clay-highlight: linear-gradient(145deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.10) 36%, rgba(255,255,255,0) 70%, rgba(32,36,37,0.05) 100%);
+  --fumira-focus-ring: 0 0 0 4px rgba(74, 144, 217, 0.34);
 }
