@@ -1,0 +1,587 @@
+{
+  "version": 2,
+  "instances": [],
+  "sun": {
+    "intensity": 1.35,
+    "rotation": [
+      -0.65,
+      0.52,
+      0
+    ],
+    "environmentIntensity": 0.5
+  },
+  "temporalScene": {
+    "version": 1,
+    "sourceImage": "source/0-beijing-street.png",
+    "bounds": {
+      "width": 13.5,
+      "depth": 9.5,
+      "groundY": 0
+    },
+    "camera": {
+      "position": [
+        7.2,
+        5.4,
+        10.6
+      ],
+      "target": [
+        -0.1,
+        1.55,
+        -0.55
+      ],
+      "fov": 34
+    },
+    "nodes": [
+      {
+        "id": "road",
+        "kind": "road",
+        "role": "support",
+        "layer": "background",
+        "position": [
+          -2,
+          0.02,
+          -0.6
+        ],
+        "footprint": [
+          11,
+          6
+        ],
+        "height": 0.08,
+        "color": "#9e9688",
+        "importance": 0.35,
+        "imageBox": [
+          0,
+          0.65,
+          1,
+          0.35
+        ],
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "sidewalk",
+        "kind": "prop",
+        "role": "support",
+        "layer": "midground",
+        "position": [
+          3.55,
+          0.1,
+          0.2
+        ],
+        "footprint": [
+          4.5,
+          8.8
+        ],
+        "height": 0.16,
+        "color": "#c8c0b2",
+        "importance": 0.62,
+        "imageBox": [
+          0,
+          0.4,
+          1,
+          0.25
+        ],
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "tree-main",
+        "kind": "tree",
+        "role": "occluder-anchor",
+        "layer": "midground",
+        "position": [
+          -1.75,
+          0,
+          0.05
+        ],
+        "footprint": [
+          2.3,
+          2
+        ],
+        "height": 5.15,
+        "color": "#7e9a27",
+        "importance": 1,
+        "imageBox": [
+          0.25,
+          0.15,
+          0.35,
+          0.55
+        ],
+        "visualPriority": 3,
+        "confidence": 0.5
+      },
+      {
+        "id": "utility-box",
+        "kind": "utility-box",
+        "role": "vertical-landmark",
+        "layer": "background",
+        "position": [
+          0.25,
+          0,
+          -1.9
+        ],
+        "footprint": [
+          1.5,
+          0.62
+        ],
+        "height": 3.15,
+        "importance": 0.84,
+        "imageBox": [
+          0.65,
+          0.48,
+          0.12,
+          0.18
+        ],
+        "visualPriority": 2,
+        "confidence": 0.45
+      },
+      {
+        "id": "utility-pole",
+        "kind": "prop",
+        "role": "vertical-landmark",
+        "layer": "background",
+        "position": [
+          -0.7,
+          0,
+          -1.9
+        ],
+        "footprint": [
+          0.22,
+          0.22
+        ],
+        "height": 4.4,
+        "color": "#b8b5aa",
+        "importance": 0.48,
+        "imageBox": [
+          0.72,
+          0.1,
+          0.04,
+          0.65
+        ],
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "person",
+        "kind": "person",
+        "role": "secondary-subject",
+        "layer": "midground",
+        "position": [
+          -1.95,
+          0,
+          -0.04
+        ],
+        "footprint": [
+          0.62,
+          0.42
+        ],
+        "height": 1.7,
+        "importance": 0.58,
+        "imageBox": [
+          0.38,
+          0.38,
+          0.08,
+          0.2
+        ],
+        "visualPriority": 2,
+        "confidence": 0.45
+      },
+      {
+        "id": "moped-foreground-red",
+        "kind": "moped",
+        "role": "recognition-anchor",
+        "layer": "foreground",
+        "position": [
+          1.93,
+          0,
+          3.21
+        ],
+        "rotation": [
+          0,
+          0.08,
+          0
+        ],
+        "scale": [
+          1.55,
+          1.55,
+          1.55
+        ],
+        "footprint": [
+          1.8,
+          0.8
+        ],
+        "height": 1.25,
+        "color": "#b51f2a",
+        "importance": 1,
+        "imageBox": [
+          0.28,
+          0.7,
+          0.28,
+          0.18
+        ],
+        "imageAnchor": {
+          "point": [
+            0.421,
+            0.801
+          ],
+          "heightFactor": 0.45,
+          "confidence": 0.85,
+          "source": "pixel-mask:red-vehicle"
+        },
+        "visualPriority": 3,
+        "confidence": 0.5
+      },
+      {
+        "id": "moped-foreground-black",
+        "kind": "moped",
+        "role": "cluster-member",
+        "layer": "foreground",
+        "position": [
+          1.45,
+          0,
+          1.65
+        ],
+        "rotation": [
+          0,
+          -0.18,
+          0
+        ],
+        "scale": [
+          1.32,
+          1.32,
+          1.32
+        ],
+        "footprint": [
+          1.55,
+          0.72
+        ],
+        "height": 1.08,
+        "color": "#343638",
+        "importance": 0.74,
+        "imageBox": [
+          0.32,
+          0.5,
+          0.15,
+          0.13
+        ],
+        "visualPriority": 2,
+        "confidence": 0.5
+      },
+      {
+        "id": "moped-mid-red",
+        "kind": "moped",
+        "role": "cluster-member",
+        "layer": "midground",
+        "position": [
+          -0.11,
+          0,
+          1.8
+        ],
+        "rotation": [
+          0,
+          -0.38,
+          0
+        ],
+        "scale": [
+          1.05,
+          1.05,
+          1.05
+        ],
+        "footprint": [
+          1.25,
+          0.62
+        ],
+        "height": 0.92,
+        "color": "#a8282b",
+        "importance": 0.63,
+        "imageBox": [
+          0.19,
+          0.64,
+          0.16,
+          0.13
+        ],
+        "imageAnchor": {
+          "point": [
+            0.27,
+            0.715
+          ],
+          "heightFactor": 0.45,
+          "confidence": 0.8,
+          "source": "pixel-mask:red-vehicle"
+        },
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "moped-mid-black",
+        "kind": "moped",
+        "role": "cluster-member",
+        "layer": "midground",
+        "position": [
+          2.8,
+          0,
+          -0.15
+        ],
+        "rotation": [
+          0,
+          -0.5,
+          0
+        ],
+        "scale": [
+          0.86,
+          0.86,
+          0.86
+        ],
+        "footprint": [
+          1.05,
+          0.52
+        ],
+        "height": 0.75,
+        "color": "#343638",
+        "importance": 0.5,
+        "imageBox": [
+          0.62,
+          0.6,
+          0.1,
+          0.07
+        ],
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "tree-mid",
+        "kind": "tree",
+        "role": "depth-plane",
+        "layer": "background",
+        "position": [
+          2.7,
+          0,
+          -2.4
+        ],
+        "scale": [
+          0.72,
+          0.72,
+          0.72
+        ],
+        "footprint": [
+          1.7,
+          1.5
+        ],
+        "height": 3.8,
+        "importance": 0.54,
+        "visualPriority": 1,
+        "confidence": 0.3
+      },
+      {
+        "id": "hedge-right",
+        "kind": "hedge",
+        "role": "edge-frame",
+        "layer": "midground",
+        "position": [
+          5.45,
+          0,
+          0.15
+        ],
+        "footprint": [
+          2.2,
+          1
+        ],
+        "height": 1.05,
+        "color": "#668e47",
+        "importance": 0.56,
+        "imageBox": [
+          0.78,
+          0.35,
+          0.22,
+          0.45
+        ],
+        "visualPriority": 1,
+        "confidence": 0.5
+      },
+      {
+        "id": "building-background",
+        "kind": "building",
+        "role": "depth-plane",
+        "layer": "background",
+        "position": [
+          2.25,
+          0,
+          -4.05
+        ],
+        "footprint": [
+          6.8,
+          0.5
+        ],
+        "height": 4.2,
+        "color": "#d7d5c8",
+        "importance": 0.4,
+        "imageBox": [
+          0,
+          0,
+          1,
+          0.15
+        ],
+        "visualPriority": 0,
+        "confidence": 0.5
+      }
+    ],
+    "relations": [
+      {
+        "type": "occludes",
+        "from": "tree-main",
+        "to": "person",
+        "strength": 0.86
+      },
+      {
+        "type": "behind",
+        "from": "utility-box",
+        "to": "tree-main",
+        "strength": 0.68
+      },
+      {
+        "type": "supports",
+        "from": "sidewalk",
+        "to": "moped-foreground-red",
+        "strength": 1
+      },
+      {
+        "type": "supports",
+        "from": "sidewalk",
+        "to": "moped-foreground-black",
+        "strength": 1
+      },
+      {
+        "type": "clustered-with",
+        "from": "moped-foreground-red",
+        "to": "moped-foreground-black",
+        "strength": 0.93
+      },
+      {
+        "type": "clustered-with",
+        "from": "moped-foreground-black",
+        "to": "moped-mid-red",
+        "strength": 0.76
+      },
+      {
+        "type": "frames",
+        "from": "hedge-right",
+        "to": "sidewalk",
+        "strength": 0.72
+      },
+      {
+        "type": "behind",
+        "from": "building-background",
+        "to": "tree-main",
+        "strength": 0.7
+      }
+    ],
+    "anchors": [
+      {
+        "year": 2026,
+        "patches": {
+          "tree-main": {
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "tree-mid": {
+            "scale": [
+              0.72,
+              0.72,
+              0.72
+            ]
+          },
+          "person": {
+            "opacity": 1
+          },
+          "moped-foreground-red": {
+            "opacity": 1
+          }
+        }
+      },
+      {
+        "year": 2040,
+        "patches": {
+          "tree-main": {
+            "scale": [
+              1.12,
+              1.17,
+              1.12
+            ]
+          },
+          "tree-mid": {
+            "scale": [
+              0.88,
+              0.92,
+              0.88
+            ]
+          },
+          "person": {
+            "opacity": 0.35
+          },
+          "moped-foreground-red": {
+            "position": [
+              2.14,
+              0,
+              3.06
+            ],
+            "rotation": [
+              0,
+              0.2,
+              0
+            ],
+            "opacity": 0.9
+          }
+        }
+      },
+      {
+        "year": 2080,
+        "patches": {
+          "tree-main": {
+            "scale": [
+              1.3,
+              1.48,
+              1.3
+            ]
+          },
+          "tree-mid": {
+            "scale": [
+              1.1,
+              1.18,
+              1.1
+            ]
+          },
+          "person": {
+            "opacity": 0
+          },
+          "moped-foreground-red": {
+            "position": [
+              2.5,
+              0,
+              2.78
+            ],
+            "rotation": [
+              0,
+              0.4,
+              0
+            ],
+            "opacity": 0.58
+          }
+        }
+      }
+    ],
+    "evaluation": {
+      "target": "overall-recognizability",
+      "fixedView": true,
+      "checks": [
+        "foreground vehicle cluster occupies the lower third",
+        "tree trunk occludes the person and sits in front of the utility cabinet",
+        "the sidewalk recedes toward the upper-right",
+        "the hedge closes the right edge of the composition",
+        "the scene remains readable as warm matte clay at thumbnail size"
+      ]
+    }
+  }
+}

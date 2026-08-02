@@ -63,9 +63,9 @@ coverage/
 demo/*/dist/
 demo/*/node_modules/
 demo/*/.vite/
-
-# Third-party nested clone (keep out of main repo)
-demo/image-blaster/
+demo/**/node_modules/
+demo/**/dist/
+demo/**/.vite/
 
 # Temporary
 *.tmp
