@@ -74,10 +74,10 @@ demo/**/.vite/
 screenshots/
 test-screenshots/
 
-# IDE
+# IDE / Cursor agent config (local only; AGENTS.md remains the shared source)
 .idea/
 .vscode/
-# Nested Cursor agent folders are local-only; root `.cursor/rules` stays tracked.
-demo/**/.cursor/
+.cursor/
+**/.cursor/
 *.swp
 *.swo

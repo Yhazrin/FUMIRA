@@ -1,9 +1,0 @@
----
-alwaysApply: true
----
-
-Read AGENTS.md and docs/exec-plans/active/001-mvp.md before editing.
-Codex owns architecture, public protocols, AppModel, AppPhase, AppDependencies,
-Domain, Services, project configuration, and architecture documents.
-Only modify files explicitly listed by the task. Stop when architecture changes
-would be required. Preserve existing user changes.
