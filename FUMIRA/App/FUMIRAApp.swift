@@ -41,7 +41,7 @@ struct FUMIRAApp: App {
                 // is white; any sub-pixel gap at the status bar or home
                 // indicator reveals a white seam. Placing a full-bleed fill
                 // below RootView guarantees the seam matches our palette.
-                ClayPalette.charcoal
+                ClayPalette.cream
                     .ignoresSafeArea()
 
                 RootView(model: model)

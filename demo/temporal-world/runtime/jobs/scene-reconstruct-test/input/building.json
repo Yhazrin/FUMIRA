@@ -1,0 +1,13 @@
+{
+  "id": "building_01",
+  "type": "building",
+  "label": "Small Garage",
+  "position": [1.5, 0, 0],
+  "rotation": [0, 0, 0],
+  "scale": [1, 1, 1],
+  "material": {
+    "color": "#F2EEE5",
+    "roughness": 0.52,
+    "metalness": 0
+  }
+}

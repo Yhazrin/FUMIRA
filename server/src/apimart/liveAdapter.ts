@@ -179,12 +179,16 @@ export class LiveAPIMartAdapter implements ImageGenerationAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: input.modelName?.trim() || "gpt-image-2",
+          model: input.modelName?.trim() || "gpt-4o-image",
           prompt: input.prompt,
           n: 1,
           size: input.aspectRatio,
           resolution: "2k",
-          image_urls: [input.imageDataUrl],
+          // Index 0 stays the authoritative source; a repair round appends the
+          // rejected attempt so the model can see what it has to correct.
+          image_urls: input.priorAttemptDataUrl
+            ? [input.imageDataUrl, input.priorAttemptDataUrl]
+            : [input.imageDataUrl],
         }),
         signal,
         dispatcher: this.dispatcher,

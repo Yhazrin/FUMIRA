@@ -78,6 +78,40 @@ export interface TemporalSpec {
   timelineIntervals: TimelineInterval[];
 }
 
+export interface SceneGraphLayer {
+  id: string;
+  zRange: [number, number];
+  priority: number;
+}
+
+export interface SceneGraphNode {
+  id: string;
+  role: string;
+  layer: string;
+  footprint: [number, number];
+  importance: number;
+}
+
+export interface SceneGraphRelation {
+  type: 'occludes' | 'supports' | 'clustered-with' | 'behind' | 'frames' | string;
+  from: string;
+  to: string;
+  strength: number;
+}
+
+export interface SceneGraphSpec {
+  coordinateSystem: 'sandbox-y-up' | string;
+  bounds: { width: number; depth: number; groundY: number };
+  layers: SceneGraphLayer[];
+  nodes: SceneGraphNode[];
+  relations: SceneGraphRelation[];
+  evaluation: {
+    target: 'overall-recognizability' | string;
+    fixedView: boolean;
+    checks: string[];
+  };
+}
+
 export interface SceneFixture {
   id: string;
   name: string;
@@ -86,6 +120,12 @@ export interface SceneFixture {
   style: StyleSpec;
   entities: EntitySpec[];
   temporalSpec: TemporalSpec;
+  sceneGraph?: SceneGraphSpec;
+  camera?: {
+    position: [number, number, number];
+    target: [number, number, number];
+    fov?: number;
+  };
 }
 
 export interface InterpolatedEntityState extends TemporalEntityState {

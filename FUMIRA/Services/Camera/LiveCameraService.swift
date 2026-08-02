@@ -642,11 +642,16 @@ private final class LiveSubjectTracker: @unchecked Sendable {
     private let lock = NSLock()
     // Vision samples fast enough to follow a real camera subject, while the
     // persistent reticle receives only filtered geometry and never remounts.
-    private let minimumProcessingInterval: TimeInterval = 1.0 / 12.0
-    private let minimumDetectionInterval: TimeInterval = 2.0
-    private let redetectionFrameInterval = 216
+    // A high processing cadence plus a near-immediate re-detection retry
+    // makes the very first lock feel instant; the exponential smoothing in
+    // ``CameraTrackedSubject/smoothed(toward:response:)`` keeps that extra
+    // sampling from reading as jitter — more samples per second just means
+    // the same easing curve resolves sooner.
+    private let minimumProcessingInterval: TimeInterval = 1.0 / 24.0
+    private let minimumDetectionInterval: TimeInterval = 0.05
+    private let redetectionFrameInterval = 168
     private let minimumTrackingConfidence: VNConfidence = 0.38
-    private let missingFrameTolerance = 15
+    private let missingFrameTolerance = 30
 
     private var isEnabled = false
     private var cameraPosition: AVCaptureDevice.Position = .back

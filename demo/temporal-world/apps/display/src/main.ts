@@ -1,13 +1,15 @@
 import type { SceneFixture, TimelineInterval } from '@fumira/contracts';
+import * as THREE from 'three';
 import {
   createScene,
   loadEntities,
   startAnimationLoop,
   type AnimationController,
+  type EntityHandle,
+  type SceneHandle,
 } from '@fumira/scene-runtime';
 import QRCode from 'qrcode';
-// import fixtureData from '../../../fixtures/campus-gate/scene.json';
-import fixtureData from '../../../fixtures/reconstruct-demo/scene.json';
+import fixtureData from '../../../fixtures/street-scene/scene.json';
 
 // ── Config ─────────────────────────────────────────────────
 const API_BASE = window.location.origin;
@@ -54,9 +56,61 @@ function updateUI(year: number, intervals: TimelineInterval[]): void {
 let ws: WebSocket | null = null;
 let sessionId: string | null = null;
 let animationController: AnimationController | null = null;
+let sceneHandle: SceneHandle | null = null;
+let sceneEntities: EntityHandle[] = [];
+let currentFixture = fixtureData as unknown as SceneFixture;
 let heartbeatTimer: number | null = null;
 
-async function initSession(fixture: SceneFixture): Promise<void> {
+function disposeObject(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    mesh.geometry?.dispose?.();
+    if (Array.isArray(mesh.material)) mesh.material.forEach(material => material.dispose());
+    else (mesh.material as THREE.Material | undefined)?.dispose?.();
+  });
+}
+
+function mountFixture(fixture: SceneFixture, source: 'initial' | 'server' | 'hot'): void {
+  animationController?.dispose();
+  animationController = null;
+  if (sceneHandle) {
+    sceneHandle.controls.dispose();
+    disposeObject(sceneHandle.scene);
+    sceneHandle.scene.clear();
+  }
+
+  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+  currentFixture = fixture;
+  sceneHandle = createScene(fixture, canvas);
+  sceneEntities = loadEntities(fixture, sceneHandle.scene, sceneHandle);
+  animationController = startAnimationLoop(sceneHandle, sceneEntities, fixture, {
+    onUpdateUI: (year) => updateUI(year, fixture.temporalSpec.timelineIntervals),
+  });
+  updateSceneStatus(source === 'hot' ? 'HOT SWAPPED · SCENE GRAPH READY' : source === 'server' ? 'SERVER FIXTURE · SCENE GRAPH READY' : 'LOCAL FIXTURE · SCENE GRAPH READY');
+}
+
+function updateSceneStatus(text: string): void {
+  const status = document.getElementById('scene-status');
+  if (status) status.textContent = text;
+}
+
+async function reloadSceneFromServer(source: 'server' | 'hot' = 'hot'): Promise<void> {
+  if (!sessionId) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/scene/${sessionId}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const next = await res.json() as SceneFixture;
+    if (!next || !Array.isArray(next.entities) || !next.sceneGraph) {
+      updateSceneStatus('SERVER SCENE REJECTED · MISSING SCENE GRAPH');
+      return;
+    }
+    mountFixture(next, source);
+  } catch {
+    updateSceneStatus('SCENE SERVER UNAVAILABLE · LOCAL FIXTURE ACTIVE');
+  }
+}
+
+async function initSession(): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/api/session`);
     const data = await res.json();
@@ -76,14 +130,16 @@ async function initSession(fixture: SceneFixture): Promise<void> {
       });
     }
 
-    connectWebSocket(fixture);
+    connectWebSocket();
+    await reloadSceneFromServer('server');
   } catch {
     console.log('Running in standalone mode (no server)');
     document.getElementById('qr-panel')?.classList.add('hidden');
+    updateSceneStatus('STANDALONE · LOCAL SCENE GRAPH');
   }
 }
 
-function connectWebSocket(fixture: SceneFixture): void {
+function connectWebSocket(): void {
   ws = new WebSocket(`${WS_BASE}/ws?session=${sessionId}&role=desktop`);
 
   ws.onopen = () => {
@@ -96,14 +152,14 @@ function connectWebSocket(fixture: SceneFixture): void {
 
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    handleWSMessage(msg, fixture);
+    handleWSMessage(msg);
   };
 
   ws.onclose = () => {
     if (heartbeatTimer !== null) window.clearInterval(heartbeatTimer);
     heartbeatTimer = null;
     updateConnectionStatus('disconnected');
-    setTimeout(() => connectWebSocket(fixture), 3000);
+    setTimeout(() => connectWebSocket(), 3000);
   };
 }
 
@@ -112,8 +168,9 @@ function handleWSMessage(msg: {
   value?: number;
   entityId?: string;
   sessionId?: string;
+  fixture?: SceneFixture;
   state?: 'paired' | 'waiting_for_phone' | 'waiting_for_desktop' | 'idle';
-}, fixture: SceneFixture): void {
+}): void {
   switch (msg.type) {
     case 'connected':
       console.log('Desktop registered for session', msg.sessionId);
@@ -143,6 +200,11 @@ function handleWSMessage(msg: {
         statusEl2.textContent = 'PHONE DISCONNECTED';
         statusEl2.className = 'waiting';
       }
+      break;
+    case 'scene.ready':
+    case 'scene.update':
+      if (msg.fixture?.sceneGraph) mountFixture(msg.fixture, 'hot');
+      else void reloadSceneFromServer('hot');
       break;
     case 'time.seek':
       if (msg.value !== undefined) {
@@ -190,22 +252,10 @@ function applyTimeFromRemote(p: number): void {
 // ── Bootstrap ──────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const fixture = fixtureData as unknown as SceneFixture;
-
-  // Create scene
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-  const sceneHandle = createScene(fixture, canvas);
-
-  // Load entities
-  const entities = loadEntities(fixture, sceneHandle.scene, sceneHandle);
-
-  // Start animation
-  animationController = startAnimationLoop(sceneHandle, entities, fixture, {
-    onUpdateUI: (year) => updateUI(year, fixture.temporalSpec.timelineIntervals),
-  });
+  mountFixture(currentFixture, 'initial');
 
   // Session (WebSocket + QR)
-  initSession(fixture);
+  initSession();
 
   // Hide loading screen
   setTimeout(() => {

@@ -41,12 +41,13 @@ struct SharePosterView: View {
 
     var body: some View {
         PosterScreenContainer(background: ClayPalette.charcoal) {
-            VStack(spacing: ClaySpacing.xxl) {
+            VStack(spacing: 0) {
                 PosterTitleView(
                     segments: ["带走", "这段", "时间"],
                     color: ClayPalette.orange,
                     fontSize: 36
                 )
+                .padding(.bottom, ClaySpacing.xl)
 
                 PosterExportCard(
                     time: posterTime,
@@ -60,12 +61,14 @@ struct SharePosterView: View {
                 .flatDecorationRotation(model.motionField)
 
                 feedbackRow
+                    .padding(.top, ClaySpacing.md)
 
-                Spacer(minLength: ClaySpacing.sm)
+                Spacer(minLength: ClaySpacing.xxxl)
 
-                VStack(spacing: ClaySpacing.lg) {
+                VStack(spacing: ClaySpacing.md) {
                     PosterCapsuleButton(
                         title: model.isSavingPoster ? "正在保存…" : "保存到相册",
+                        style: .accent,
                         accessibilityHint: "将合成海报写入系统相册"
                     ) {
                         Task { await model.savePosterToLibrary() }
@@ -83,6 +86,7 @@ struct SharePosterView: View {
                         model.returnToResult()
                     }
                 }
+                .padding(.bottom, ClaySpacing.lg)
             }
         }
         .task(id: shareTaskID) {
@@ -121,17 +125,19 @@ struct SharePosterView: View {
                 )
             ) {
                 Text("分享海报")
-                    .font(.body.weight(.semibold))
+                    .font(PosterTypography.button)
                     .foregroundStyle(ClayPalette.charcoal)
+                    .lineLimit(1)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 56)
-                    .background(ClayPalette.charcoal)
-                    .clipShape(Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(ClayPalette.charcoal, lineWidth: 2)
-                    }
             }
+            .clayButtonStyle(
+                base: ClayPalette.warmWhite,
+                rim: ClayPalette.warmWhiteRim,
+                foreground: ClayPalette.charcoal,
+                cornerRadius: ClayShape.pill,
+                depth: 5
+            )
             .simultaneousGesture(TapGesture().onEnded {
                 model.playShareHaptic()
             })

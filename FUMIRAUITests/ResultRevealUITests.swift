@@ -29,6 +29,7 @@ final class ResultRevealUITests: XCTestCase {
     func testButtonFallbackCompletesBlowReveal() {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "result"
+        app.launchEnvironment["FUMIRA_EXPERIMENTS"] = "blowReveal"
         app.launch()
 
         let revealButton = app.buttons["result.reveal-now"]
@@ -44,6 +45,7 @@ final class ResultRevealUITests: XCTestCase {
     func testBlowRevealUsesOnePhysicalSurfaceAtPartialProgress() {
         let app = XCUIApplication()
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "result"
+        app.launchEnvironment["FUMIRA_EXPERIMENTS"] = "blowReveal"
         app.launchEnvironment["FUMIRA_AUDIT_RESULT_REVEAL_PROGRESS"] = "0.56"
         app.launchEnvironment["FUMIRA_AUDIT_BLOW_GUST"] = "0.88"
         app.launch()
@@ -129,6 +131,7 @@ final class ResultRevealUITests: XCTestCase {
         app.launchEnvironment["FUMIRA_AUDIT_PHASE"] = "result"
         app.launchEnvironment["FUMIRA_AUDIT_RESULT_REVEAL"] = "1"
         app.launchEnvironment["FUMIRA_AUDIT_TARGET_TIME"] = "future"
+        app.launchEnvironment["FUMIRA_EXPERIMENTS"] = "futureFork,shakeToFork"
         app.launch()
 
         let header = app.otherElements["result.future-fork"]

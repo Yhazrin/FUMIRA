@@ -33,14 +33,6 @@ struct ClaySegmentedControl: View {
                                 RoundedRectangle(cornerRadius: ClayShape.sm, style: .continuous)
                                     .fill(ClayPalette.orange)
                                     .overlay {
-                                        LinearGradient(
-                                            stops: ClayShadow.highlightStops,
-                                            startPoint: ClayShadow.highlightStart,
-                                            endPoint: ClayShadow.highlightEnd
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: ClayShape.sm, style: .continuous))
-                                    }
-                                    .overlay {
                                         ClayNoiseTexture(opacity: 0.12)
                                             .clipShape(RoundedRectangle(cornerRadius: ClayShape.sm, style: .continuous))
                                     }

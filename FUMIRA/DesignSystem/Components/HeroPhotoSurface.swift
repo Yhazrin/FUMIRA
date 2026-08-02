@@ -34,6 +34,9 @@ private struct GenerationReflectionBack: View {
     let selectedChoiceID: String?
     @Binding var note: String
     let isNoteCommitted: Bool
+    let pipelinePhase: AppPhase
+    let understandingProgress: Double
+    let generationProgress: Double
     let onSelect: (GenerationReflectionPrompt.Choice) -> Void
     let onCommitNote: () -> Void
 
@@ -52,7 +55,7 @@ private struct GenerationReflectionBack: View {
         ZStack {
             PosterPalette.paperWhite
 
-            VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+            VStack(alignment: .leading, spacing: PosterSpacing.md) {
                 HStack(spacing: PosterSpacing.xs) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                     Text("给时间的一句猜想")
@@ -69,14 +72,23 @@ private struct GenerationReflectionBack: View {
                 interaction
 
                 if let acknowledgement {
-                    Text(acknowledgement)
-                        .font(PosterTypography.caption)
-                        .foregroundStyle(PosterPalette.mutedInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .accessibilityIdentifier("reality.reflection-confirmation")
+                    VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+                        Text(acknowledgement)
+                            .font(PosterTypography.caption)
+                            .foregroundStyle(PosterPalette.mutedInk)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.72)
+                            .accessibilityIdentifier("reality.reflection-confirmation")
+
+                        GenerationPipelineTrace(
+                            phase: pipelinePhase,
+                            understandingProgress: understandingProgress,
+                            generationProgress: generationProgress
+                        )
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(PosterSpacing.md)
         }
         .accessibilityElement(children: .contain)
@@ -89,13 +101,13 @@ private struct GenerationReflectionBack: View {
     private var interaction: some View {
         switch prompt.interactionKind {
         case .choices:
-            VStack(spacing: PosterSpacing.xs) {
+            VStack(spacing: PosterSpacing.sm) {
                 ForEach(prompt.choices) { choice in
                     choiceRow(choice)
                 }
             }
         case .stamps:
-            HStack(spacing: PosterSpacing.xs) {
+            HStack(spacing: PosterSpacing.sm) {
                 ForEach(Array(prompt.choices.enumerated()), id: \.element.id) { index, choice in
                     stamp(choice, symbol: stampSymbols[index % stampSymbols.count])
                 }
@@ -196,44 +208,194 @@ private struct GenerationReflectionBack: View {
         .accessibilityIdentifier("reality.reflection-option-\(choice.id)")
     }
 
+    @ViewBuilder
     private var noteComposer: some View {
-        VStack(spacing: PosterSpacing.xs) {
-            TextField(prompt.notePlaceholder ?? "写一句话…", text: $note)
-                .font(PosterTypography.caption)
-                .foregroundStyle(PosterPalette.ink)
-                .lineLimit(1)
-                .padding(PosterSpacing.sm)
-                .frame(minHeight: HeroPhotoMetrics.minimumInteractiveHeight)
-                .background(
-                    PosterPalette.cardLight,
-                    in: RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
-                        .stroke(PosterPalette.line, lineWidth: 1)
-                }
-                .accessibilityIdentifier("reality.reflection-note")
+        if isNoteCommitted {
+            sealedNote
+        } else {
+            VStack(alignment: .leading, spacing: PosterSpacing.sm) {
+                Text("写给这一刻")
+                    .font(PosterTypography.caption.weight(.semibold))
+                    .foregroundStyle(PosterPalette.mutedInk)
 
-            Button {
-                onCommitNote()
-            } label: {
-                Label("封存这句话", systemImage: "seal")
+                TextField(prompt.notePlaceholder ?? "写一句话…", text: $note)
                     .font(PosterTypography.caption)
-                    .foregroundStyle(PosterPalette.actionBlueDeep)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: HeroPhotoMetrics.minimumInteractiveHeight
+                    .foregroundStyle(PosterPalette.ink)
+                    .lineLimit(1)
+                    .padding(PosterSpacing.sm)
+                    .frame(maxWidth: .infinity, minHeight: HeroPhotoMetrics.minimumInteractiveHeight)
+                    .background(
+                        PosterPalette.cardLight,
+                        in: RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
                     )
-                    .background(PosterPalette.cardActive, in: Capsule())
                     .overlay {
-                        Capsule()
-                            .stroke(PosterPalette.actionBlue, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
+                            .stroke(PosterPalette.line, lineWidth: 1)
                     }
+                    .accessibilityIdentifier("reality.reflection-note")
+
+                Button {
+                    onCommitNote()
+                } label: {
+                    Label("封存这句话", systemImage: "seal")
+                        .font(PosterTypography.caption)
+                        .foregroundStyle(PosterPalette.actionBlueDeep)
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: HeroPhotoMetrics.minimumInteractiveHeight
+                        )
+                        .background(PosterPalette.cardActive, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(PosterPalette.actionBlue, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(PosterPressStyle())
+                .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityIdentifier("reality.reflection-save-note")
             }
-            .buttonStyle(PosterPressStyle())
-            .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityIdentifier("reality.reflection-save-note")
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    /// Once sealed, the composer never re-shows the text field or button —
+    /// their fixed-width container above already keeps their size stable
+    /// while typing, but removing them entirely after commit is what makes
+    /// the "sealed" state read as genuinely final rather than still-editable.
+    private var sealedNote: some View {
+        HStack(alignment: .top, spacing: PosterSpacing.sm) {
+            Image(systemName: "seal.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(PosterPalette.actionBlueDeep)
+            Text(note)
+                .font(PosterTypography.caption.weight(.semibold))
+                .foregroundStyle(PosterPalette.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+        }
+        .padding(PosterSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            PosterPalette.cardActive,
+            in: RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: PosterRadius.card, style: .continuous)
+                .stroke(PosterPalette.actionBlue.opacity(0.5), lineWidth: 1)
+        }
+        .accessibilityIdentifier("reality.reflection-note-sealed")
+    }
+}
+
+/// A quiet, three-stage trace of what happens while the pipeline keeps
+/// working in the background — shown once the person has responded, so
+/// sealing a note or picking an answer never leads into silent waiting.
+private struct GenerationPipelineTrace: View {
+    let phase: AppPhase
+    let understandingProgress: Double
+    let generationProgress: Double
+
+    private let stages: [(label: String, systemImage: String)] = [
+        ("理解画面", "eye"),
+        ("编写故事", "text.quote"),
+        ("生成画面", "sparkles"),
+    ]
+
+    private var activeIndex: Int {
+        switch phase {
+        case .understanding: 0
+        case .storyWriting: 1
+        case .generating: 2
+        default: 2
+        }
+    }
+
+    private var activeProgress: Double? {
+        switch phase {
+        case .understanding: understandingProgress
+        case .generating: generationProgress
+        default: nil
+        }
+    }
+
+    private var nextStepCopy: String {
+        switch phase {
+        case .understanding:
+            "接下来会先读懂这张照片，再编写故事，最后生成新的画面。"
+        case .storyWriting:
+            "画面已经理解完成，正在为它编写时间线索。"
+        case .generating:
+            "故事写好了，新的画面正在生成。"
+        default:
+            "完成后会自动翻回照片正面，展示这一刻的新样子。"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+            HStack(spacing: PosterSpacing.xs) {
+                ForEach(Array(stages.enumerated()), id: \.offset) { index, stage in
+                    stageMark(stage, index: index)
+                    if index < stages.count - 1 {
+                        Rectangle()
+                            .fill(
+                                index < activeIndex
+                                    ? PosterPalette.actionBlue.opacity(0.6)
+                                    : PosterPalette.line
+                            )
+                            .frame(height: 1)
+                    }
+                }
+            }
+
+            if let activeProgress {
+                Capsule()
+                    .fill(PosterPalette.line)
+                    .frame(height: 3)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { proxy in
+                            Capsule()
+                                .fill(PosterPalette.actionBlue)
+                                .frame(
+                                    width: proxy.size.width
+                                        * min(max(activeProgress, 0), 1)
+                                )
+                        }
+                    }
+                    .clipShape(Capsule())
+            }
+
+            Text(nextStepCopy)
+                .font(PosterTypography.caption)
+                .foregroundStyle(PosterPalette.mutedInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("生成进度")
+        .accessibilityValue(nextStepCopy)
+    }
+
+    @ViewBuilder
+    private func stageMark(
+        _ stage: (label: String, systemImage: String),
+        index: Int
+    ) -> some View {
+        let isActive = index == activeIndex
+        let isDone = index < activeIndex
+        VStack(spacing: 2) {
+            Image(systemName: isDone ? "checkmark.circle.fill" : stage.systemImage)
+                .font(.caption.weight(.bold))
+            Text(stage.label)
+                .font(.caption2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .foregroundStyle(
+            isActive || isDone
+                ? PosterPalette.actionBlueDeep
+                : PosterPalette.mutedInk.opacity(0.55)
+        )
     }
 }
 
@@ -525,6 +687,9 @@ struct HeroPhotoSurface: View {
             selectedChoiceID: selectedReflectionChoiceID,
             note: $reflectionNote,
             isNoteCommitted: isReflectionNoteCommitted,
+            pipelinePhase: model.phase,
+            understandingProgress: model.understandingProgress,
+            generationProgress: model.generationProgress,
             onSelect: { choice in
                 withAnimation(PosterMotion.interaction) {
                     selectedReflectionChoiceID = choice.id

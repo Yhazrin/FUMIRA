@@ -42,15 +42,15 @@ struct ClayButtonStyle: ButtonStyle {
         }
             .shadow(
                 color: isPressed
-                    ? ClayShadow.pressed.color
-                    : ClayShadow.rest.color,
+                    ? ClayShadow.buttonPressed.color
+                    : ClayShadow.buttonRest.color,
                 radius: isPressed
-                    ? ClayShadow.pressed.radius
-                    : ClayShadow.rest.radius,
+                    ? ClayShadow.buttonPressed.radius
+                    : ClayShadow.buttonRest.radius,
                 x: 0,
                 y: isPressed
-                    ? ClayShadow.pressed.y
-                    : ClayShadow.rest.y
+                    ? ClayShadow.buttonPressed.y
+                    : ClayShadow.buttonRest.y
             )
             .opacity(isEnabled ? 1 : 0.46)
             .contentShape(
@@ -103,16 +103,6 @@ struct ClayMoldedControl<Label: View>: View {
                 .background {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(base)
-                        .overlay {
-                            LinearGradient(
-                                stops: ClayShadow.highlightStops,
-                                startPoint: ClayShadow.highlightStart,
-                                endPoint: ClayShadow.highlightEnd
-                            )
-                            .clipShape(
-                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            )
-                        }
                         .overlay {
                             ClayNoiseTexture(opacity: 0.035)
                                 .clipShape(

@@ -20,7 +20,7 @@ struct BluetoothPermissionView: View {
 
                 Text("连接 FutureCam")
                     .font(ClayTypography.displaySmall)
-                    .foregroundStyle(ClayPalette.textOnDark)
+                    .foregroundStyle(ClayPalette.textPrimary)
                     .multilineTextAlignment(.center)
 
                 Button {

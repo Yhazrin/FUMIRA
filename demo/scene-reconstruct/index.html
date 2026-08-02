@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FUMIRA Clay Scene — Street Mopeds</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#202425;overflow:hidden;font-family:'SF Pro Rounded',-apple-system,system-ui,sans-serif;color:#F2EEE5;height:100%;height:100dvh}
+  #canvas{display:block;width:100vw;height:100vh;height:100dvh}
+  #info{position:fixed;top:24px;left:24px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.4;line-height:1.8}
+  #info strong{opacity:1;color:#FF672A}
+  #loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#202425;z-index:100;transition:opacity 0.6s ease}
+  #loading.hidden{opacity:0;pointer-events:none}
+  #loading h1{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:8px}
+  #loading p{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.4}
+  .loader-blocks{display:flex;gap:6px;margin-top:24px}
+  .loader-blocks span{width:10px;height:10px;border-radius:2px;animation:loadPulse 0.8s ease infinite alternate}
+  .loader-blocks span:nth-child(1){background:#FF672A;animation-delay:0s}
+  .loader-blocks span:nth-child(2){background:#FFC52A;animation-delay:0.15s}
+  .loader-blocks span:nth-child(3){background:#B7D83D;animation-delay:0.3s}
+  @keyframes loadPulse{from{opacity:0.3;transform:scaleY(0.6)}to{opacity:1;transform:scaleY(1)}}
+</style>
+</head>
+<body>
+<div id="loading">
+  <h1>FUMIRA</h1>
+  <p>Reconstructing scene from photo</p>
+  <div class="loader-blocks"><span></span><span></span><span></span></div>
+</div>
+<div id="info">
+  <strong>SCENE RECONSTRUCTION</strong><br>
+  Street Mopeds — Clay Diorama<br>
+  Drag to rotate · Scroll to zoom
+</div>
+<canvas id="canvas"></canvas>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+// ── Palette (FUMIRA Clay3DStyle) ──
+const P = {
+  charcoal: 0x202425,
+  warmWhite: 0xF2EEE5,
+  warmWhiteR: 0xCEC7B8,
+  orange: 0xFF672A,
+  lime: 0xB7D83D,
+  yellow: 0xFFC52A,
+  ground: 0xD6CEBF,
+  road: 0x9E9688,
+  sidewalk: 0xC8C0B2,
+  grass: 0x8FCB7E,
+  trunk: 0x6B4E3D,
+  foliage1: 0x7E9A27,
+  foliage2: 0xB7D83D,
+  skin: 0xF2D5B5,
+  mopedRed: 0xC62828,
+  mopedDark: 0x1A1A1A,
+  mopedChrome: 0xC8C0B0,
+  hedge: 0x4A7A2A,
+  pinkCover: 0xF0B8C8,
+};
+
+// ── Clay material ──
+function clay(color, r=0.84) {
+  return new THREE.MeshStandardMaterial({color, roughness:r, metalness:0, flatShading:false});
+}
+
+// ── Renderer ──
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.VSMShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.setClearColor(P.charcoal);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(P.charcoal, 0.015);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(2.5, 2.0, 3.0);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 0.4, 0);
+controls.update();
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(P.warmWhite, 0.35));
+const key = new THREE.DirectionalLight(0xFFF5E8, 1.4);
+key.position.set(3, 6, 4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+scene.add(key);
+scene.add(new THREE.DirectionalLight(P.warmWhite, 0.3).translateX(-3).translateY(4));
+
+// ── Ground ──
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), clay(P.charcoal, 1));
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.02; ground.receiveShadow = true;
+scene.add(ground);
+
+// ── Sidewalk ──
+const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(4, 0.08, 6, 1,1,1), clay(P.sidewalk));
+sidewalk.position.set(0, 0.04, 0); sidewalk.receiveShadow = true; sidewalk.castShadow = true;
+scene.add(sidewalk);
+
+// ── Road ──
+const road = new THREE.Mesh(new THREE.BoxGeometry(6, 0.06, 6, 1,1,1), clay(P.road));
+road.position.set(0, 0.01, 4.5); road.receiveShadow = true;
+scene.add(road);
+
+// ── Moped builder ──
+function createMoped(x, z, rot=0, opts={}) {
+  const g = new THREE.Group();
+  const bodyC = opts.bodyColor || P.mopedRed;
+  const seatC = opts.seatColor || P.mopedDark;
+
+  // Body shell
+  const bodyShape = new THREE.Shape();
+  bodyShape.moveTo(-0.22, 0);
+  bodyShape.quadraticCurveTo(-0.22, 0.10, -0.15, 0.14);
+  bodyShape.lineTo(0.12, 0.14);
+  bodyShape.quadraticCurveTo(0.20, 0.14, 0.22, 0.08);
+  bodyShape.lineTo(0.22, 0);
+  bodyShape.lineTo(-0.22, 0);
+  const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, {depth:0.18, bevelEnabled:true, bevelThickness:0.015, bevelSize:0.015, bevelSegments:3, curveSegments:24});
+  bodyGeo.center();
+  const body = new THREE.Mesh(bodyGeo, clay(bodyC, 0.78));
+  body.rotation.y = Math.PI/2;
+  body.position.set(0, 0.14, 0);
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+
+  // Front panel
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.14, 0.03, 2,2,2), clay(bodyC, 0.78));
+  panel.position.set(0, 0.18, -0.14); panel.castShadow = true;
+  g.add(panel);
+
+  // Seat
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.20, 2,2,2), clay(seatC, 0.88));
+  seat.position.set(0, 0.24, 0.02); seat.castShadow = true;
+  g.add(seat);
+
+  // Wheels
+  function wheel(wz) {
+    const wg = new THREE.Group();
+    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.015, 12, 24), clay(P.mopedDark, 0.92));
+    wg.add(tire);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.015, 12), clay(P.mopedChrome, 0.4));
+    hub.rotation.x = Math.PI/2; wg.add(hub);
+    for(let i=0;i<5;i++){
+      const a=(i/5)*Math.PI*2;
+      const s=new THREE.Mesh(new THREE.BoxGeometry(0.004,0.04,0.004), clay(P.mopedChrome,0.4));
+      s.position.set(Math.cos(a)*0.02, Math.sin(a)*0.02, 0); s.rotation.z=a; wg.add(s);
+    }
+    wg.position.set(0, 0.08, wz);
+    wg.rotation.y = Math.PI/2;
+    return wg;
+  }
+  g.add(wheel(0.16));
+  g.add(wheel(-0.18));
+
+  // Front fork
+  [-1,1].forEach(s => {
+    const fork = new THREE.Mesh(new THREE.CylinderGeometry(0.005,0.005,0.14,6), clay(P.mopedDark));
+    fork.position.set(s*0.035, 0.16, -0.18);
+    fork.rotation.x = -0.15; fork.castShadow = true;
+    g.add(fork);
+  });
+
+  // Handlebar
+  const hbar = new THREE.Mesh(new THREE.CylinderGeometry(0.006,0.006,0.18,6), clay(P.mopedChrome,0.4));
+  hbar.position.set(0, 0.24, -0.17); hbar.rotation.z = Math.PI/2; hbar.castShadow = true;
+  g.add(hbar);
+
+  // Mirrors
+  [-1,1].forEach(s => {
+    const mStem = new THREE.Mesh(new THREE.CylinderGeometry(0.002,0.002,0.035,4), clay(P.mopedChrome,0.4));
+    mStem.position.set(s*0.10, 0.27, -0.16); mStem.rotation.z = s * -0.3;
+    g.add(mStem);
+    const mHead = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.004,8), clay(P.mopedChrome,0.4));
+    mHead.position.set(s*0.12, 0.29, -0.16); mHead.rotation.x = Math.PI/2;
+    g.add(mHead);
+  });
+
+  // Headlight
+  const hl = new THREE.Mesh(new THREE.SphereGeometry(0.015, 12, 8), clay(P.warmWhite, 0.3));
+  hl.position.set(0, 0.20, -0.22); g.add(hl);
+
+  // Taillight
+  const tl = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.015, 0.008, 2,2,2), clay(0xB71C1C, 0.5));
+  tl.position.set(0, 0.16, 0.20); g.add(tl);
+
+  // Basket wire
+  const basketG = new THREE.Group();
+  basketG.position.set(0, 0.20, -0.20);
+  const bw=0.10, bh=0.04, bd=0.07, br=0.002;
+  const wm = clay(P.mopedChrome, 0.4);
+  for(let i=0;i<4;i++){const w=new THREE.Mesh(new THREE.CylinderGeometry(br,br,bd,4),wm);w.position.set(-bw/2+i*(bw/3),0,0);w.rotation.x=Math.PI/2;basketG.add(w);}
+  for(let i=0;i<3;i++){const w=new THREE.Mesh(new THREE.CylinderGeometry(br,br,bw,4),wm);w.position.set(0,0,-bd/2+i*(bd/2));w.rotation.z=Math.PI/2;basketG.add(w);}
+  [[-bw/2,-bd/2],[-bw/2,bd/2],[bw/2,-bd/2],[bw/2,bd/2]].forEach(([bx,bz])=>{const u=new THREE.Mesh(new THREE.CylinderGeometry(br,br,bh,4),wm);u.position.set(bx,bh/2,bz);basketG.add(u);});
+  g.add(basketG);
+
+  // Kickstand
+  const ks = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.04, 0.005), clay(P.mopedDark));
+  ks.position.set(-0.06, 0.02, 0.02); ks.rotation.z = 0.4;
+  g.add(ks);
+
+  g.position.set(x, 0.08, z);
+  g.rotation.y = rot;
+  return g;
+}
+
+// Place 3 mopeds (reference has a row)
+scene.add(createMoped(0, 0, 0.05));
+scene.add(createMoped(-0.65, 0.15, 0.1, {bodyColor: 0xB71C1C}));
+scene.add(createMoped(0.60, -0.10, -0.05, {bodyColor: 0xC62828}));
+
+// ── Tree ──
+function createTree(x, z, scale=1) {
+  const tree = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.04*scale, 0.07*scale, 1.0*scale, 8), clay(P.trunk));
+  trunk.position.y = 0.5*scale; trunk.castShadow = true;
+  tree.add(trunk);
+  for(let i=0;i<4;i++){
+    const r = (0.3 + Math.random()*0.2) * scale;
+    const blob = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), clay(i%2===0 ? P.foliage1 : P.foliage2));
+    blob.position.set((Math.random()-0.5)*0.3*scale, 1.0*scale + (Math.random()-0.3)*0.2*scale, (Math.random()-0.5)*0.3*scale);
+    blob.scale.y = 0.7 + Math.random()*0.3;
+    blob.castShadow = true;
+    tree.add(blob);
+  }
+  tree.position.set(x, 0.08, z);
+  return tree;
+}
+scene.add(createTree(-1.5, 0.5, 1.0));
+scene.add(createTree(1.8, -0.3, 0.8));
+
+// ── Hedge (right side of reference) ──
+const hedge = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.35, 3.0, 2,2,2), clay(P.hedge, 0.88));
+hedge.position.set(1.5, 0.25, 0); hedge.castShadow = true; hedge.receiveShadow = true;
+scene.add(hedge);
+
+// ── Pink quilted cover on rear moped ──
+const cover = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 0.22, 2,2,2), clay(P.pinkCover, 0.82));
+cover.position.set(0.60, 0.28, -0.08); cover.castShadow = true;
+scene.add(cover);
+
+// ── Animate ──
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ── Resize ──
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Hide loading ──
+setTimeout(() => document.getElementById('loading').classList.add('hidden'), 600);
+</script>
+</body>
+</html>

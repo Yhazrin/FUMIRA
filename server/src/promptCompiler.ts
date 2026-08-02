@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { config } from "./config.js";
+import {
+  computeChangeBudget,
+  renderChangeBudget,
+  type ChangeBudget,
+} from "./changeBudget.js";
+import { DEFAULT_TIER, TIER_PROFILES, type PromptDetail } from "./tiers.js";
 import type {
   AspectRatio,
   GenerationContext,
@@ -32,6 +38,8 @@ interface CompileContext {
   plan: TemporalRenderPlan;
   timePosition: TimePositionPayload;
   aspectRatio: AspectRatio;
+  changeBudget: ChangeBudget;
+  promptDetail: PromptDetail;
 }
 
 interface Section {
@@ -114,6 +122,18 @@ const sections: Section[] = [
     },
     buildCompact(ctx) {
       return formatTemporalPlan(ctx, true);
+    },
+  },
+  {
+    id: "changeBudget",
+    retentionPriority: 96,
+    renderOrder: 45,
+    required: true,
+    buildFull(ctx) {
+      return renderChangeBudget(ctx.changeBudget, ctx.promptDetail);
+    },
+    buildCompact(ctx) {
+      return renderChangeBudget(ctx.changeBudget, "compact");
     },
   },
   {
@@ -241,8 +261,11 @@ export function compilePrompt(input: {
   context: GenerationContext;
   timePosition: TimePositionPayload;
   aspectRatio: AspectRatio;
+  promptDetail?: PromptDetail;
 }): CompiledPrompt {
   const targetBeat = input.context.story.targetBeat;
+  const promptDetail =
+    input.promptDetail ?? TIER_PROFILES[DEFAULT_TIER].promptDetail;
   const ctx: CompileContext = {
     understanding: input.context.understanding,
     story: input.context.story,
@@ -255,6 +278,8 @@ export function compilePrompt(input: {
       ),
     timePosition: input.timePosition,
     aspectRatio: input.aspectRatio,
+    changeBudget: computeChangeBudget(input.timePosition.offsetDays),
+    promptDetail,
   };
 
   const built = sections.map((section) => ({
@@ -278,13 +303,16 @@ export function compilePrompt(input: {
     }
   }
 
-  for (const section of [...built]
-    .filter((item) => !item.required && item.fullText)
-    .sort((a, b) => b.retentionPriority - a.retentionPriority)) {
-    const candidate = new Map(included);
-    candidate.set(section.id, section.fullText);
-    if (renderLength(candidate) <= TOTAL_BUDGET) {
-      included.set(section.id, section.fullText);
+  // The cheapest tier stops here: required sections only, no optional context.
+  if (promptDetail !== "compact") {
+    for (const section of [...built]
+      .filter((item) => !item.required && item.fullText)
+      .sort((a, b) => b.retentionPriority - a.retentionPriority)) {
+      const candidate = new Map(included);
+      candidate.set(section.id, section.fullText);
+      if (renderLength(candidate) <= TOTAL_BUDGET) {
+        included.set(section.id, section.fullText);
+      }
     }
   }
 

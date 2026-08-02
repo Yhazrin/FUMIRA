@@ -6,11 +6,21 @@ import {
   toClientGeneration,
 } from "../queue.js";
 import { getGeneration, getGeneratedAbsolutePath } from "../storage.js";
+import { anchorNormalizedPositions, DEFAULT_TIER, listTierProfiles } from "../tiers.js";
 import type { CreateGenerationBody } from "../types.js";
 
 export async function registerGenerationRoutes(
   app: FastifyInstance
 ): Promise<void> {
+  app.get("/v1/tiers", async () => ({
+    schemaVersion: "generation-tiers.v1" as const,
+    defaultTier: DEFAULT_TIER,
+    tiers: listTierProfiles().map((tier) => ({
+      ...tier,
+      anchorPositions: anchorNormalizedPositions(tier),
+    })),
+  }));
+
   app.post<{ Body: Record<string, unknown> }>(
     "/v1/generations",
     async (request, reply) => {

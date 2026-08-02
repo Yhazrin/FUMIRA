@@ -191,6 +191,14 @@ struct ViewfinderChromeOverlay: View {
                         subject,
                         in: compositionFrame
                     )
+
+                    SubjectLockScanEffect(confidence: subject.confidence)
+                        .frame(
+                            width: subjectFrame.width,
+                            height: subjectFrame.height
+                        )
+                        .position(x: subjectFrame.midX, y: subjectFrame.midY)
+
                     SubjectTrackingReticle(confidence: subject.confidence)
                         .frame(
                             width: subjectFrame.width,
@@ -199,7 +207,7 @@ struct ViewfinderChromeOverlay: View {
                         .position(x: subjectFrame.midX, y: subjectFrame.midY)
                         .animation(
                             reduceMotion ? nil : PosterMotion.subjectTracking,
-                            value: subject.normalizedBounds
+                            value: subject
                         )
                 }
 
@@ -329,14 +337,18 @@ struct ViewfinderChromeOverlay: View {
         _ subject: CameraTrackedSubject,
         in compositionFrame: CGRect
     ) -> CGRect {
-                let minimumExtent = ClaySpacing.xxl + ClaySpacing.xxs
+        let minimumExtent = ClaySpacing.xxl + ClaySpacing.xxs
         let proposedWidth = CGFloat(subject.normalizedWidth)
             * compositionFrame.width
         let proposedHeight = CGFloat(subject.normalizedHeight)
             * compositionFrame.height
         // Compact 1:1 lock — smaller than the raw Vision core so corner marks
-        // read as a quiet focus accent, not a full-scene selection.
-        let proposedSide = max(proposedWidth, proposedHeight) * 0.54
+        // read as a quiet focus accent, not a full-scene selection. A rising
+        // confidence pulls the corners in further, so finding the subject
+        // visibly tightens the lock instead of holding one static size.
+        let lockAmount = CGFloat(min(max(subject.confidence, 0), 1))
+        let lockScale = 0.60 - lockAmount * 0.14
+        let proposedSide = max(proposedWidth, proposedHeight) * lockScale
         let maxSide = min(compositionFrame.width, compositionFrame.height) * 0.28
         let side = min(max(proposedSide, minimumExtent), maxSide)
         let centerX = compositionFrame.minX
@@ -426,15 +438,7 @@ struct ViewfinderChromeOverlay: View {
         HStack {
             albumPickerButton
             Spacer(minLength: 0)
-            CameraChromeButton(
-                systemImage: "gearshape",
-                isEnabled: true,
-                rotation: chromeRotation,
-                accessibilityLabelText: "设置",
-                accessibilityHintText: "打开设置页面"
-            ) {
-                isSettingsPresented = true
-            }
+            settingsButton
         }
         .padding(.horizontal, ClaySpacing.lg)
         .frame(height: CameraChromeMetrics.topRowHeight, alignment: .center)
@@ -528,6 +532,22 @@ struct ViewfinderChromeOverlay: View {
         try? await Task.sleep(for: PosterMotion.cameraInputGuard)
         guard !Task.isCancelled else { return }
         controlsAreReady = true
+    }
+
+    /// A plain trigger — no raised clay chrome, just the gear glyph and a
+    /// normal press response, matching the album picker's simplicity.
+    private var settingsButton: some View {
+        Button {
+            isSettingsPresented = true
+        } label: {
+            CameraChromeGlyph(
+                systemImage: "gearshape",
+                rotation: chromeRotation
+            )
+        }
+        .buttonStyle(PosterPressStyle())
+        .accessibilityLabel("设置")
+        .accessibilityHint("打开设置页面")
     }
 
     private var albumPickerButton: some View {

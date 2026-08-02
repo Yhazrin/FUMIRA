@@ -1,0 +1,69 @@
+{
+  "objects": [
+    {
+      "type": "building",
+      "label": "Campus Main Building",
+      "confidence": 0.92,
+      "bounds": {
+        "x": 0.3,
+        "y": 0.2,
+        "w": 0.4,
+        "h": 0.5
+      }
+    },
+    {
+      "type": "tree",
+      "label": "Oak Tree",
+      "confidence": 0.88,
+      "bounds": {
+        "x": 0.1,
+        "y": 0.3,
+        "w": 0.15,
+        "h": 0.3
+      }
+    },
+    {
+      "type": "tree",
+      "label": "Pine Tree",
+      "confidence": 0.85,
+      "bounds": {
+        "x": 0.75,
+        "y": 0.25,
+        "w": 0.12,
+        "h": 0.35
+      }
+    },
+    {
+      "type": "road",
+      "label": "Campus Path",
+      "confidence": 0.95,
+      "bounds": {
+        "x": 0,
+        "y": 0.7,
+        "w": 1,
+        "h": 0.3
+      }
+    },
+    {
+      "type": "person",
+      "label": "Student",
+      "confidence": 0.72,
+      "bounds": {
+        "x": 0.5,
+        "y": 0.5,
+        "w": 0.08,
+        "h": 0.2
+      }
+    }
+  ],
+  "scene": "university campus with main building, trees, and walking paths",
+  "style": "modern architecture with warm brick and glass",
+  "dominantColors": [
+    "#8B7355",
+    "#4A90D9",
+    "#5B8C3E",
+    "#D4C5A9"
+  ],
+  "timeOfDay": "afternoon",
+  "weather": "clear"
+}

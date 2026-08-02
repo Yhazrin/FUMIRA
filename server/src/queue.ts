@@ -26,6 +26,7 @@ import type {
   ExactTarget,
   GenerationContext,
   GenerationRecord,
+  GenerationValidationResult,
   ImageGenerationAdapter,
   ImageGenerationProvider,
   SceneUnderstandingPayload,
@@ -33,9 +34,9 @@ import type {
   StructuredGenerationBody,
   TimePositionPayload,
 } from "./types.js";
+import { resolveTier, type TierProfile } from "./tiers.js";
 import {
   getPostGenerationValidationAdapter,
-  planFromValidation,
   runPostGenerationValidation,
 } from "./validationService.js";
 import { shouldAttemptRepair, DEFAULT_REPAIR_INSTRUCTION } from "./validation.js";
@@ -50,6 +51,7 @@ const promptByGeneration = new Map<
     understanding: SceneUnderstandingPayload | null;
     storyBeat: StoryBeatPayload | null;
     targetTime: { offsetYears: number; compactLabel: string };
+    tier: TierProfile;
   }
 >();
 
@@ -103,12 +105,13 @@ export function createGenerationJob(
       retryable: false,
     };
   }
+  const tier = resolveTier((body as { tier?: unknown }).tier);
   const imageProvider: ImageGenerationProvider =
-    body.imageProvider === "apimart" ? "apimart" : "minimax";
+    body.imageProvider ?? tier.imageProvider;
   const adapter = getImageGenerationAdapter(imageProvider);
   const imageModel =
     imageProvider === "apimart"
-      ? resolveAPIMartImageModel(body.imageModel)
+      ? resolveAPIMartImageModel(body.imageModel, tier)
       : undefined;
   // Runtime readiness = admin kill-switch + the specifically requested adapter.
   if (!settings.remoteGenerationEnabled || !adapter) {
@@ -163,6 +166,7 @@ export function createGenerationJob(
       context: ctx,
       timePosition,
       aspectRatio,
+      promptDetail: tier.promptDetail,
     });
     understanding = ctx.understanding;
     beat = ctx.story.targetBeat;
@@ -234,10 +238,11 @@ export function createGenerationJob(
     updatedAt: now,
     modelName:
       imageProvider === "apimart"
-        ? (imageModel ?? "gpt-image-2")
+        ? (imageModel ?? tier.imageModel)
         : settings.modelName,
     imageProvider,
     aspectRatio,
+    tier: tier.id,
     promptTruncated: built.truncated,
     promptCharCount: built.charCount,
     promptVersion: built.version,
@@ -252,6 +257,7 @@ export function createGenerationJob(
     understanding,
     storyBeat: beat,
     targetTime: timePosition,
+    tier,
   });
 
   putGeneration(record);
@@ -263,6 +269,8 @@ export function createGenerationJob(
       requestId: record.requestId,
       generationId: record.generationId,
       status: record.status,
+      tier: tier.id,
+      model: record.modelName,
       promptTruncated: record.promptTruncated,
       promptVersion: built.version,
     })
@@ -538,17 +546,8 @@ async function processGeneration(generationId: string): Promise<void> {
       contentType: result.contentType,
     });
 
-    const primaryRelativeUrl = resultRelativeUrl;
-    updateGeneration(generationId, {
-      status: "succeeded",
-      finishedAt: new Date().toISOString(),
-      durationMs: Date.now() - startedAt,
-      resultRelativeUrl: primaryRelativeUrl,
-    });
-
-    // Post-generation validation + at-most-one repair, only when validation is
-    // enabled and we have enough metadata to compare source vs target.
-    const finalRelativeUrl = await maybeRepair({
+    const tier = stored?.tier ?? resolveTier(current.tier);
+    const quality = await runQualityLoop({
       generationId,
       sourceAssetId: current.sourceAssetId,
       requestId: current.requestId,
@@ -556,6 +555,7 @@ async function processGeneration(generationId: string): Promise<void> {
       sourceContentType: asset.contentType,
       targetBytes: result.imageBytes,
       targetContentType: result.contentType,
+      primaryRelativeUrl: resultRelativeUrl,
       targetTime: stored?.targetTime ?? {
         offsetYears: 0,
         compactLabel: "NOW",
@@ -564,22 +564,27 @@ async function processGeneration(generationId: string): Promise<void> {
       storyBeat: stored?.storyBeat ?? null,
       aspectRatio: current.aspectRatio,
       adapter,
+      modelName: current.modelName,
       useSubjectReference: Boolean(stored?.useSubjectReference),
       originalPrompt: prompt,
+      validationEnabled: tier.validationEnabled,
+      maxRounds: tier.repairRounds,
     });
-    const finalUrl = finalRelativeUrl ?? primaryRelativeUrl;
     promptByGeneration.delete(generationId);
-
-    updateGeneration(generationId, {
-      resultRelativeUrl: finalUrl,
-      updatedAt: new Date().toISOString(),
-    });
 
     updateGeneration(generationId, {
       status: "succeeded",
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
-      resultRelativeUrl: finalUrl,
+      resultRelativeUrl: quality.relativeUrl,
+      repairedResultRelativeUrl:
+        quality.relativeUrl === resultRelativeUrl
+          ? undefined
+          : quality.relativeUrl,
+      repairAttempts: quality.repairAttempts,
+      validationSummary: quality.lastSummary,
+      qualityScore: quality.qualityScore,
+      qualityHistory: quality.qualityHistory,
     });
 
     console.info(
@@ -590,6 +595,9 @@ async function processGeneration(generationId: string): Promise<void> {
         durationMs: Date.now() - startedAt,
         model: current.modelName,
         provider: current.imageProvider,
+        tier: tier.id,
+        qualityScore: quality.qualityScore,
+        repairAttempts: quality.repairAttempts,
       })
     );
   } catch (error) {
@@ -608,13 +616,40 @@ async function processGeneration(generationId: string): Promise<void> {
   }
 }
 
+interface QualityLoopOutcome {
+  relativeUrl: string;
+  qualityScore?: number;
+  qualityHistory: number[];
+  repairAttempts: number;
+  lastSummary?: GenerationValidationResult;
+}
+
+const VALIDATION_METRICS = [
+  "cameraConsistency",
+  "anchorPreservation",
+  "identityConsistency",
+  "temporalCoverage",
+  "environmentEvolution",
+  "eraCoherence",
+  "storyAlignment",
+] as const;
+
+function meanScore(value: GenerationValidationResult): number {
+  const total = VALIDATION_METRICS.reduce(
+    (sum, metric) => sum + value[metric],
+    0
+  );
+  return total / VALIDATION_METRICS.length;
+}
+
 /**
- * Run an optional dual-image VLM validate against the just-generated image,
- * and at most once trigger a regenerate with a repair-instruction augmented
- * prompt. Returns the relative URL of the chosen final image, or `null`
- * when no validation was performed / the primary result is the final image.
+ * Bounded validate → repair → re-validate loop.
+ *
+ * Each repair round sees both the source and the rejected attempt, and its
+ * output is validated again rather than trusted. The highest-scoring image
+ * across all rounds wins, so a repair can never make the served result worse.
  */
-async function maybeRepair(input: {
+async function runQualityLoop(input: {
   generationId: string;
   sourceAssetId: string;
   requestId: string;
@@ -622,6 +657,7 @@ async function maybeRepair(input: {
   sourceContentType: string;
   targetBytes: Buffer;
   targetContentType: string;
+  primaryRelativeUrl: string;
   targetTime: { offsetYears: number; compactLabel: string };
   understanding: SceneUnderstandingPayload | null;
   storyBeat: StoryBeatPayload | null;
@@ -629,95 +665,144 @@ async function maybeRepair(input: {
     ? (A extends { aspectRatio: infer R } ? R : never)
     : never;
   adapter: ImageGenerationAdapter;
+  modelName: string;
   useSubjectReference: boolean;
   originalPrompt: string;
-}): Promise<string | null> {
-  const validator = getPostGenerationValidationAdapter();
-  if (!validator) return null;
-  const validationStart = Date.now();
-  const validation = await runPostGenerationValidation({
-    sourceAssetId: input.sourceAssetId,
-    sourceContentType: input.sourceContentType,
-    targetBytes: input.targetBytes,
-    targetContentType: input.targetContentType,
-    targetTime: input.targetTime,
-    understanding: input.understanding,
-    storyBeat: input.storyBeat,
-    requestId: input.requestId,
-  }).catch(() => null);
-  if (!validation) return null;
-  if (!validation.ok) {
+  validationEnabled: boolean;
+  maxRounds: number;
+}): Promise<QualityLoopOutcome> {
+  const idle: QualityLoopOutcome = {
+    relativeUrl: input.primaryRelativeUrl,
+    qualityHistory: [],
+    repairAttempts: 0,
+  };
+  if (!input.validationEnabled) return idle;
+  if (!getPostGenerationValidationAdapter()) return idle;
+
+  let currentBytes = input.targetBytes;
+  let currentContentType = input.targetContentType;
+  let currentUrl = input.primaryRelativeUrl;
+  let bestUrl = input.primaryRelativeUrl;
+  let bestScore = -1;
+  let repairAttempts = 0;
+  let lastSummary: GenerationValidationResult | undefined;
+  const qualityHistory: number[] = [];
+
+  for (let round = 0; round <= input.maxRounds; round += 1) {
+    const validationStart = Date.now();
+    const validation = await runPostGenerationValidation({
+      sourceAssetId: input.sourceAssetId,
+      sourceContentType: input.sourceContentType,
+      targetBytes: currentBytes,
+      targetContentType: currentContentType,
+      targetTime: input.targetTime,
+      understanding: input.understanding,
+      storyBeat: input.storyBeat,
+      requestId: input.requestId,
+    }).catch(() => null);
+
+    if (!validation || !validation.ok) {
+      console.info(
+        JSON.stringify({
+          event: "validation_failed",
+          requestId: input.requestId,
+          generationId: input.generationId,
+          round,
+          errorCode: validation?.ok === false ? validation.errorCode : "no_result",
+          durationMs: Date.now() - validationStart,
+        })
+      );
+      break;
+    }
+
+    const value = validation.value;
+    lastSummary = value;
+    const score = meanScore(value);
+    qualityHistory.push(Number(score.toFixed(4)));
+    if (score > bestScore) {
+      bestScore = score;
+      bestUrl = currentUrl;
+    }
+
     console.info(
       JSON.stringify({
-        event: "validation_failed",
+        event: "validation_succeeded",
         requestId: input.requestId,
         generationId: input.generationId,
-        errorCode: validation.errorCode,
+        round,
+        score: Number(score.toFixed(4)),
+        cameraConsistency: value.cameraConsistency,
+        anchorPreservation: value.anchorPreservation,
+        identityConsistency: value.identityConsistency,
+        temporalCoverage: value.temporalCoverage,
+        environmentEvolution: value.environmentEvolution,
+        eraCoherence: value.eraCoherence,
+        storyAlignment: value.storyAlignment,
+        shouldRegenerate: value.shouldRegenerate,
         durationMs: Date.now() - validationStart,
       })
     );
-    return null;
-  }
-  const value = validation.value;
-  console.info(
-    JSON.stringify({
-      event: "validation_succeeded",
+
+    if (!shouldAttemptRepair(value)) break;
+    if (round === input.maxRounds) break;
+
+    const repairInstructions = value.repairInstructions.length
+      ? value.repairInstructions
+      : [DEFAULT_REPAIR_INSTRUCTION];
+    const repairId = `${input.generationId}-repair-${round + 1}`;
+    const repair = await input.adapter.generate({
+      prompt: buildRepairPrompt(input.originalPrompt, repairInstructions),
+      imageDataUrl: toJpegDataUrl(input.sourceBytes, input.sourceContentType),
+      priorAttemptDataUrl: toJpegDataUrl(currentBytes, currentContentType),
+      aspectRatio: input.aspectRatio as never,
+      useSubjectReference: input.useSubjectReference,
       requestId: input.requestId,
-      generationId: input.generationId,
-      cameraConsistency: value.cameraConsistency,
-      anchorPreservation: value.anchorPreservation,
-      identityConsistency: value.identityConsistency,
-      temporalCoverage: value.temporalCoverage,
-      environmentEvolution: value.environmentEvolution,
-      eraCoherence: value.eraCoherence,
-      storyAlignment: value.storyAlignment,
-      shouldRegenerate: value.shouldRegenerate,
-      durationMs: Date.now() - validationStart,
-    })
-  );
-  if (!shouldAttemptRepair(value)) return null;
-  const plan = planFromValidation(value);
-  const repairInstructions =
-    plan?.repairInstructions ?? [DEFAULT_REPAIR_INSTRUCTION];
-  const repairPrompt = buildRepairPrompt(
-    input.originalPrompt,
-    repairInstructions
-  );
-  const repair = await input.adapter.generate({
-    prompt: repairPrompt,
-    imageDataUrl: toJpegDataUrl(input.sourceBytes, input.sourceContentType),
-    aspectRatio: input.aspectRatio as never,
-    useSubjectReference: input.useSubjectReference,
-    requestId: input.requestId,
-    generationId: `${input.generationId}-repair`,
-  });
-  if (!repair.ok) {
+      generationId: repairId,
+      modelName: input.modelName,
+    });
+
+    if (!repair.ok) {
+      console.info(
+        JSON.stringify({
+          event: "repair_failed",
+          requestId: input.requestId,
+          generationId: input.generationId,
+          round: round + 1,
+          errorCode: repair.errorCode,
+        })
+      );
+      break;
+    }
+
+    repairAttempts += 1;
+    currentBytes = repair.imageBytes;
+    currentContentType = repair.contentType;
+    currentUrl = await saveGeneratedImage({
+      generationId: repairId,
+      bytes: currentBytes,
+      contentType: currentContentType,
+    });
+
     console.info(
       JSON.stringify({
-        event: "repair_failed",
+        event: "repair_succeeded",
         requestId: input.requestId,
         generationId: input.generationId,
-        errorCode: repair.errorCode,
+        round: round + 1,
+        repairUrl: currentUrl,
+        problems: value.problems,
+        repairInstructions,
       })
     );
-    return null;
   }
-  const repairedUrl = await saveGeneratedImage({
-    generationId: `${input.generationId}-repair`,
-    bytes: repair.imageBytes,
-    contentType: repair.contentType,
-  });
-  console.info(
-    JSON.stringify({
-      event: "repair_succeeded",
-      requestId: input.requestId,
-      generationId: input.generationId,
-      repairUrl: repairedUrl,
-      problems: value.problems,
-      repairInstructions,
-    })
-  );
-  return repairedUrl;
+
+  return {
+    relativeUrl: bestUrl,
+    qualityScore: bestScore >= 0 ? Number(bestScore.toFixed(4)) : undefined,
+    qualityHistory,
+    repairAttempts,
+    lastSummary,
+  };
 }
 
 function buildRepairPrompt(
@@ -764,6 +849,7 @@ export function toClientGeneration(record: GenerationRecord) {
     modelName: record.modelName,
     imageProvider: record.imageProvider ?? "minimax",
     aspectRatio: record.aspectRatio,
+    tier: record.tier,
     promptTruncated: record.promptTruncated,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -791,12 +877,17 @@ export function toAdminGeneration(record: GenerationRecord) {
     modelName: record.modelName,
     imageProvider: record.imageProvider ?? "minimax",
     aspectRatio: record.aspectRatio,
+    tier: record.tier,
     promptTruncated: record.promptTruncated,
     promptCharCount: record.promptCharCount,
     promptVersion: record.promptVersion,
     promptHash: record.promptHash,
     sectionCharCounts: record.sectionCharCounts,
     truncatedSections: record.truncatedSections,
+    qualityScore: record.qualityScore,
+    qualityHistory: record.qualityHistory,
+    repairAttempts: record.repairAttempts,
+    validationSummary: record.validationSummary,
     durationMs: record.durationMs,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -810,6 +901,7 @@ export function adminList() {
 }
 
 const APIMART_IMAGE_MODELS = new Set([
+  "gpt-4o-image",
   "gpt-image-2",
   "gemini-3.1-flash-image-preview",
   "gemini-3-pro-image-preview",
@@ -817,12 +909,17 @@ const APIMART_IMAGE_MODELS = new Set([
   "flux-kontext-pro",
 ]);
 
-function resolveAPIMartImageModel(raw: string | undefined): string {
+function resolveAPIMartImageModel(
+  raw: string | undefined,
+  tier: TierProfile
+): string {
   const trimmed = raw?.trim();
   if (trimmed && APIMART_IMAGE_MODELS.has(trimmed)) {
     return trimmed;
   }
-  return "gpt-image-2";
+  return APIMART_IMAGE_MODELS.has(tier.imageModel)
+    ? tier.imageModel
+    : "gpt-4o-image";
 }
 
 /** Wait helper for tests. */

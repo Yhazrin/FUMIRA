@@ -33,6 +33,7 @@ export class JobOrchestrator extends EventEmitter {
   /** External service providers (injected). */
   #xiaomiProvider;
   #claudeWorker;
+  #useClayWorker = false;
   #sceneCompiler;
 
   /** Root directory under which per-job folders are created. */
@@ -53,10 +54,12 @@ export class JobOrchestrator extends EventEmitter {
    * @param {string} opts.jobsDir        – Absolute path to the jobs root directory
    * @param {number} [opts.maxConcurrent=1] – Maximum concurrent jobs
    */
-  constructor({ xiaomiProvider, claudeWorker, sceneCompiler, jobsDir, maxConcurrent }) {
+  constructor({ xiaomiProvider, claudeWorker, clayWorker, sceneCompiler, jobsDir, maxConcurrent }) {
     super();
     this.#xiaomiProvider = xiaomiProvider;
-    this.#claudeWorker = claudeWorker;
+    // ClayWorker is preferred (clay style, faster); fall back to generic ClaudeWorker.
+    this.#claudeWorker = clayWorker || claudeWorker;
+    this.#useClayWorker = !!clayWorker;
     this.#sceneCompiler = sceneCompiler;
     this.#jobsDir = path.resolve(jobsDir);
     this.#maxConcurrent = maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
@@ -256,23 +259,38 @@ export class JobOrchestrator extends EventEmitter {
       if (entity.buildStatus === 'refined') continue;
 
       try {
-        const refined = await this.#claudeWorker.executeTask({
+        // Build task — ClayWorker uses entitySpecPath, generic ClaudeWorker uses sceneSpecPath.
+        const task = {
           taskType: 'REFINE_ENTITY',
           jobId: job.id,
           entityId: entity.id,
-          sceneSpecPath,
           referenceImagePath: job.input.photoPath,
           outputDirectory: path.join(jobDir, 'output', 'entities', entity.id),
-          maxTurns: REFINE_MAX_TURNS,
-          timeoutMs: REFINE_TIMEOUT_MS,
-        });
+          maxTurns: this.#useClayWorker ? 4 : REFINE_MAX_TURNS,
+          timeoutMs: this.#useClayWorker ? 90_000 : REFINE_TIMEOUT_MS,
+        };
+        if (this.#useClayWorker) {
+          // ClayWorker expects the entity spec path; write entity to disk for it.
+          const entitySpecPath = path.join(jobDir, 'output', 'entities', entity.id, 'entity-spec.json');
+          await mkdir(path.dirname(entitySpecPath), { recursive: true });
+          await writeFile(entitySpecPath, JSON.stringify(entity, null, 2));
+          task.entitySpecPath = entitySpecPath;
+        } else {
+          task.sceneSpecPath = sceneSpecPath;
+        }
+
+        const refined = await this.#claudeWorker.executeTask(task);
 
         if (refined.success) {
           entity.buildStatus = 'refined';
+          // ClayWorker returns entityPatch (singular), generic returns entityPatches (plural).
+          const patches = this.#useClayWorker
+            ? (refined.entityPatch ? [refined.entityPatch] : [])
+            : (refined.entityPatches || []);
           this.emit('entity:refined', {
             jobId: job.id,
             entityId: entity.id,
-            patches: refined.entityPatches,
+            patches,
           });
         }
       } catch (err) {

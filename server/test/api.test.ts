@@ -266,13 +266,68 @@ describe("fumira-server", () => {
     const finished = await waitForGeneration(create.json().generationId, 3000);
     assert.equal(finished?.status, "succeeded");
     assert.equal(finished?.imageProvider, "apimart");
-    assert.equal(finished?.modelName, "gpt-image-2");
+    // No explicit tier or model: the default `balanced` tier resolves the model.
+    assert.equal(finished?.modelName, "gpt-4o-image");
+    assert.equal(finished?.tier, "balanced");
 
     const poll = await app.inject({
       method: "GET",
       url: `/v1/generations/${create.json().generationId}`,
     });
     assert.equal(poll.json().imageProvider, "apimart");
+  });
+
+  it("resolves the image model from the requested tier", async () => {
+    const { payload, contentType } = multipartBody(
+      {},
+      { name: "scene.jpg", contentType: "image/jpeg", bytes: TINY_JPEG }
+    );
+    const upload = await app.inject({
+      method: "POST",
+      url: "/v1/uploads",
+      headers: { "content-type": contentType },
+      payload,
+    });
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/generations",
+      payload: {
+        sourceAssetId: upload.json().assetId,
+        requestId: "req-tier-swift",
+        tier: "swift",
+        aspectRatio: "3:4",
+        prompt: "Keep this exact place and camera continuous while time advances.",
+        timePosition: {
+          normalized: normalizedForOffsetDays(7305),
+          offsetDays: 7305,
+          offsetYears: 20,
+          compactLabel: "20 年后",
+        },
+      },
+    });
+    assert.equal(create.statusCode, 202);
+
+    const finished = await waitForGeneration(create.json().generationId, 3000);
+    assert.equal(finished?.status, "succeeded");
+    assert.equal(finished?.imageProvider, "apimart");
+    assert.equal(finished?.modelName, "gemini-3.1-flash-image-preview");
+    assert.equal(finished?.tier, "swift");
+  });
+
+  it("exposes the tier catalog with symmetric anchor positions", async () => {
+    const response = await app.inject({ method: "GET", url: "/v1/tiers" });
+    assert.equal(response.statusCode, 200);
+    const body = response.json();
+    assert.equal(body.defaultTier, "balanced");
+    assert.equal(body.tiers.length, 4);
+
+    for (const tier of body.tiers) {
+      assert.equal(tier.anchorPositions.length, tier.anchorCount);
+      assert.equal(tier.anchorPositions[0], -1);
+      assert.equal(tier.anchorPositions.at(-1), 1);
+      assert.equal(tier.anchorPositions[(tier.anchorCount - 1) / 2], 0);
+    }
   });
 
   it("maps MiniMax 2013 to non-retryable invalid_params", async () => {

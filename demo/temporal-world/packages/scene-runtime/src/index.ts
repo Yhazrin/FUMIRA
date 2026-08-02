@@ -101,12 +101,14 @@ export function createScene(fixture: SceneFixture, canvas: HTMLCanvasElement): S
   scene.fog = new THREE.FogExp2(hex(fixture.style.fog.color), fixture.style.fog.density);
 
   const camera = new THREE.PerspectiveCamera(
-    38,
+    fixture.camera?.fov ?? 38,
     window.innerWidth / window.innerHeight,
     0.1,
     100,
   );
-  camera.position.set(5.5, 4.8, 6.2);
+  const cameraPosition = fixture.camera?.position ?? [5.5, 4.8, 6.2];
+  const cameraTarget = fixture.camera?.target ?? [0, 0.6, 0];
+  camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
@@ -114,7 +116,7 @@ export function createScene(fixture: SceneFixture, canvas: HTMLCanvasElement): S
   controls.minDistance = 3;
   controls.maxDistance = 16;
   controls.maxPolarAngle = Math.PI * 0.48;
-  controls.target.set(0, 0.6, 0);
+  controls.target.set(cameraTarget[0], cameraTarget[1], cameraTarget[2]);
   controls.update();
 
   // Lighting

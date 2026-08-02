@@ -1,0 +1,273 @@
+{
+  "type": "scene.manifest",
+  "revision": 4,
+  "sceneGraph": [
+    {
+      "id": "node_ground_platform",
+      "type": "mesh",
+      "geometry": {
+        "type": "BoxGeometry",
+        "args": [
+          12,
+          0.1,
+          12
+        ]
+      },
+      "position": [
+        0,
+        -0.05,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#8FCB7E",
+        "roughness": 0.76,
+        "metalness": 0,
+        "opacity": 1,
+        "transparent": false
+      },
+      "children": []
+    },
+    {
+      "id": "node_tree_trunk_01",
+      "type": "mesh",
+      "geometry": {
+        "type": "CylinderGeometry",
+        "args": [
+          0.12,
+          0.15,
+          0.8,
+          8
+        ]
+      },
+      "position": [
+        -1.8,
+        0.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#5C4033",
+        "roughness": 0.76,
+        "metalness": 0,
+        "opacity": 1,
+        "transparent": false
+      },
+      "children": []
+    },
+    {
+      "id": "node_tree_crown_01",
+      "type": "mesh",
+      "geometry": {
+        "type": "SphereGeometry",
+        "args": [
+          0.65,
+          12,
+          10
+        ]
+      },
+      "position": [
+        -1.8,
+        1.1,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "material": {
+        "color": "#8FCB7E",
+        "roughness": 0.52,
+        "metalness": 0,
+        "opacity": 1,
+        "transparent": false
+      },
+      "children": []
+    },
+    {
+      "id": "node_cube_01",
+      "type": "mesh",
+      "geometry": {
+        "type": "BoxGeometry",
+        "args": [
+          1,
+          1,
+          1
+        ]
+      },
+      "position": [
+        1.5,
+        0.5,
+        0.3
+      ],
+      "rotation": [
+        0,
+        0.3,
+        0
+      ],
+      "material": {
+        "color": "#4A90D9",
+        "roughness": 0.52,
+        "metalness": 0,
+        "opacity": 1,
+        "transparent": false
+      },
+      "children": []
+    }
+  ],
+  "entities": {
+    "ground_platform": {
+      "sceneNodeId": "node_ground_platform",
+      "spec": {
+        "id": "ground_platform",
+        "type": "prop",
+        "label": "Ground Platform",
+        "temporalRange": [
+          -1,
+          1
+        ]
+      },
+      "temporalInterpolationTables": {
+        "0": {
+          "position": [
+            0,
+            -0.05,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "tree_trunk_01": {
+      "sceneNodeId": "node_tree_trunk_01",
+      "spec": {
+        "id": "tree_trunk_01",
+        "type": "prop",
+        "label": "Tree Trunk",
+        "temporalRange": [
+          -1,
+          1
+        ]
+      },
+      "temporalInterpolationTables": {
+        "0": {
+          "position": [
+            -1.8,
+            0.4,
+            -0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "tree_crown_01": {
+      "sceneNodeId": "node_tree_crown_01",
+      "spec": {
+        "id": "tree_crown_01",
+        "type": "prop",
+        "label": "Tree Crown",
+        "temporalRange": [
+          -1,
+          1
+        ]
+      },
+      "temporalInterpolationTables": {
+        "0": {
+          "position": [
+            -1.8,
+            1.1,
+            -0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "cube_01": {
+      "sceneNodeId": "node_cube_01",
+      "spec": {
+        "id": "cube_01",
+        "type": "prop",
+        "label": "Clay Cube",
+        "temporalRange": [
+          -1,
+          1
+        ]
+      },
+      "temporalInterpolationTables": {
+        "0": {
+          "position": [
+            1.5,
+            0.5,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0.3,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    }
+  },
+  "temporalSpec": {
+    "raw": {
+      "anchorYears": [
+        0
+      ]
+    }
+  },
+  "defaultCamera": {
+    "position": [
+      0,
+      5,
+      10
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ]
+  },
+  "timestamp": 1785568966549
+}

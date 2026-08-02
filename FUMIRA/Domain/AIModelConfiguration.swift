@@ -188,12 +188,21 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
                 availability: .ready
             ),
             AIModelOption(
+                id: "apimart.image.gpt-4o",
+                role: .image,
+                provider: .apiMart,
+                modelID: "apimart/gpt-4o-image",
+                displayName: "GPT-4o Image",
+                detail: "默认图生图，指令跟随稳、构图还原度高",
+                availability: .ready
+            ),
+            AIModelOption(
                 id: "apimart.image.gpt-image-2",
                 role: .image,
                 provider: .apiMart,
                 modelID: "apimart/gpt-image-2",
                 displayName: "GPT-Image-2",
-                detail: "原图参考、多比例与 2K/4K 输出",
+                detail: "专用图像编辑模型，机位与锈点保持最好，支持 2K/4K",
                 availability: .ready
             ),
             AIModelOption(
@@ -211,7 +220,7 @@ struct AIModelCatalog: Hashable, Codable, Sendable {
                 provider: .apiMart,
                 modelID: "apimart/gemini-3-pro-image-preview",
                 displayName: "Nano Banana Pro",
-                detail: "Gemini 3 Pro，更高质量图生图",
+                detail: "Gemini 3 Pro，更高质量图生图，作为对照组备选",
                 availability: .ready
             ),
             AIModelOption(
@@ -276,6 +285,28 @@ struct AIModelConfiguration: Hashable, Codable, Sendable {
     var understandingOptionID: String
     var storyOptionID: String
     var imageOptionID: String
+    /// Optional so configurations persisted before tiers existed still decode.
+    /// Swift's synthesized decoder does not fall back to property defaults for
+    /// non-optional keys, so widening this to `GenerationTier` would break
+    /// every stored configuration.
+    var tierRawValue: String?
+
+    init(
+        understandingOptionID: String,
+        storyOptionID: String,
+        imageOptionID: String,
+        tierRawValue: String? = nil
+    ) {
+        self.understandingOptionID = understandingOptionID
+        self.storyOptionID = storyOptionID
+        self.imageOptionID = imageOptionID
+        self.tierRawValue = tierRawValue
+    }
+
+    var tier: GenerationTier {
+        get { GenerationTier.resolve(tierRawValue) }
+        set { tierRawValue = newValue.rawValue }
+    }
 
     func optionID(for role: AIModelRole) -> String {
         switch role {
@@ -299,10 +330,18 @@ struct AIModelConfiguration: Hashable, Codable, Sendable {
         }
     }
 
+    /// Selecting a tier also moves the image model, because the tier *is* the
+    /// model choice as far as the primary settings surface is concerned.
+    mutating func select(tier: GenerationTier) {
+        self.tier = tier
+        imageOptionID = tier.imageOptionID
+    }
+
     static let standard = AIModelConfiguration(
         understandingOptionID: "fumira.vision.context",
         storyOptionID: "fumira.story.cinematic",
-        imageOptionID: "fumira.image.identity"
+        imageOptionID: GenerationTier.default.imageOptionID,
+        tierRawValue: GenerationTier.default.rawValue
     )
 }
 

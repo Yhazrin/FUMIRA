@@ -27,20 +27,15 @@ struct PosterExportCard: View {
         VStack(spacing: 0) {
             hero
                 .frame(maxWidth: .infinity)
-                .frame(height: 340)
+                .frame(height: 320)
 
-            VStack(alignment: .leading, spacing: PosterSpacing.sm) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: PosterSpacing.md) {
-                        selectedTimeLabel
-                        Spacer(minLength: PosterSpacing.sm)
-                        interpretationLabel
-                    }
+            VStack(alignment: .leading, spacing: PosterSpacing.md) {
+                VStack(alignment: .leading, spacing: PosterSpacing.xs) {
+                    Text("一种可能的时间解释")
+                        .font(PosterTypography.caption)
+                        .foregroundStyle(PosterPalette.mutedInk)
 
-                    VStack(alignment: .leading, spacing: PosterSpacing.xs) {
-                        interpretationLabel
-                        selectedTimeLabel
-                    }
+                    selectedTimeLabel
                 }
 
                 Text(title)
@@ -51,10 +46,10 @@ struct PosterExportCard: View {
                 Text(displayedNarrative)
                     .font(PosterTypography.supporting)
                     .foregroundStyle(PosterPalette.mutedInk)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: PosterSpacing.sm)
+                Spacer(minLength: PosterSpacing.lg)
 
                 HStack(alignment: .bottom, spacing: PosterSpacing.md) {
                     TemporalFingerprintMark(
@@ -66,13 +61,15 @@ struct PosterExportCard: View {
                     Spacer(minLength: PosterSpacing.sm)
 
                     Text("FUMIRA")
-                        .font(PosterTypography.script(22))
-                        .foregroundStyle(PosterPalette.skyDeep)
+                        .font(PosterTypography.script(20))
+                        .foregroundStyle(PosterPalette.actionBlueDeep.opacity(0.52))
                         .fixedSize(horizontal: true, vertical: false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(PosterSpacing.lg)
+            .padding(.horizontal, PosterSpacing.lg)
+            .padding(.top, PosterSpacing.md)
+            .padding(.bottom, PosterSpacing.lg)
             .background(PosterPalette.paperWhite)
         }
         .background(PosterPalette.paper)
@@ -86,39 +83,24 @@ struct PosterExportCard: View {
 
     private var selectedTimeLabel: some View {
         Text(yearLabel)
-            .font(PosterTypography.display(36))
-            .foregroundStyle(PosterPalette.skyDeep)
+            .font(PosterTypography.display(32))
+            .foregroundStyle(PosterPalette.ink)
             .accessibilityAddTraits(.isHeader)
-    }
-
-    private var interpretationLabel: some View {
-        Text("一种可能的时间解释")
-            .font(PosterTypography.caption)
-            .foregroundStyle(PosterPalette.actionBlueDeep)
-            .multilineTextAlignment(.leading)
     }
 
     @ViewBuilder
     private var hero: some View {
-        ZStack(alignment: .topTrailing) {
-            if let sceneImage {
-                Image(uiImage: sceneImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
-            } else {
-                TemporalParkScene(
-                    time: time,
-                    cornerRadius: 0
-                )
-            }
-
-            Circle()
-                .stroke(PosterPalette.leafGreen.opacity(0.75), lineWidth: 2.5)
-                .frame(width: 22, height: 22)
-                .padding(PosterSpacing.md)
-                .accessibilityHidden(true)
+        if let sceneImage {
+            Image(uiImage: sceneImage)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+        } else {
+            TemporalParkScene(
+                time: time,
+                cornerRadius: 0
+            )
         }
     }
 }

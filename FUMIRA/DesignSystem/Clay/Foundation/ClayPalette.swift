@@ -11,6 +11,15 @@ enum ClayPalette {
     static let warmWhite = Color(hex: 0xF2EEE5)
     static let warmWhiteRim = Color(hex: 0xCEC7B8)
 
+    // MARK: - Cream ground
+
+    /// The ground plane clay objects sit on. Lighter than `warmWhite` so that
+    /// a card on top of it still reads as raised without needing a border.
+    static let cream = Color(hex: 0xFAF6EF)
+    static let creamRim = Color(hex: 0xE4DCCC)
+    /// Recessed wells cut into the ground — rails, troughs, screen insets.
+    static let creamWell = Color(hex: 0xEDE6D8)
+
     // MARK: - Accent
 
     static let orange = Color(hex: 0xFF672A)
@@ -42,6 +51,9 @@ enum ClayPalette {
     static let surfaceLightRim = warmWhiteRim
     static let surfaceDark = charcoal
     static let surfaceDarkRim = charcoalLight
+    static let ground = cream
+    static let groundRim = creamRim
+    static let groundWell = creamWell
 
     // MARK: - Text
 

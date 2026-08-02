@@ -22,14 +22,14 @@ struct GenerationFailureView: View {
                     ForEach(failureTitle.indices, id: \.self) { index in
                         Text(failureTitle[index])
                             .font(ClayTypography.displayLarge)
-                            .foregroundStyle(ClayPalette.textOnDark)
+                            .foregroundStyle(ClayPalette.textPrimary)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: ClaySpacing.sm) {
                     Text(failureMessage)
                         .font(ClayTypography.body)
-                        .foregroundStyle(ClayPalette.textOnDark.opacity(0.72))
+                        .foregroundStyle(ClayPalette.textMuted)
                         .multilineTextAlignment(.leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -55,14 +55,14 @@ struct GenerationFailureView: View {
                     } label: {
                         Text(fallbackTitle)
                             .font(ClayTypography.bodyBold)
-                            .foregroundStyle(ClayPalette.textOnDark)
+                            .foregroundStyle(ClayPalette.textPrimary)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
                     }
                     .buttonStyle(.plain)
                     .overlay {
                         RoundedRectangle(cornerRadius: ClayShape.button, style: .continuous)
-                            .stroke(ClayPalette.warmWhite.opacity(0.24), lineWidth: 1.5)
+                            .stroke(ClayPalette.warmWhiteRim, lineWidth: 1.5)
                     }
                 }
             }

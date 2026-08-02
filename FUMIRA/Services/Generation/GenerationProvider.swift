@@ -11,6 +11,7 @@ struct ImageGenerationRequest: Sendable {
     let prompt: String
     let sessionID: UUID
     let model: AIModelOption
+    var tier: GenerationTier = .default
     var understanding: SceneUnderstanding? = nil
     var temporalStory: TemporalStory? = nil
     var storyBeat: StoryBeat? = nil

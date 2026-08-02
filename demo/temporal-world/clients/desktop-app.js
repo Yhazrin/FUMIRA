@@ -535,6 +535,15 @@ function loadFixture(fixture) {
     }
   }
 
+  // Apply camera if specified in fixture
+  if (fixture.camera) {
+    const cam = fixture.camera;
+    if (cam.position) camera.position.set(cam.position[0], cam.position[1], cam.position[2]);
+    if (cam.target) controls.target.set(cam.target[0], cam.target[1], cam.target[2]);
+    if (cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
+    controls.update();
+  }
+
   if (fixture.temporalSpec?.anchorYears?.length > 0) applyTemporalState(2026, fixture);
   setSceneState('loaded');
   console.log('[Desktop] Fixture loaded:', loadedEntities.length, 'entities');
@@ -570,7 +579,7 @@ function buildRoadFromFixture(entity, P) {
 function buildEntityFromFixture(entity, P) {
   // Map canonical scene types to desktop builder types
   const typeMap = {
-    'building': 'gate', 'tree': 'tree', 'path': 'road', 'terrain': 'ground',
+    'building': 'gate', 'tree': 'tree', 'vegetation': 'tree', 'path': 'road', 'terrain': 'ground',
     'road': 'road', 'vehicle': 'bicycle', 'person': 'character', 'prop': 'bench',
     'furniture': 'bench', 'sign': 'streetSign', 'light-pole': 'lampPost',
   };
@@ -586,6 +595,7 @@ function buildEntityFromFixture(entity, P) {
     case 'lampPost': return buildLampPost(entity, P);
     case 'flowerBed': return buildFlowerBed(entity, P);
     case 'road': return buildRoadFromEntity(entity, P);
+    case 'cube': return buildCube(entity, P);
     default: {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), clayMat(P.warmWhite ?? 0xF2EEE5)));
@@ -593,6 +603,31 @@ function buildEntityFromFixture(entity, P) {
       return g;
     }
   }
+}
+
+function buildCube(entity, P) {
+  const g = new THREE.Group();
+  const w = entity.size?.[0] ?? entity.geometry?.parameters?.width ?? 1;
+  const h = entity.size?.[1] ?? entity.geometry?.parameters?.height ?? 1;
+  const d = entity.size?.[2] ?? entity.geometry?.parameters?.depth ?? 1;
+  const bevel = 0.08;
+  const matColor = entity.material?.color ?? (P.warmWhite ?? 0xF2EEE5);
+
+  const geo = new RoundedBoxGeometry(w, h, d, 3, bevel);
+  const mesh = new THREE.Mesh(geo, clayMat(matColor, {
+    entityType: 'prop',
+    roughness: entity.material?.roughness ?? 0.52,
+    seed: hashStr(entity.id || 'cube'),
+  }));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  g.add(mesh);
+
+  addContactShadow(g, Math.max(w, d) * 0.5, 0.1);
+
+  g.position.set(entity.position?.[0] ?? 0, (entity.position?.[1] ?? 0) + h / 2, entity.position?.[2] ?? 0);
+  g.rotation.y = entity.rotation || 0;
+  return g;
 }
 
 // Build a road/path from canonical entity spec

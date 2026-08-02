@@ -33,9 +33,11 @@ final class BlowRevealModelTests: XCTestCase {
         let model = BlowRevealModel(service: service)
 
         model.activate()
-        await Task.yield()
-        await Task.yield()
+        let settled = await waitUntil(timeout: 0.5) {
+            model.fallbackRecommended && !model.isActive
+        }
 
+        XCTAssertTrue(settled)
         XCTAssertFalse(model.isActive)
         XCTAssertTrue(model.fallbackRecommended)
         XCTAssertEqual(
@@ -51,8 +53,14 @@ final class BlowRevealModelTests: XCTestCase {
 
         model.activate()
         await Task.yield()
-        service.emit(decibels: -8, at: start + 0.2)
-        await Task.yield()
+        for index in 1...8 {
+            service.emit(decibels: -8, at: start + Double(index) * 0.1)
+            await Task.yield()
+        }
+        let advanced = await waitUntil(timeout: 0.5) {
+            model.snapshot.revealProgress > 0
+        }
+        XCTAssertTrue(advanced)
         XCTAssertGreaterThan(model.snapshot.revealProgress, 0)
 
         model.reset()
@@ -60,5 +68,19 @@ final class BlowRevealModelTests: XCTestCase {
         XCTAssertEqual(model.snapshot.gust, 0)
         XCTAssertEqual(model.snapshot.revealProgress, 0)
         XCTAssertEqual(model.availability, .unknown)
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval,
+        condition: @MainActor () -> Bool
+    ) async -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            if condition() {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
     }
 }

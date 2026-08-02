@@ -52,6 +52,7 @@
 		2B830D00B603C23888404BBD /* ResultRevealUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6FC703372F3750F1381293 /* ResultRevealUITests.swift */; };
 		2B8B38265A0F2F5795D4DB87 /* doraemon_time_machine_travel_cruise_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 35E10F14170358A0319D2AD5 /* doraemon_time_machine_travel_cruise_00.png */; };
 		2C6FB6E61541F4F2EC4DC441 /* doraemon_time_machine_travel_turbulence_05.png in Resources */ = {isa = PBXBuildFile; fileRef = 8827F88821AF19F454BE8B8A /* doraemon_time_machine_travel_turbulence_05.png */; };
+		2C7DF18FD0602F3A04F236C5 /* ResultFutureForkSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C711634B4B42C8E79EE64E /* ResultFutureForkSection.swift */; };
 		2CC731C7ECA5160DA534F449 /* CaptureMotionProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AADE13F7AA67EC5612F18B /* CaptureMotionProviding.swift */; };
 		2E8D98E1C43A11DB89B1A1D0 /* TemporalBlowRevealSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D103D0C1AF8A48734B8F7158 /* TemporalBlowRevealSurfaceTests.swift */; };
 		30ABDD4BDD1B0A16219DB349 /* PosterZoomID.swift in Sources */ = {isa = PBXBuildFile; fileRef = B687965D4D82A26CE5F78AB3 /* PosterZoomID.swift */; };
@@ -95,6 +96,8 @@
 		52EF9D5DE3BFBF49BB35B198 /* doraemon_time_machine_travel_shared_delight_02.png in Resources */ = {isa = PBXBuildFile; fileRef = 7E6248B687417278B0214882 /* doraemon_time_machine_travel_shared_delight_02.png */; };
 		5369ECBF03E011DBB5798154 /* SpatialDepthLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBAE072E701429A1DB374EE2 /* SpatialDepthLayer.swift */; };
 		5392923DA5EB8A68A1E21131 /* CameraPreviewFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48A9778F8AA6121B7B3623F /* CameraPreviewFactory.swift */; };
+		53ABD1FDFBC2921BC54A317D /* GenerationTier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0622139C7A1A58D6D3950655 /* GenerationTier.swift */; };
+		54A8FC9100FF4FB09C534385 /* TemporalAnchorPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = E843384D5021286545530AB1 /* TemporalAnchorPlan.swift */; };
 		550384EF66F46E394353594C /* TemporalShakeDeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F43119E21A6EF4CA9D1C9869 /* TemporalShakeDeviceService.swift */; };
 		55FD4A836D87F4FDD4E2EE97 /* ResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE41698ABAA3DB4B8FB3DB7F /* ResultView.swift */; };
 		583EE574E6A1116210347351 /* PosterTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1C46339D067C8F2F24BEB7 /* PosterTypography.swift */; };
@@ -140,12 +143,14 @@
 		790C9F2BB83F010E6DDA4094 /* Clay3DStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 949EAC7FBDD553C866643207 /* Clay3DStyle.swift */; };
 		79657053B048C247750F6272 /* CapturedPhotoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD220E73C38AD63913E16F77 /* CapturedPhotoView.swift */; };
 		7D3938DD2CBC4077C250EA98 /* doraemon_inspiration_camera_idea_bloom_04.png in Resources */ = {isa = PBXBuildFile; fileRef = C5C5544A55525C71DA510B16 /* doraemon_inspiration_camera_idea_bloom_04.png */; };
+		7D819DC855E83ED42DE3D858 /* GeneratedFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1006C3B9F1FBAAFEC7E74407 /* GeneratedFrameCache.swift */; };
 		7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEB5A8653918B8E3544BFC /* RemoteStoryProvider.swift */; };
 		7EEFD8ED23133EB21FB27056 /* doraemon_time_machine_travel_doraemon_controls_00.png in Resources */ = {isa = PBXBuildFile; fileRef = DBACAFA814AB57C110EB19AD /* doraemon_time_machine_travel_doraemon_controls_00.png */; };
 		7F39561E1031DD0D1D9CFA24 /* PosterSensory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39C08ABDA32DDFDB2DEDE233 /* PosterSensory.swift */; };
 		7F577BB321E75C60DF91F847 /* DioramaSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECFC47EA5D7E8EF164A05E5C /* DioramaSceneView.swift */; };
 		81316B6079F4AF30F594819F /* GenerationReflectionPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BD32BA7A5B49CC7FE83EA4 /* GenerationReflectionPromptTests.swift */; };
 		82C3C4C17E45AC4D8BBDB510 /* doraemon_time_machine_travel_shared_delight_03.png in Resources */ = {isa = PBXBuildFile; fileRef = 8849D8D91354C3EBC54EF9D7 /* doraemon_time_machine_travel_shared_delight_03.png */; };
+		83A4E9DF63DB52500B819746 /* ResultActionDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31CBB4112C20AAF496FF35E /* ResultActionDock.swift */; };
 		875A426463396769F098091F /* ClayTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 357615EE5D40710B939BC611 /* ClayTerminal.swift */; };
 		893ED3BD26DACA8A44490226 /* ShutterWaveTimeRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 197CF52CE7B99367255DB079 /* ShutterWaveTimeRail.swift */; };
 		8B668E924590BF9EE38082B5 /* DioramaBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D487F0BA7DDB136E6DF8B9 /* DioramaBridge.swift */; };
@@ -195,7 +200,9 @@
 		B792935929AE3980B1D37614 /* doraemon_inspiration_camera_idea_bloom_05.png in Resources */ = {isa = PBXBuildFile; fileRef = 5F6FA17FACAD803F39AAEF57 /* doraemon_inspiration_camera_idea_bloom_05.png */; };
 		B79DFD56F8941502C7E872C9 /* doraemon_inspiration_camera_calm_breathe_01.png in Resources */ = {isa = PBXBuildFile; fileRef = F8BD9713BABE88EAC806CCC6 /* doraemon_inspiration_camera_calm_breathe_01.png */; };
 		B8704C4550161C9B0ABC5177 /* doraemon_time_machine_travel_shared_delight_01.png in Resources */ = {isa = PBXBuildFile; fileRef = 6064181B299F9899E0CDB0EA /* doraemon_time_machine_travel_shared_delight_01.png */; };
+		B9F3C86EC5D35F9D6DC634AF /* ResultTiltTimeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C140503AB5C90656122A307 /* ResultTiltTimeController.swift */; };
 		BD1DE2ACD3880490DA320C6F /* CameraLiveActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B488656CA9757ABE0CE4EA51 /* CameraLiveActivityTests.swift */; };
+		BE213B38FB6D55D1AB8D1AC2 /* ExperimentalFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B6A99816514A9F9DEEBBA5 /* ExperimentalFeature.swift */; };
 		BF25445760A1065F5E5ABDA4 /* TimeRevealRipple.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EEBD4D58501633F4739EA36 /* TimeRevealRipple.swift */; };
 		BF63C1D31520E9EB2DAEDD39 /* TemporalDarkroomModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9A9E7B470572287D4B96ECC /* TemporalDarkroomModel.swift */; };
 		C0C651107C09B31F746D13E8 /* BlowInputProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E9D03FA7F330E9515568DA /* BlowInputProviding.swift */; };
@@ -208,6 +215,7 @@
 		CA1EECF1AE84DD47A74AB589 /* doraemon_inspiration_camera_pocket_pull_00.png in Resources */ = {isa = PBXBuildFile; fileRef = 588C405C754EC042F44D8980 /* doraemon_inspiration_camera_pocket_pull_00.png */; };
 		CA9E9F8ABF94986F0EB5B7E5 /* ClayAppBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FF17A17B07693E817624304 /* ClayAppBackground.swift */; };
 		CAF2D2057ECE7EA5A68C9455 /* PosterStaggerEntrance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4091E258118976ACAAE58F5 /* PosterStaggerEntrance.swift */; };
+		CBCA97F033B96C7AD4CB88BB /* HighFrameRateDisplayLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B84A80BDA64EA81147751B7 /* HighFrameRateDisplayLink.swift */; };
 		CC9564F3F5A7240742019CC3 /* ViewfinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CB6750024A152A0CB217B3 /* ViewfinderView.swift */; };
 		CE5D95265A2BF7879F4F543F /* doraemon_inspiration_camera_aim_shoot_00.png in Resources */ = {isa = PBXBuildFile; fileRef = F7C0D068BF34066A889699D3 /* doraemon_inspiration_camera_aim_shoot_00.png */; };
 		CF935D1C605D4A958722E458 /* TemporalFutureForkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F3370ECC0569DEB59DDB5D /* TemporalFutureForkView.swift */; };
@@ -228,6 +236,7 @@
 		DAF803F1FEF01E7917B3C99B /* ClayMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C729097BCEE645124E954E /* ClayMotion.swift */; };
 		DB1FFB0E6083B353899FA1E0 /* BluetoothPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E18BF1C7346B1EED368BA24 /* BluetoothPermissionView.swift */; };
 		DCB201F36E0EB7D7624678B6 /* PairingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 433171DB34297222FB05D12B /* PairingClient.swift */; };
+		DF20696ADAB9EF647361469F /* ClayFacet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143682E8B424F248960ACAD7 /* ClayFacet.swift */; };
 		DFCD7FC6521A828AF2F05D17 /* CaptureMotionModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E9DE0F1CBECF89E9ABD317 /* CaptureMotionModelTests.swift */; };
 		E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD55939FA9AED9CA1F176218 /* RootView.swift */; };
 		E1BE31E5AD99AEBECD5318C4 /* ClayTimeDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C68601F3013EF87571DA4E /* ClayTimeDial.swift */; };
@@ -260,7 +269,9 @@
 		F488C69C73FE7ABB0C3B30CE /* DioramaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED34A456D6BF4FC58816345 /* DioramaView.swift */; };
 		F4F3244AEDAFBD874E8A516E /* PosterScreenContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7B61D89FF2DAB3CD8E4B34 /* PosterScreenContainer.swift */; };
 		F52BB40AD845207CF1B3A517 /* PosterPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9D3F8455A03C4D1CA12455 /* PosterPalette.swift */; };
+		F5BA5716FA7DE20FD12FE7C8 /* RealityComparisonSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914962591505A54DF026E738 /* RealityComparisonSurface.swift */; };
 		F5D830954FE27BBD2EA46D38 /* doraemon_time_machine_travel_doraemon_controls_04.png in Resources */ = {isa = PBXBuildFile; fileRef = BF6BF7BFD5CC64637F95771A /* doraemon_time_machine_travel_doraemon_controls_04.png */; };
+		F699C715A6FE22038CF60005 /* ResultNarrativeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E347F92B9E35FC45922D39F /* ResultNarrativeSection.swift */; };
 		F6B7AE94AF7E3431AA213088 /* CaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */; };
 		F71995D4813B7D66FF9D3D3E /* ClaySegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F22E066D3A251E68A0D9B7 /* ClaySegmentedControl.swift */; };
 		F9730B97FC743E74ADE6861C /* CameraChromeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F15A56D8DBF7FFFE8BE2EF /* CameraChromeButton.swift */; };
@@ -317,6 +328,7 @@
 		02F8C71E335F95A71BF31A8E /* PosterZoomTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterZoomTransition.swift; sourceTree = "<group>"; };
 		042888D8DFC9DAF2FF94C7FE /* PosterTitleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterTitleView.swift; sourceTree = "<group>"; };
 		042E12ECBB9C87F4E71ADDEE /* TemporalBlinkComparatorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlinkComparatorEngine.swift; sourceTree = "<group>"; };
+		0622139C7A1A58D6D3950655 /* GenerationTier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationTier.swift; sourceTree = "<group>"; };
 		062A223835C17A86E7E1B7E1 /* RemoteStoryProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteStoryProviderTests.swift; sourceTree = "<group>"; };
 		077F5421F7BF01FD17ED7F45 /* doraemon_time_machine_travel_cruise_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_cruise_01.png; sourceTree = "<group>"; };
 		0827B783C9AB999B8B2F7667 /* ConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
@@ -327,6 +339,8 @@
 		0A778B6EFDF02D450B730773 /* PerformanceFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceFlowUITests.swift; sourceTree = "<group>"; };
 		0BFB9E6BA9F519AE0A75A816 /* doraemon_time_machine_travel_turbulence_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_turbulence_02.png; sourceTree = "<group>"; };
 		0E4C3D6039D691DD08FE1795 /* TemporalFutureForkViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFutureForkViewTests.swift; sourceTree = "<group>"; };
+		1006C3B9F1FBAAFEC7E74407 /* GeneratedFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedFrameCache.swift; sourceTree = "<group>"; };
+		143682E8B424F248960ACAD7 /* ClayFacet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayFacet.swift; sourceTree = "<group>"; };
 		16C68601F3013EF87571DA4E /* ClayTimeDial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayTimeDial.swift; sourceTree = "<group>"; };
 		16E9D03FA7F330E9515568DA /* BlowInputProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlowInputProviding.swift; sourceTree = "<group>"; };
 		17FE326D223B9F51279B0C89 /* SettingsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsUITests.swift; sourceTree = "<group>"; };
@@ -402,10 +416,12 @@
 		54F6BE2E5753FC66B5D1002A /* doraemon_time_machine_travel_doraemon_controls_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_01.png; sourceTree = "<group>"; };
 		568F7732AA2B9D365ADEFABD /* TemporalInterpretationTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalInterpretationTrace.swift; sourceTree = "<group>"; };
 		588C405C754EC042F44D8980 /* doraemon_inspiration_camera_pocket_pull_00.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_pocket_pull_00.png; sourceTree = "<group>"; };
+		59C711634B4B42C8E79EE64E /* ResultFutureForkSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultFutureForkSection.swift; sourceTree = "<group>"; };
 		59E76C7193C5F3E63FE2D6B7 /* doraemon_inspiration_camera_idea_bloom_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_idea_bloom_03.png; sourceTree = "<group>"; };
 		5A7DC07F5D99115EA52CBEAA /* FUMIRALiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRALiveActivityBundle.swift; sourceTree = "<group>"; };
 		5AB4052AF9CDC36726F2A587 /* TiltTimeNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TiltTimeNavigatorTests.swift; sourceTree = "<group>"; };
 		5E18BF1C7346B1EED368BA24 /* BluetoothPermissionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothPermissionView.swift; sourceTree = "<group>"; };
+		5E347F92B9E35FC45922D39F /* ResultNarrativeSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultNarrativeSection.swift; sourceTree = "<group>"; };
 		5E93F953A8C49D0CB4E9C676 /* doraemon_time_machine_travel_doraemon_controls_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_02.png; sourceTree = "<group>"; };
 		5EE4EF4AE0E371938E5D609F /* TemporalShakeReducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalShakeReducer.swift; sourceTree = "<group>"; };
 		5F1291D1E99CF7BF544262A3 /* doraemon_time_machine_travel_nobita_points_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_nobita_points_04.png; sourceTree = "<group>"; };
@@ -426,6 +442,7 @@
 		69FB5355C01816385FB3B724 /* doraemon_inspiration_camera_aim_shoot_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_aim_shoot_02.png; sourceTree = "<group>"; };
 		6A3A04D835B66D1D74D6466F /* PreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewFixtures.swift; sourceTree = "<group>"; };
 		6AE458687454A187F7CE6DCE /* ApertureTransitionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApertureTransitionOverlay.swift; sourceTree = "<group>"; };
+		6B84A80BDA64EA81147751B7 /* HighFrameRateDisplayLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HighFrameRateDisplayLink.swift; sourceTree = "<group>"; };
 		6C3FF3398A5E1071A44D1179 /* MotionTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionTimeline.swift; sourceTree = "<group>"; };
 		6DCD765D349D795C07B9A771 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6F813C0AC9E3A3902A11C9EF /* PosterRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterRadius.swift; sourceTree = "<group>"; };
@@ -468,6 +485,7 @@
 		8EFAE1493CFFB64DAA59BBA5 /* AIModelConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModelConfiguration.swift; sourceTree = "<group>"; };
 		90314E852788ABF1D6EBA7E3 /* CameraCompositionGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCompositionGeometry.swift; sourceTree = "<group>"; };
 		910F9858AAC9AFC76559F893 /* ClayShadow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayShadow.swift; sourceTree = "<group>"; };
+		914962591505A54DF026E738 /* RealityComparisonSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealityComparisonSurface.swift; sourceTree = "<group>"; };
 		91DBB78BA18D4224BAAA62DB /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		920768381E9898ACF87ACEEF /* TemporalFingerprintMark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFingerprintMark.swift; sourceTree = "<group>"; };
 		9228A14A8F377D7B3C13A27C /* TemporalBlinkComparatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlinkComparatorTests.swift; sourceTree = "<group>"; };
@@ -485,6 +503,7 @@
 		9A85722097A9AA1D8A905ADF /* PosterStaggerReveal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterStaggerReveal.swift; sourceTree = "<group>"; };
 		9B5279CAFEEC36FF61D3AF1D /* GenerationFailureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationFailureView.swift; sourceTree = "<group>"; };
 		9BCEA1CCA8105DAE8F4E1F3E /* doraemon_time_machine_travel_doraemon_controls_03.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_time_machine_travel_doraemon_controls_03.png; sourceTree = "<group>"; };
+		9C140503AB5C90656122A307 /* ResultTiltTimeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultTiltTimeController.swift; sourceTree = "<group>"; };
 		9E1D21376F5EC41FF13568E4 /* PosterComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterComposer.swift; sourceTree = "<group>"; };
 		9E665DDF00B3522C1512829E /* doraemon_inspiration_camera_pocket_pull_01.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_pocket_pull_01.png; sourceTree = "<group>"; };
 		9EC3A6EA4A95C7C7FE8503E2 /* GenerationErrorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationErrorTests.swift; sourceTree = "<group>"; };
@@ -522,6 +541,7 @@
 		C07F63FE6C3A1582391397E6 /* FUMIRA.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FUMIRA.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C1F22E066D3A251E68A0D9B7 /* ClaySegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaySegmentedControl.swift; sourceTree = "<group>"; };
 		C23EC7D31E6476DD5F0BBE27 /* TemporalBlowRevealSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalBlowRevealSurface.swift; sourceTree = "<group>"; };
+		C2B6A99816514A9F9DEEBBA5 /* ExperimentalFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExperimentalFeature.swift; sourceTree = "<group>"; };
 		C5424EB8310CD47651E69E68 /* CoreCaptureMotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreCaptureMotionService.swift; sourceTree = "<group>"; };
 		C5C5544A55525C71DA510B16 /* doraemon_inspiration_camera_idea_bloom_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_idea_bloom_04.png; sourceTree = "<group>"; };
 		C68CE7A3ABDFE7017E8AB333 /* PixelSequencePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelSequencePlayer.swift; sourceTree = "<group>"; };
@@ -550,6 +570,7 @@
 		E1D487F0BA7DDB136E6DF8B9 /* DioramaBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DioramaBridge.swift; sourceTree = "<group>"; };
 		E39E84C5D38FBD2F94A20BD0 /* FUMIRAApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FUMIRAApp.swift; sourceTree = "<group>"; };
 		E83A7750786CAB185C72662C /* TemporalDarkroomProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalDarkroomProviding.swift; sourceTree = "<group>"; };
+		E843384D5021286545530AB1 /* TemporalAnchorPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalAnchorPlan.swift; sourceTree = "<group>"; };
 		E8A86FA65A55C5A368BE7B4C /* doraemon_inspiration_camera_pocket_pull_02.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_pocket_pull_02.png; sourceTree = "<group>"; };
 		EA587D6C9E9E262090BBAE69 /* SceneLayerAnalyzing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLayerAnalyzing.swift; sourceTree = "<group>"; };
 		EA94F00A4320644B80411889 /* TemporalFutureFork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalFutureFork.swift; sourceTree = "<group>"; };
@@ -559,6 +580,7 @@
 		EDD952CC2BA37447CBD4E087 /* ClayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClayPanel.swift; sourceTree = "<group>"; };
 		F1201C603B55FFB051E84EE9 /* HeroPhotoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroPhotoSurface.swift; sourceTree = "<group>"; };
 		F2222BEE7C91A6D016D36592 /* doraemon_inspiration_camera_calm_breathe_04.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = doraemon_inspiration_camera_calm_breathe_04.png; sourceTree = "<group>"; };
+		F31CBB4112C20AAF496FF35E /* ResultActionDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultActionDock.swift; sourceTree = "<group>"; };
 		F38B62F5E824DE206A0A9B48 /* TemporalShakeProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalShakeProviding.swift; sourceTree = "<group>"; };
 		F3910C0B76C6DCBE6C3FC287 /* FlatMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlatMotion.swift; sourceTree = "<group>"; };
 		F43119E21A6EF4CA9D1C9869 /* TemporalShakeDeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalShakeDeviceService.swift; sourceTree = "<group>"; };
@@ -647,7 +669,9 @@
 		30E031966E7B89AB5D26C0C9 /* Result */ = {
 			isa = PBXGroup;
 			children = (
+				9C140503AB5C90656122A307 /* ResultTiltTimeController.swift */,
 				FE41698ABAA3DB4B8FB3DB7F /* ResultView.swift */,
+				5D3B06346CBB259AA6F9C502 /* Sections */,
 			);
 			path = Result;
 			sourceTree = "<group>";
@@ -692,6 +716,7 @@
 		42B2B39EC4E14E6FD4BADFB6 /* Generation */ = {
 			isa = PBXGroup;
 			children = (
+				1006C3B9F1FBAAFEC7E74407 /* GeneratedFrameCache.swift */,
 				243297E75BDC73D76502065F /* GenerationProvider.swift */,
 				7E9FE19485E8A63606DD35E5 /* RemoteGenerationProvider.swift */,
 				D65EE3766769108908928C9B /* UploadImageEncoder.swift */,
@@ -725,11 +750,14 @@
 				89DBE5E6011F2A13CDFEE4D9 /* CameraLiveActivityAttributes.swift */,
 				74F2D0EC7CA972AE8D85236A /* CameraTrackedSubject.swift */,
 				CDFE6846CCEDC140DF182C65 /* CaptureSession.swift */,
+				C2B6A99816514A9F9DEEBBA5 /* ExperimentalFeature.swift */,
 				F3910C0B76C6DCBE6C3FC287 /* FlatMotion.swift */,
 				964FD3F17147C8FFDF9F9EA9 /* GenerationError.swift */,
 				7385B387D00E741EEF2BB28A /* GenerationReflectionPrompt.swift */,
 				09DDDE905B093FADE1CBA842 /* GenerationState.swift */,
+				0622139C7A1A58D6D3950655 /* GenerationTier.swift */,
 				2723D494B5C3ADA5C5714675 /* PixelSequence.swift */,
+				E843384D5021286545530AB1 /* TemporalAnchorPlan.swift */,
 				042E12ECBB9C87F4E71ADDEE /* TemporalBlinkComparatorEngine.swift */,
 				2240F0724F77FCB5239C8CDF /* TemporalCapturePacket.swift */,
 				EA94F00A4320644B80411889 /* TemporalFutureFork.swift */,
@@ -751,6 +779,17 @@
 				941911A01BC1537BB03A3349 /* DioramaWebView.swift */,
 			);
 			path = Diorama;
+			sourceTree = "<group>";
+		};
+		5D3B06346CBB259AA6F9C502 /* Sections */ = {
+			isa = PBXGroup;
+			children = (
+				914962591505A54DF026E738 /* RealityComparisonSurface.swift */,
+				F31CBB4112C20AAF496FF35E /* ResultActionDock.swift */,
+				59C711634B4B42C8E79EE64E /* ResultFutureForkSection.swift */,
+				5E347F92B9E35FC45922D39F /* ResultNarrativeSection.swift */,
+			);
+			path = Sections;
 			sourceTree = "<group>";
 		};
 		624A61DD2B8368B4D0767A0A /* Services */ = {
@@ -777,6 +816,7 @@
 			isa = PBXGroup;
 			children = (
 				949EAC7FBDD553C866643207 /* Clay3DStyle.swift */,
+				143682E8B424F248960ACAD7 /* ClayFacet.swift */,
 				09C729097BCEE645124E954E /* ClayMotion.swift */,
 				D9FE839637F8327631993FCE /* ClayPalette.swift */,
 				910F9858AAC9AFC76559F893 /* ClayShadow.swift */,
@@ -966,6 +1006,7 @@
 			children = (
 				DD5015FC8AE6F9707D40CA84 /* FlatParallaxModifier.swift */,
 				FD43AC89F787A9E0FD5171AE /* FUMIRASpatialMotion.swift */,
+				6B84A80BDA64EA81147751B7 /* HighFrameRateDisplayLink.swift */,
 				6C3FF3398A5E1071A44D1179 /* MotionTimeline.swift */,
 				38E8FAC30622AD50DE1F54BB /* PhaseTransition.swift */,
 				D8058176375A98A66217D33A /* PosterBreath.swift */,
@@ -1492,6 +1533,7 @@
 				6F76581923F5399FE062DEAF /* ClayButton.swift in Sources */,
 				B230F88A764D44B18DE46B38 /* ClayCard.swift in Sources */,
 				609602F269F5C7FF970F8800 /* ClayChip.swift in Sources */,
+				DF20696ADAB9EF647361469F /* ClayFacet.swift in Sources */,
 				E7EE9CF267D35AC2104A05B7 /* ClayIconButton.swift in Sources */,
 				2B4C84781EAA28BC2022748F /* ClayIndicator.swift in Sources */,
 				DAF803F1FEF01E7917B3C99B /* ClayMotion.swift in Sources */,
@@ -1518,22 +1560,26 @@
 				F488C69C73FE7ABB0C3B30CE /* DioramaView.swift in Sources */,
 				9608C83D37087D5749AECBDD /* DioramaWebView.swift in Sources */,
 				1530F190F2B4FA42E6129688 /* DisconnectedView.swift in Sources */,
+				BE213B38FB6D55D1AB8D1AC2 /* ExperimentalFeature.swift in Sources */,
 				A6C6E3D6BAEB618881A25AA6 /* FUMIRAAPIConfiguration.swift in Sources */,
 				1245BDCD7EC1C8CB446A703A /* FUMIRAApp.swift in Sources */,
 				73F785565CE27C7C701ECEC0 /* FUMIRASpatialMotion.swift in Sources */,
 				4879FF0213249ACC4AB791ED /* FlatMotion.swift in Sources */,
 				D0BA2028CA6E88BDC14C1229 /* FlatParallaxModifier.swift in Sources */,
 				0EBB9147A09ED73A0B3166DB /* FutureCamBody.swift in Sources */,
+				7D819DC855E83ED42DE3D858 /* GeneratedFrameCache.swift in Sources */,
 				9720DF22794231F1B09A75F1 /* GenerationError.swift in Sources */,
 				9CFA5CCAED0C6B13D9E5DDAA /* GenerationFailureView.swift in Sources */,
 				C4D3B86795A57B78A821B0BC /* GenerationProgressRow.swift in Sources */,
 				A1427FB05CE0F83DA5D1B137 /* GenerationProvider.swift in Sources */,
 				4056B06C331C286D977D3CA7 /* GenerationReflectionPrompt.swift in Sources */,
 				F3A064B6FCA1C2D795F91FC5 /* GenerationState.swift in Sources */,
+				53ABD1FDFBC2921BC54A317D /* GenerationTier.swift in Sources */,
 				1EFD6FA595EEE33E8A381498 /* HapticsClient.swift in Sources */,
 				67CEAFFFB4F728E029B955AF /* HardwareController.swift in Sources */,
 				396FFEE2B899571D830BC74C /* HeroPhotoSlot.swift in Sources */,
 				6B9F437DA2C42C355157BE52 /* HeroPhotoSurface.swift in Sources */,
+				CBCA97F033B96C7AD4CB88BB /* HighFrameRateDisplayLink.swift in Sources */,
 				23CCFD4E047B40C404BD4F16 /* ImageUnderstandingProvider.swift in Sources */,
 				1C7E7B0AC38697DAA10F2487 /* LiveBlowInputService.swift in Sources */,
 				0214A77A0FFCB9ED57DB2183 /* LiveCameraService.swift in Sources */,
@@ -1580,10 +1626,15 @@
 				30ABDD4BDD1B0A16219DB349 /* PosterZoomID.swift in Sources */,
 				0845C6F210CEF677B3742D77 /* PosterZoomTransition.swift in Sources */,
 				FA5A450417E8AF3A398CE5BE /* PreviewFixtures.swift in Sources */,
+				F5BA5716FA7DE20FD12FE7C8 /* RealityComparisonSurface.swift in Sources */,
 				FB29E68E938C0261ECF87D3C /* RealityDevelopingView.swift in Sources */,
 				346647DD342F7ADBF2D8EA3C /* RemoteGenerationProvider.swift in Sources */,
 				7E61FA8E0DE6B0BD54ACDB08 /* RemoteStoryProvider.swift in Sources */,
 				07CE3DA12048AD23FC41D2EC /* RemoteUnderstandingProvider.swift in Sources */,
+				83A4E9DF63DB52500B819746 /* ResultActionDock.swift in Sources */,
+				2C7DF18FD0602F3A04F236C5 /* ResultFutureForkSection.swift in Sources */,
+				F699C715A6FE22038CF60005 /* ResultNarrativeSection.swift in Sources */,
+				B9F3C86EC5D35F9D6DC634AF /* ResultTiltTimeController.swift in Sources */,
 				55FD4A836D87F4FDD4E2EE97 /* ResultView.swift in Sources */,
 				E09FDF7D0D01BA9998A2DD3B /* RootView.swift in Sources */,
 				4C6B1AB910D17FA656776A7B /* SceneLayerAnalyzing.swift in Sources */,
@@ -1594,6 +1645,7 @@
 				B2BB6D120859B9973A9EDAF4 /* SpatialTransformModifier.swift in Sources */,
 				D634280455F3F1B7470120B4 /* StatusPill.swift in Sources */,
 				712440EB96D62CDF09B0E02E /* StoryProvider.swift in Sources */,
+				54A8FC9100FF4FB09C534385 /* TemporalAnchorPlan.swift in Sources */,
 				F3AC440A5D50A2E5E5086E5C /* TemporalBlinkComparator.swift in Sources */,
 				AFD5BCB8B9940D3CEAA0F7E5 /* TemporalBlinkComparatorEngine.swift in Sources */,
 				772B0DB49A96FE33D3144F04 /* TemporalBlowRevealSurface.swift in Sources */,

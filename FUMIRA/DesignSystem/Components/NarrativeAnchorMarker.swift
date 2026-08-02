@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Four soft corner marks around the subject Vision is following.
-/// Only the corners are drawn — never a full rounded rectangle — and the host
-/// stays a compact 1:1 square so the lock stays quiet on the live preview.
+/// Four soft corner marks around the subject Vision is following. Only the
+/// corners are drawn — never a full rounded rectangle — so the lock reads as
+/// quiet and precise rather than a boxed selection. The host stays a compact
+/// 1:1 square so the lock stays quiet on the live preview.
 struct SubjectTrackingReticle: View {
     let confidence: Double
 
@@ -32,7 +33,7 @@ struct SubjectTrackingReticle: View {
                     radius: innerRadius,
                     armLength: innerArm,
                     context: &context,
-                    color: PosterPalette.actionBlue.opacity(0.94),
+                    color: ClayPalette.orange.opacity(0.94),
                     lineWidth: 2
                 )
 
@@ -112,6 +113,102 @@ struct SubjectTrackingReticle: View {
     }
 }
 
+/// A one-shot, code-like scanline that sweeps once over the subject the
+/// instant a lock is confirmed — never a lingering outline. Retriggers only
+/// when confidence newly crosses the lock threshold, runs for about a
+/// second, and clears itself completely when done.
+struct SubjectLockScanEffect: View {
+    let confidence: Double
+
+    private static let lockedConfidenceThreshold: Double = 0.62
+    private static let scanDuration: TimeInterval = 0.9
+    private static let codeGlyphs = ["01", "10", "{ }", "</>", "0x2F", "if()", "##", "11", "->"]
+
+    @State private var wasLocked = false
+    @State private var scanStartedAt: Date?
+    @State private var scanTask: Task<Void, Never>?
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let scanStartedAt {
+                TimelineView(.animation) { timeline in
+                    Canvas { context, size in
+                        let elapsed = timeline.date.timeIntervalSince(scanStartedAt)
+                        let progress = min(max(elapsed / Self.scanDuration, 0), 1)
+                        drawScan(progress: progress, size: size, context: &context)
+                    }
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+        .onChange(of: confidence) { _, newValue in
+            let isLocked = newValue >= Self.lockedConfidenceThreshold
+            if isLocked, !wasLocked {
+                scanStartedAt = Date()
+                scanTask?.cancel()
+                scanTask = Task {
+                    try? await Task.sleep(for: .seconds(Self.scanDuration))
+                    if !Task.isCancelled {
+                        scanStartedAt = nil
+                    }
+                }
+            }
+            wasLocked = isLocked
+        }
+        .onDisappear {
+            scanTask?.cancel()
+        }
+    }
+
+    private func drawScan(progress: Double, size: CGSize, context: inout GraphicsContext) {
+        guard size.width > 0, size.height > 0 else { return }
+        let lineY = size.height * progress
+        let bandHeight = size.height * 0.24
+
+        let bandRect = CGRect(
+            x: 0,
+            y: max(lineY - bandHeight, 0),
+            width: size.width,
+            height: min(bandHeight, lineY)
+        )
+        context.fill(
+            Path(bandRect),
+            with: .linearGradient(
+                Gradient(colors: [ClayPalette.orange.opacity(0), ClayPalette.orange.opacity(0.3)]),
+                startPoint: CGPoint(x: 0, y: bandRect.minY),
+                endPoint: CGPoint(x: 0, y: bandRect.maxY)
+            )
+        )
+
+        context.fill(
+            Path(CGRect(x: 0, y: lineY - 4, width: size.width, height: 8)),
+            with: .color(ClayPalette.orange.opacity(0.55))
+        )
+        context.fill(
+            Path(CGRect(x: 0, y: lineY - 1, width: size.width, height: 2)),
+            with: .color(PosterPalette.paperWhite.opacity(0.92))
+        )
+
+        // Fixed columns so the glyphs read as decoded, not randomly jittering.
+        let columns = Self.codeGlyphs.count
+        for (index, glyph) in Self.codeGlyphs.enumerated() {
+            let columnX = size.width * (CGFloat(index) + 0.5) / CGFloat(columns)
+            let glyphY = size.height * CGFloat(index % 3 + 1) / 4
+            let distance = abs(glyphY - lineY)
+            guard distance < bandHeight else { continue }
+            let glyphOpacity = max(0, 1 - distance / bandHeight)
+            context.draw(
+                Text(glyph)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(ClayPalette.orange.opacity(glyphOpacity * 0.85)),
+                at: CGPoint(x: columnX, y: glyphY)
+            )
+        }
+    }
+}
+
 #Preview {
     ZStack {
         PosterPalette.skyDeep
@@ -119,3 +216,4 @@ struct SubjectTrackingReticle: View {
             .frame(width: 96, height: 96)
     }
 }
+

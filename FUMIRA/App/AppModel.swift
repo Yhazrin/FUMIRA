@@ -97,6 +97,8 @@ final class AppModel {
     let temporalDarkroom: TemporalDarkroomModel
     let temporalShake: TemporalShakeModel
     let blowReveal: BlowRevealModel
+    /// Switches for the time interactions that lost the convergence decision.
+    let experimental: ExperimentalFeatureStore
     /// A stable preview identity prevents remounting the SwiftUI/UIKit bridge
     /// whenever unrelated camera chrome state changes.
     let cameraPreview: AnyView
@@ -104,6 +106,7 @@ final class AppModel {
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
         cameraPreview = dependencies.cameraPreview.makePreview()
+        experimental = ExperimentalFeatureStore()
         motionField = MotionFieldModel(service: dependencies.motionField)
         captureMotion = CaptureMotionModel(
             service: dependencies.captureMotion,
@@ -669,6 +672,7 @@ final class AppModel {
                     prompt: prompt,
                     sessionID: sessionID,
                     model: option,
+                    tier: modelConfiguration.tier,
                     understanding: resolvedUnderstanding,
                     temporalStory: resolvedStory,
                     storyBeat: resolvedBeat
@@ -1300,6 +1304,11 @@ final class AppModel {
         sceneIsActive: Bool
     ) {
         temporalShake.setSceneActive(sceneIsActive)
+        guard experimental.isEnabled(.shakeToFork),
+              experimental.isEnabled(.futureFork) else {
+            temporalShake.deactivate()
+            return
+        }
         let target = generatedFrame?.time ?? generationTargetTime
         let branches = TemporalFutureForkEngine.resolve(
             understanding: sceneUnderstanding,
@@ -1523,6 +1532,30 @@ final class AppModel {
         } catch {
             lastErrorMessage = "本次已生效，暂时无法保存。"
         }
+    }
+
+    /// The primary quality control. Moves the image model with the tier so the
+    /// two can never disagree, and keeps a manual model override from silently
+    /// claiming a tier it does not match.
+    func selectTier(_ tier: GenerationTier) async {
+        guard modelCatalog.option(id: tier.imageOptionID)?.availability == .ready else {
+            lastErrorMessage = "这个档位的模型尚未接入。"
+            return
+        }
+        modelConfiguration.select(tier: tier)
+        do {
+            try await dependencies.modelConfigurationStore.save(modelConfiguration)
+            lastErrorMessage = nil
+        } catch {
+            lastErrorMessage = "本次已生效，暂时无法保存。"
+        }
+    }
+
+    /// True when the image model still matches the tier it was selected from.
+    /// A manual override in advanced settings makes this false, and the UI
+    /// surfaces that rather than pretending the tier is still authoritative.
+    var isTierImageModelOverridden: Bool {
+        modelConfiguration.imageOptionID != modelConfiguration.tier.imageOptionID
     }
 
     private func sanitized(

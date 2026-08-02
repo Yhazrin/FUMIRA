@@ -1,0 +1,103 @@
+{
+  "id": "reconstruct-demo",
+  "name": "Clay Garage & Tree — Reconstructed v2",
+  "version": "1.0.0",
+  "palette": {
+    "charcoal": "#202425",
+    "warmWhite": "#F2EEE5",
+    "warmWhiteR": "#CEC7B8",
+    "orange": "#FF672A",
+    "orangeRim": "#C9441D",
+    "lime": "#B7D83D",
+    "limeRim": "#7E9A27",
+    "yellow": "#FFC52A",
+    "yellowRim": "#C18B14",
+    "ground": "#8FCB7E",
+    "road": "#9E9688",
+    "sidewalk": "#C8C0B2",
+    "grass": "#8FCB7E",
+    "trunk": "#5C4033",
+    "foliage1": "#7E9A27",
+    "foliage2": "#B7D83D",
+    "roofDark": "#3A3E3F",
+    "skin": "#F2D5B5",
+    "cloth1": "#FF672A",
+    "cloth2": "#3A3E3F"
+  },
+  "style": {
+    "clayMat": {
+      "roughness": 0.52,
+      "metalness": 0,
+      "flatShading": false
+    },
+    "fog": {
+      "color": "#F7F5EF",
+      "density": 0.005
+    },
+    "clearColor": "#E8F0F8"
+  },
+  "camera": {
+    "position": [2, 8, 7],
+    "target": [0.3, 0, 0],
+    "fov": 35
+  },
+  "entities": [
+    {
+      "id": "ground",
+      "category": "ground",
+      "type": "ground",
+      "position": [0, -0.52, 0],
+      "size": [16, 16]
+    },
+    {
+      "id": "building_body",
+      "category": "building",
+      "type": "building",
+      "position": [1.8, 0, 0],
+      "size": [3.0, 1.8, 2.2],
+      "material": {
+        "color": "#F2EEE5",
+        "roughness": 0.52
+      }
+    },
+    {
+      "id": "building_roof",
+      "category": "building",
+      "type": "building",
+      "position": [1.8, 1.8, 0],
+      "size": [3.3, 0.35, 2.5],
+      "material": {
+        "color": "#3A3E3F",
+        "roughness": 0.45
+      }
+    },
+    {
+      "id": "tree_01",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [-1.5, 0.06, 0.2],
+      "scale": 1.0,
+      "trunkHeight": 1.2,
+      "crownRadius": 0.85
+    }
+  ],
+  "temporalSpec": {
+    "anchorYears": [
+      {
+        "year": 2026,
+        "entities": {
+          "tree_01": { "growth": 1.0, "crownVolume": 1.0 }
+        }
+      },
+      {
+        "year": 2036,
+        "entities": {
+          "tree_01": { "growth": 1.3, "crownVolume": 1.4 }
+        }
+      }
+    ],
+    "timelineIntervals": [
+      { "startYear": 2026, "endYear": 2036, "mode": "stable", "narrative": "Clay world." }
+    ]
+  }
+}

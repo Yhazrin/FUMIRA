@@ -309,6 +309,167 @@ function createBicycle(entity: EntitySpec, palette: Palette): THREE.Group {
   return bike;
 }
 
+// ── Street-scene props ───────────────────────────────────────
+
+function materialColor(entity: EntitySpec, fallback: string): number {
+  const material = entity.material as { color?: string } | undefined;
+  return hex(material?.color ?? fallback);
+}
+
+/**
+ * A deliberately readable electric moped blockout. It is not intended to
+ * recover hidden mechanical geometry from one photograph; the seat, red body,
+ * two wheels, handlebar and rear rack are the recognition cues that survive
+ * the clay treatment and the desktop camera distance.
+ */
+function createMoped(entity: EntitySpec, palette: Palette): THREE.Group {
+  const moped = new THREE.Group();
+  moped.userData = { category: 'vehicle', id: entity.id };
+  const bodyColor = materialColor(entity, palette.orangeRim);
+  const dark = hex(palette.charcoal);
+  const rim = hex(palette.warmWhiteR);
+  const wheelRadius = 0.28;
+
+  for (const x of [-0.58, 0.58]) {
+    const wheel = new THREE.Mesh(
+      new THREE.TorusGeometry(wheelRadius, 0.075, 10, 18),
+      clayMat(dark, { roughness: 0.9 }),
+    );
+    wheel.rotation.y = Math.PI / 2;
+    wheel.position.set(x, wheelRadius + 0.02, 0);
+    wheel.castShadow = true;
+    moped.add(wheel);
+  }
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.42, 0.42, 3, 2, 3),
+    clayMat(bodyColor, { roughness: 0.58 }),
+  );
+  body.position.set(0, 0.52, 0);
+  body.castShadow = true;
+  moped.add(body);
+
+  const footboard = new THREE.Mesh(
+    new THREE.BoxGeometry(0.72, 0.09, 0.48, 2, 1, 2),
+    clayMat(rim),
+  );
+  footboard.position.set(0.02, 0.78, 0);
+  moped.add(footboard);
+
+  const seat = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.16, 0.38, 3, 2, 3),
+    clayMat(dark, { roughness: 0.72 }),
+  );
+  seat.position.set(-0.12, 1.0, 0);
+  seat.castShadow = true;
+  moped.add(seat);
+
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.06, 0.54, 8),
+    clayMat(bodyColor),
+  );
+  stem.position.set(0.48, 0.92, 0);
+  stem.rotation.z = -0.18;
+  moped.add(stem);
+
+  const handlebar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.42, 8),
+    clayMat(dark),
+  );
+  handlebar.position.set(0.55, 1.2, 0);
+  handlebar.rotation.x = Math.PI / 2;
+  moped.add(handlebar);
+
+  const mirror = new THREE.Mesh(
+    new THREE.SphereGeometry(0.09, 10, 8),
+    clayMat(rim, { roughness: 0.46 }),
+  );
+  mirror.position.set(0.55, 1.42, 0.16);
+  moped.add(mirror);
+
+  const rack = new THREE.Mesh(
+    new THREE.BoxGeometry(0.62, 0.05, 0.5, 2, 1, 2),
+    clayMat(rim, { roughness: 0.7 }),
+  );
+  rack.position.set(-0.52, 1.08, 0);
+  moped.add(rack);
+
+  moped.position.set(entity.position[0], entity.position[1], entity.position[2]);
+  moped.rotation.y = entity.rotation ?? 0;
+  moped.scale.setScalar(entity.scale ?? 1);
+  return moped;
+}
+
+function createUtilityBox(entity: EntitySpec, palette: Palette): THREE.Group {
+  const box = new THREE.Group();
+  box.userData = { category: 'infrastructure', id: entity.id };
+  const warm = hex(palette.warmWhite);
+  const rim = hex(palette.warmWhiteR);
+  const dark = hex(palette.charcoal);
+  const size = (entity.size as number[]) ?? [1.45, 2.2, 0.5];
+
+  const cabinet = new THREE.Mesh(
+    new THREE.BoxGeometry(size[0], size[1], size[2], 3, 3, 2),
+    clayMat(warm, { roughness: 0.68 }),
+  );
+  cabinet.position.y = size[1] / 2 + 0.5;
+  cabinet.castShadow = true;
+  cabinet.receiveShadow = true;
+  box.add(cabinet);
+
+  const cap = new THREE.Mesh(
+    new THREE.BoxGeometry(size[0] + 0.12, 0.12, size[2] + 0.12, 2, 1, 2),
+    clayMat(rim),
+  );
+  cap.position.y = size[1] + 0.56;
+  box.add(cap);
+
+  for (const x of [-size[0] * 0.32, size[0] * 0.32]) {
+    const leg = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.48, 0.08),
+      clayMat(rim),
+    );
+    leg.position.set(x, 0.24, 0);
+    box.add(leg);
+  }
+
+  const lock = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.16, 0.03),
+    clayMat(dark, { roughness: 0.5 }),
+  );
+  lock.position.set(size[0] * 0.28, size[1] * 0.58 + 0.5, size[2] / 2 + 0.03);
+  box.add(lock);
+
+  box.position.set(entity.position[0], entity.position[1], entity.position[2]);
+  box.rotation.y = entity.rotation ?? 0;
+  return box;
+}
+
+function createHedge(entity: EntitySpec, palette: Palette): THREE.Group {
+  const hedge = new THREE.Group();
+  hedge.userData = { category: 'vegetation', id: entity.id };
+  const size = (entity.size as number[]) ?? [3.4, 0.9, 0.75];
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(size[0], size[1], size[2], 4, 3, 4),
+    clayMat(hex(palette.foliage1), { roughness: 0.92 }),
+  );
+  base.position.y = size[1] / 2;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  hedge.add(base);
+  for (let i = 0; i < 6; i += 1) {
+    const blob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 10, 8),
+      clayMat(hex(palette.foliage2), { roughness: 0.95 }),
+    );
+    blob.position.set(-size[0] / 2 + 0.3 + i * (size[0] - 0.6) / 5, size[1] + 0.05, 0);
+    blob.scale.y = 0.7;
+    hedge.add(blob);
+  }
+  hedge.position.set(entity.position[0], entity.position[1], entity.position[2]);
+  return hedge;
+}
+
 function createLampPost(entity: EntitySpec, palette: Palette): THREE.Group {
   const lp = new THREE.Group();
   lp.userData = { category: 'prop', id: entity.id };
@@ -417,6 +578,9 @@ const builders: Record<string, EntityBuilder> = {
   bench: createBench,
   streetSign: createStreetSign,
   bicycle: createBicycle,
+  moped: createMoped,
+  utilityBox: createUtilityBox,
+  hedge: createHedge,
   lampPost: createLampPost,
   flowerBed: createFlowerBed,
   cube: createCube,

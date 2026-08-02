@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "1.0.0",
+  "targetName": "Clay Small Tree",
+  "suitability": "pass",
+  "coordinateFrame": {
+    "handedness": "right",
+    "upAxis": "y",
+    "unit": "meter"
+  },
+  "silhouette": {
+    "style": "clay-rounded",
+    "complexity": "simple"
+  },
+  "proceduralStrategy": [
+    "single-pass-blockout"
+  ],
+  "objectClass": {
+    "primaryDomain": "object",
+    "subType": "tree"
+  },
+  "complexity": "simple",
+  "qualityContract": {
+    "fidelityTarget": "stylized-clay",
+    "styleGuide": "FUMIRA Clay3DStyle",
+    "minimumSpecDepth": {
+      "structural": true,
+      "material": true,
+      "lighting": false
+    },
+    "featureGroups": [
+      {
+        "id": "tree_body",
+        "name": "body",
+        "features": [
+          "tree base form"
+        ]
+      }
+    ],
+    "constraints": [
+      "clay-non-metallic",
+      "clay-bevel-all-edges",
+      "clay-palette-only"
+    ]
+  },
+  "componentTree": [
+    {
+      "id": "tree_main_de32ef",
+      "name": "Small Tree",
+      "level": "macro",
+      "primitive": "sphere",
+      "dimensions": {
+        "radius": 1.2
+      },
+      "transform": {
+        "position": [
+          -1.5,
+          0,
+          -0.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.8,
+          0.8
+        ]
+      },
+      "material": "clay_tree_bca15f",
+      "topologyClass": "organic",
+      "topologyRationale": "tree default clay topology"
+    }
+  ],
+  "materials": [
+    {
+      "id": "clay_tree_bca15f",
+      "baseColor": "#7E9A27",
+      "roughness": {
+        "base": 0.76,
+        "variation": 0.08
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.15
+      },
+      "clearcoatRoughness": {
+        "base": 0.6
+      },
+      "normal": {
+        "strength": 0.15
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.2
+      },
+      "colorVariation": {
+        "palette": [
+          "#7E9A27"
+        ],
+        "amplitude": 0.05,
+        "heightCorrelation": 0.1
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "clay-base",
+          "frequency": 3,
+          "amplitude": 0.15,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "clay-base"
+        },
+        {
+          "id": "clay-grain",
+          "frequency": 18,
+          "amplitude": 0.06,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "grain",
+          "role": "clay-grain"
+        }
+      ]
+    }
+  ],
+  "buildPasses": [
+    {
+      "id": "blockout",
+      "componentRefs": [
+        "tree_main_de32ef"
+      ]
+    }
+  ],
+  "reviewHistory": [],
+  "detailInventory": {
+    "targetMinDetails": 1,
+    "details": [
+      {
+        "zone": "body",
+        "feature": "tree base form",
+        "level": "macro"
+      }
+    ]
+  },
+  "clayOverrides": {
+    "style": "soft-clay",
+    "roughness": 0.52,
+    "metalness": 0.0,
+    "clearcoat": 0.15,
+    "bevelRadius": 0.08,
+    "bevelSegments": 3,
+    "lighting": {
+      "primaryDirection": [
+        -0.4,
+        0.8,
+        0.6
+      ],
+      "ambientIntensity": 0.5,
+      "keyLightIntensity": 1.2,
+      "fillLightIntensity": 0.4
+    },
+    "contactShadow": {
+      "softness": 0.78,
+      "opacity": 0.24
+    }
+  }
+}

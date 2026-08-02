@@ -6,11 +6,7 @@ struct ResultView: View {
     var namespace: Namespace.ID
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isTiltTimeActive = false
-    @State private var tiltBaselineRoll: Double?
-    @State private var tiltLastSampleTime: TimeInterval?
-    @State private var tiltLastHapticYears: Double?
-    @State private var tiltStructureTime: TimePosition?
+    @State private var tilt = ResultTiltTimeController()
     @State private var selectedFutureForkIndex = 0
     @State private var futureForkShakeFeedbackTrigger: Int?
     @State private var showsInterpretationEvidence = false
@@ -31,7 +27,7 @@ struct ResultView: View {
     /// not rebuild the rest of the page thirty times per second. Text, actions,
     /// and future branches commit once when tilt browsing stops.
     private var structureTime: TimePosition {
-        tiltStructureTime ?? model.selectedTime
+        tilt.structureTime ?? model.selectedTime
     }
 
     private var resultTitle: String {
@@ -75,9 +71,16 @@ struct ResultView: View {
     }
 
     private var canOfferFutureForks: Bool {
-        generatedTime.offsetDays > 0
+        model.experimental.isEnabled(.futureFork)
+            && generatedTime.offsetDays > 0
             && isBrowseTimeGenerated
             && futureForkBranches.count >= 2
+    }
+
+    /// Blow-to-reveal is an experiment. When it is off the photo is simply
+    /// present and nothing gates the action dock.
+    private var isBlowRevealEnabled: Bool {
+        model.experimental.isEnabled(.blowReveal)
     }
 
     /// Read-only context for the current browse position. The witness layer
@@ -150,7 +153,15 @@ struct ResultView: View {
             }
             #endif
             if model.resultRevealProgress < 0.999 {
-                model.blowReveal.activate()
+                guard isBlowRevealEnabled else {
+                    model.completeResultReveal()
+                    return
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(120))
+                    guard model.resultRevealProgress < 0.999 else { return }
+                    model.blowReveal.activate()
+                }
             }
         }
         .onChange(of: model.blowReveal.snapshot) { _, snapshot in
@@ -196,15 +207,17 @@ struct ResultView: View {
                         cornerRadius: ClayShape.lg
                     )
 
-                    TemporalBlowRevealSurface(
-                        original: model.decodedCapturedImage,
-                        progress: model.resultRevealProgress,
-                        gust: blowGust,
-                        reduceMotion: reduceMotion,
-                        targetLabel: generatedTime.compactLabel,
-                        handwrittenTitle: model.temporalStory?.title
-                            ?? "风把时间吹开"
-                    )
+                    if isBlowRevealEnabled {
+                        TemporalBlowRevealSurface(
+                            original: model.decodedCapturedImage,
+                            progress: model.resultRevealProgress,
+                            gust: blowGust,
+                            reduceMotion: reduceMotion,
+                            targetLabel: generatedTime.compactLabel,
+                            handwrittenTitle: model.temporalStory?.title
+                                ?? "风把时间吹开"
+                        )
+                    }
 
                     if model.isRealityAlignmentPresented {
                         RealityComparisonSurface(
@@ -217,7 +230,7 @@ struct ResultView: View {
                     }
                 }
 
-                if model.resultRevealProgress < 0.999 {
+                if isBlowRevealEnabled, model.resultRevealProgress < 0.999 {
                     BlowRevealPrompt(
                         target: generatedTime,
                         progress: model.resultRevealProgress
@@ -225,14 +238,19 @@ struct ResultView: View {
                         completeBlowReveal()
                     }
                 } else {
-                    resultActionDock
+                    actionDock
                 }
 
-                narrativeSection
+                ResultNarrativeSection(
+                    narrative: displayedNarrative,
+                    trace: interpretationTrace,
+                    provenance: frameProvenanceText,
+                    isEvidenceExpanded: $showsInterpretationEvidence
+                )
 
                 TimeRail(
                     value: model.selectedTime.normalized,
-                    isExternalValueDirectDriven: isTiltTimeActive,
+                    isExternalValueDirectDriven: tilt.isActive,
                     onDetent: model.playTimeDetent
                 ) { normalized in
                     stopTiltTime()
@@ -247,224 +265,37 @@ struct ResultView: View {
         }
     }
 
-    private var resultActionDock: some View {
-        VStack(alignment: .leading, spacing: ClaySpacing.sm) {
-            if !isBrowseTimeGenerated {
-                generateBrowsedFrameButton
-            }
-
-            saveButton
-
-            HStack(spacing: ClaySpacing.sm) {
-                Spacer(minLength: ClaySpacing.sm)
-
-                compactAction(
-                    title: "对准现实",
-                    systemImage: "viewfinder"
-                ) {
-                    presentRealityComparison()
-                }
-                .opacity(canPresentRealityComparison ? 1 : 0)
-                .allowsHitTesting(canPresentRealityComparison)
-                .accessibilityHidden(!canPresentRealityComparison)
-
-                compactTiltTimeAction
-                    .opacity(canOfferTiltTime ? 1 : 0)
-                    .allowsHitTesting(canOfferTiltTime)
-                    .accessibilityHidden(!canOfferTiltTime)
-
-                compactMoreActionsMenu
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("result.action-dock")
+    private var actionDock: some View {
+        ResultActionDock(
+            isBrowseTimeGenerated: isBrowseTimeGenerated,
+            isPreparingGeneration: model.isPreparingBrowsedTimeGeneration,
+            canPresentComparison: canPresentRealityComparison,
+            canOfferTilt: canOfferTiltTime,
+            isTiltActive: tilt.isActive,
+            canUndo: model.canUndoGeneration,
+            browseLabel: model.selectedTime.compactLabel,
+            revealProgress: model.resultRevealProgress,
+            reduceMotion: reduceMotion,
+            isDioramaEnabled: model.experimental.isEnabled(.diorama),
+            didSaveToLibrary: model.shareFeedbackMessage == "已保存到相册",
+            onGenerateBrowsedFrame: {
+                stopTiltTime()
+                Task { await model.generateAtStoryPreviewTime() }
+            },
+            onSave: { model.openShare() },
+            onPresentComparison: { presentRealityComparison() },
+            onToggleTilt: toggleTiltTime,
+            onRegenerate: { Task { await model.regenerateResult() } },
+            onUndo: { model.undoLastGeneration() },
+            onOpenSettings: { model.openSettings() },
+            onRetake: { model.retake() },
+            onShowDiorama: { showsDiorama = true }
+        )
     }
 
     private var canPresentRealityComparison: Bool {
         model.resultRevealProgress >= 0.999
             && !model.isRealityAlignmentPresented
-    }
-
-    private var saveButton: some View {
-        TemporalSaveCapsule(
-            title: "保存海报",
-            revealProgress: model.resultRevealProgress,
-            reduceMotion: reduceMotion
-        ) {
-            model.openShare()
-        }
-        .posterSensoryFeedback(
-            trigger: model.shareFeedbackMessage == "已保存到相册",
-            .success
-        )
-    }
-
-    private func compactAction(
-        title: String,
-        systemImage: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .frame(
-                    width: 56,
-                    height: 56
-                )
-                .contentShape(Circle())
-        }
-        .clayButtonStyle(
-            base: ClayPalette.warmWhite,
-            rim: ClayPalette.warmWhiteRim,
-            foreground: ClayPalette.orangeDepth,
-            cornerRadius: ClayShape.pill,
-            depth: 4
-        )
-        .accessibilityLabel(title)
-    }
-
-    private var compactTiltTimeAction: some View {
-        Button(action: toggleTiltTime) {
-            Image(systemName: isTiltTimeActive ? "pause.circle" : "gyroscope")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(
-                    isTiltTimeActive
-                        ? ClayPalette.charcoal
-                        : ClayPalette.orangeDepth
-                )
-                .frame(
-                    width: 56,
-                    height: 56
-                )
-                .contentShape(Circle())
-        }
-        .clayButtonStyle(
-            base: isTiltTimeActive ? ClayPalette.orange : ClayPalette.warmWhite,
-            rim: isTiltTimeActive ? ClayPalette.orangeDepth : ClayPalette.warmWhiteRim,
-            foreground: isTiltTimeActive ? ClayPalette.charcoal : ClayPalette.orangeDepth,
-            cornerRadius: ClayShape.pill,
-            depth: 4
-        )
-        .disabled(model.isPreparingBrowsedTimeGeneration)
-        .posterSensoryFeedback(trigger: isTiltTimeActive, .selection)
-        .accessibilityIdentifier("result.tilt-time")
-        .accessibilityLabel(isTiltTimeActive ? "停止倾斜穿越" : "开启倾斜穿越")
-        .accessibilityValue(isTiltTimeActive ? "已开启" : "已关闭")
-        .accessibilityHint(
-            isTiltTimeActive
-                ? "停止使用设备倾斜浏览时间"
-                : "开启后，向左倾斜浏览过去，向右倾斜浏览未来，回正时停止"
-        )
-        .accessibilityAddTraits(isTiltTimeActive ? .isSelected : [])
-    }
-
-    private var compactMoreActionsMenu: some View {
-        Menu {
-            Button {
-                Task { await model.regenerateResult() }
-            } label: {
-                Label("重新生成", systemImage: "sparkles")
-            }
-
-            if model.canUndoGeneration {
-                Button {
-                    model.undoLastGeneration()
-                } label: {
-                    Label("撤销", systemImage: "arrow.uturn.backward")
-                }
-            }
-
-            Button {
-                model.openSettings()
-            } label: {
-                Label("设置", systemImage: "gearshape")
-            }
-
-            Divider()
-
-            Button(role: .destructive) {
-                model.retake()
-            } label: {
-                Label("重拍", systemImage: "camera.rotate")
-            }
-
-            Divider()
-
-            Button {
-                showsDiorama = true
-            } label: {
-                Label("3D 微缩场景", systemImage: "cube.transparent")
-            }
-        } label: {
-            ClayMoldedControl(
-                base: ClayPalette.warmWhite,
-                rim: ClayPalette.warmWhiteRim,
-                foreground: ClayPalette.orangeDepth,
-                cornerRadius: ClayShape.pill,
-                depth: 4,
-                isPressed: false
-            ) {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .frame(width: 56, height: 56)
-            }
-            .shadow(
-                color: ClayShadow.rest.color,
-                radius: ClayShadow.rest.radius,
-                x: ClayShadow.rest.x,
-                y: ClayShadow.rest.y
-            )
-            .contentShape(Circle())
-        }
-        .accessibilityIdentifier("result.more-actions")
-        .accessibilityLabel("更多")
-        .accessibilityHint("重新生成、撤销、设置和重拍")
-    }
-
-    private var generateBrowsedFrameButton: some View {
-        PosterCapsuleButton(
-            title: model.isPreparingBrowsedTimeGeneration ? "正在对齐这一帧…" : "生成这一帧",
-            accessibilityHint: "使用当前浏览的 \(model.selectedTime.compactLabel) 重新生成照片"
-        ) {
-            stopTiltTime()
-            Task { await model.generateAtStoryPreviewTime() }
-        }
-        .disabled(model.isPreparingBrowsedTimeGeneration)
-        .accessibilityIdentifier("result.generate-browsed-frame")
-    }
-
-    private var narrativeSection: some View {
-        let trace = interpretationTrace
-
-        return VStack(alignment: .leading, spacing: ClaySpacing.sm) {
-            Text(displayedNarrative)
-                .font(ClayTypography.bodySmall)
-                .foregroundStyle(ClayPalette.textMuted)
-                .lineLimit(showsInterpretationEvidence ? nil : 1)
-                .fixedSize(horizontal: false, vertical: true)
-                .contentTransition(.opacity)
-
-            DisclosureGroup(isExpanded: $showsInterpretationEvidence) {
-                TemporalWitnessRibbon(trace: trace)
-                    .padding(.top, ClaySpacing.sm)
-            } label: {
-                Text("画面线索")
-                    .font(ClayTypography.label)
-                    .foregroundStyle(ClayPalette.textMuted)
-                    .frame(minHeight: ClaySpacing.minTapTarget, alignment: .leading)
-            }
-            .tint(ClayPalette.textMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier("result.temporal-interpretation")
-        .accessibilityValue(frameProvenanceText)
-    }
-
-    private var selectedFutureFork: TemporalFutureForkBranch? {
-        guard !futureForkBranches.isEmpty else { return nil }
-        let index = min(max(selectedFutureForkIndex, 0), futureForkBranches.count - 1)
-        return futureForkBranches[index]
     }
 
     private var futureForkPresentationItems: [TemporalFutureForkView.PresentationItem] {
@@ -481,96 +312,27 @@ struct ResultView: View {
     }
 
     private var futureForkSection: some View {
-        VStack(alignment: .leading, spacing: ClaySpacing.sm) {
-            TemporalFutureForkView(
-                items: futureForkPresentationItems,
-                selectedIndex: selectedFutureForkIndex,
-                reduceMotion: reduceMotion,
-                shakeFeedbackTrigger: futureForkShakeFeedbackTrigger
-            ) { index in
+        ResultFutureForkSection(
+            items: futureForkPresentationItems,
+            branches: futureForkBranches,
+            selectedIndex: selectedFutureForkIndex,
+            currentForkID: model.generatedFrame?.futureForkID,
+            targetLabel: generatedTime.compactLabel,
+            reduceMotion: reduceMotion,
+            shakeFeedbackTrigger: futureForkShakeFeedbackTrigger,
+            isShakeEnabled: model.experimental.isEnabled(.shakeToFork),
+            onSelect: { index in
                 selectedFutureForkIndex = index
                 futureForkShakeFeedbackTrigger = nil
                 model.playFutureForkDetent()
+            },
+            onRequestAdvance: {
+                model.temporalShake.requestFallbackAdvance()
+            },
+            onGenerate: { branch in
+                Task { await model.generateFutureFork(branch) }
             }
-
-            if let selectedFutureFork {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: ClaySpacing.lg) {
-                        futureForkAdvanceAction
-
-                        Spacer(minLength: ClaySpacing.sm)
-
-                        futureForkGenerateAction(selectedFutureFork)
-                    }
-
-                    VStack(alignment: .leading, spacing: ClaySpacing.xxs) {
-                        futureForkGenerateAction(selectedFutureFork)
-                        futureForkAdvanceAction
-                    }
-                }
-            }
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var futureForkAdvanceAction: some View {
-        Button {
-            model.temporalShake.requestFallbackAdvance()
-        } label: {
-            Label(
-                "下一种",
-                systemImage: "arrow.trianglehead.2.clockwise.rotate.90"
-            )
-            .font(ClayTypography.label)
-            .foregroundStyle(ClayPalette.textMuted)
-            .frame(minHeight: ClaySpacing.minTapTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PosterPressStyle())
-        .accessibilityLabel("换一种可能")
-        .accessibilityIdentifier("result.future-fork.advance")
-    }
-
-    private func futureForkGenerateAction(
-        _ branch: TemporalFutureForkBranch
-    ) -> some View {
-        let isCurrent = model.generatedFrame?.futureForkID == branch.id
-
-        return Button {
-            Task {
-                await model.generateFutureFork(branch)
-            }
-        } label: {
-            Text(isCurrent ? "已经显影" : "显影这一可能")
-                .font(ClayTypography.label)
-                .foregroundStyle(
-                    isCurrent
-                        ? ClayPalette.textMuted
-                        : ClayPalette.warmWhite
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, ClaySpacing.lg)
-                .frame(minHeight: ClaySpacing.minTapTarget)
-                .background(
-                    isCurrent
-                        ? ClayPalette.warmWhite
-                        : ClayPalette.orange,
-                    in: Capsule()
-                )
-                .overlay {
-                    if isCurrent {
-                        Capsule()
-                            .stroke(ClayPalette.warmWhiteRim, lineWidth: 1)
-                    }
-                }
-        }
-        .buttonStyle(PosterPressStyle())
-        .disabled(isCurrent)
-        .accessibilityHint(
-            "保持 \(generatedTime.compactLabel) 不变，从原始照片生成所选未来分支"
         )
-        .accessibilityIdentifier("result.future-fork.generate")
     }
 
     private func alignFutureForkSelection() {
@@ -597,71 +359,33 @@ struct ResultView: View {
     }
 
     private func toggleTiltTime() {
-        if isTiltTimeActive {
-            stopTiltTime()
+        if tilt.isActive {
+            tilt.stop()
             return
         }
-
         guard canOfferTiltTime else { return }
-
-        isTiltTimeActive = true
-        tiltStructureTime = model.selectedTime
-        // The first sensor sample after opt-in establishes a real baseline.
-        // Reusing the observable's initial zero can otherwise jump time on
-        // hardware whose current attitude has not been published yet.
-        tiltBaselineRoll = nil
-        tiltLastSampleTime = nil
-        tiltLastHapticYears = model.selectedTime.offsetYears
+        tilt.start(from: model.selectedTime)
     }
 
     private func stopTiltTime() {
-        isTiltTimeActive = false
-        tiltStructureTime = nil
-        tiltBaselineRoll = nil
-        tiltLastSampleTime = nil
-        tiltLastHapticYears = nil
+        tilt.stop()
     }
 
     private func advanceTiltTime(using currentRoll: Double) {
-        guard
-            isTiltTimeActive,
-            canOfferTiltTime,
-            !model.isPreparingBrowsedTimeGeneration,
-            currentRoll.isFinite
-        else {
+        guard canOfferTiltTime, !model.isPreparingBrowsedTimeGeneration else {
+            return
+        }
+        guard let advance = tilt.advance(
+            from: model.selectedTime,
+            roll: currentRoll
+        ) else {
             return
         }
 
-        let now = ProcessInfo.processInfo.systemUptime
-        guard let baselineRoll = tiltBaselineRoll,
-              let lastSampleTime = tiltLastSampleTime else {
-            tiltBaselineRoll = currentRoll
-            tiltLastSampleTime = now
-            return
+        model.updateTime(normalized: advance.time.normalized)
+        if let detent = advance.detent {
+            model.playTimeDetent(detent)
         }
-        tiltLastSampleTime = now
-
-        let next = TiltTimeNavigator.standard.advance(
-            model.selectedTime,
-            rollRadians: signedAngularDelta(currentRoll, baselineRoll),
-            frameDelta: now - lastSampleTime
-        )
-        guard next != model.selectedTime else { return }
-
-        let previousYears = tiltLastHapticYears ?? model.selectedTime.offsetYears
-        model.updateTime(normalized: next.normalized)
-        if WaveTimeHapticCrossing.shouldTick(
-            previousYears: previousYears,
-            currentYears: next.offsetYears
-        ) {
-            model.playTimeDetent(
-                WaveTimeHapticCrossing.crossedNow(
-                    previousYears: previousYears,
-                    currentYears: next.offsetYears
-                ) ? .now : .decade
-            )
-        }
-        tiltLastHapticYears = next.offsetYears
     }
 
     private var canOfferTiltTime: Bool {
@@ -669,13 +393,6 @@ struct ResultView: View {
             && model.resultRevealProgress >= 0.999
             && model.captureMotion.isActive
             && !model.isRealityAlignmentPresented
-    }
-
-    private func signedAngularDelta(_ current: Double, _ baseline: Double) -> Double {
-        var delta = current - baseline
-        while delta > .pi { delta -= .pi * 2 }
-        while delta < -.pi { delta += .pi * 2 }
-        return delta
     }
 
     /// Present original ↔ generated comparison in the same bounded hero frame.
@@ -790,305 +507,6 @@ private struct BlowRevealPrompt: View {
         // This prompt lives inside a bounded photo frame. Keep it legible at
         // accessibility sizes without letting it cover the photo completely.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-    }
-}
-
-/// Inline original ↔ generated comparison on the hero photo frame.
-/// Presented by sliding the result panel down — never as a separate page.
-private struct RealityComparisonSurface: View {
-    let original: UIImage?
-    let generated: UIImage?
-    let target: TimePosition
-    let close: () -> Void
-
-    @State private var position: CGFloat = 0.5
-    @State private var showsGrid = true
-    @State private var comparisonMode = RealityComparisonMode.auditInitial
-
-    var body: some View {
-        GeometryReader { proxy in
-            let boundary = proxy.size.width * min(max(position, 0), 1)
-
-            ZStack(alignment: .topLeading) {
-                if comparisonMode == .split {
-                    splitComparison(
-                        size: proxy.size,
-                        boundary: boundary
-                    )
-                } else {
-                    TemporalBlinkComparator(
-                        originalImage: original,
-                        generatedImage: generated,
-                        targetTime: target
-                    )
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                }
-
-                comparisonChrome
-            }
-            // Both comparison modes replace pixels in one exact crop. Parent
-            // phase animations must never turn the switch into a crossfade.
-            .transaction { transaction in
-                transaction.disablesAnimations = true
-            }
-            .clipShape(
-                RoundedRectangle(cornerRadius: ClayShape.lg, style: .continuous)
-            )
-        }
-    }
-
-    private func splitComparison(
-        size: CGSize,
-        boundary: CGFloat
-    ) -> some View {
-        ZStack(alignment: .topLeading) {
-            comparisonImage(original)
-                .frame(width: size.width, height: size.height)
-                .clipped()
-
-            if showsGrid {
-                RealityComparisonGrid()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-
-            comparisonImage(generated)
-                .frame(width: size.width, height: size.height)
-                .mask {
-                    HStack(spacing: 0) {
-                        Color.clear
-                            .frame(width: boundary)
-                        Rectangle()
-                            .fill(Color.white)
-                    }
-                }
-                .allowsHitTesting(false)
-
-            boundaryHandle(at: boundary, height: size.height)
-                .allowsHitTesting(false)
-
-            HStack {
-                Text("原片 · NOW")
-                    .foregroundStyle(ClayPalette.orangeRim)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(ClayPalette.warmWhite.opacity(0.94), in: Capsule())
-                Spacer()
-                Text(target.compactLabel)
-                    .foregroundStyle(ClayPalette.warmWhite)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(ClayPalette.orange, in: Capsule())
-            }
-            .font(ClayTypography.labelSmall.weight(.semibold))
-            .padding(.horizontal, ClaySpacing.lg)
-            .padding(.top, ClaySpacing.xxl + CameraChromeMetrics.controlDiameter)
-            .allowsHitTesting(false)
-            .zIndex(4)
-
-            PosterGlassCard(cornerRadius: ClayShape.card) {
-                Text("拖动，看时间差")
-                    .font(ClayTypography.heading)
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.horizontal, ClaySpacing.lg)
-            .padding(.bottom, ClaySpacing.lg)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .allowsHitTesting(false)
-            .zIndex(4)
-
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(boundaryGesture(width: size.width))
-                .accessibilityElement(children: .ignore)
-                .accessibilityIdentifier("result.reality-boundary")
-                .accessibilityLabel("现实与目标时间边界")
-                .accessibilityValue("原片占 \(Int(position * 100))%")
-                .accessibilityHint("左右拖动比较原片与目标时间；上下滑动可逐级调整")
-                .accessibilityAdjustableAction(adjustBoundary)
-                .zIndex(3)
-        }
-    }
-
-    private var comparisonChrome: some View {
-        HStack(spacing: ClaySpacing.sm) {
-            Spacer(minLength: 0)
-
-            comparisonControl(
-                systemImage: comparisonMode == .split
-                    ? "circle.lefthalf.filled"
-                    : "arrow.left.and.right",
-                accessibilityLabel: comparisonMode == .split
-                    ? "切换到眨眼对照"
-                    : "切换到拖动对照",
-                identifier: "result.comparison-mode"
-            ) {
-                comparisonMode = comparisonMode == .split ? .blink : .split
-            }
-
-            if comparisonMode == .split {
-                comparisonControl(
-                    systemImage: showsGrid ? "grid" : "grid.circle",
-                    accessibilityLabel: showsGrid ? "隐藏对照栅格" : "显示对照栅格",
-                    identifier: "result.comparison-grid"
-                ) {
-                    showsGrid.toggle()
-                }
-            }
-
-            comparisonControl(
-                systemImage: "xmark",
-                accessibilityLabel: "关闭现实对照",
-                identifier: "result.comparison-close",
-                action: close
-            )
-        }
-        .padding(.horizontal, ClaySpacing.lg)
-        .padding(.top, ClaySpacing.sm)
-        .zIndex(5)
-    }
-
-    private func comparisonControl(
-        systemImage: String,
-        accessibilityLabel: String,
-        identifier: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(ClayTypography.label)
-                .foregroundStyle(ClayPalette.orangeRim)
-                .frame(
-                    width: CameraChromeMetrics.controlDiameter,
-                    height: CameraChromeMetrics.controlDiameter
-                )
-                .background(ClayPalette.warmWhite.opacity(0.94), in: Circle())
-                .overlay {
-                    Circle()
-                        .stroke(ClayPalette.orange.opacity(0.22), lineWidth: 1)
-                }
-        }
-        .buttonStyle(PosterPressStyle())
-        .accessibilityIdentifier(identifier)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
-    private func boundaryHandle(at x: CGFloat, height: CGFloat) -> some View {
-        ZStack {
-            Capsule(style: .continuous)
-                .fill(ClayPalette.warmWhite.opacity(0.92))
-                .frame(width: 3, height: height)
-                .shadow(color: ClayPalette.orange.opacity(0.22), radius: 6)
-
-            Capsule(style: .continuous)
-                .fill(ClayPalette.warmWhite)
-                .frame(width: 34, height: 56)
-                .overlay {
-                    Capsule(style: .continuous)
-                        .stroke(ClayPalette.orange.opacity(0.28), lineWidth: 1)
-                }
-                .overlay {
-                    Image(systemName: "arrow.left.and.right")
-                        .font(ClayTypography.labelSmall)
-                        .foregroundStyle(ClayPalette.orangeRim)
-                }
-                .shadow(color: ClayPalette.orange.opacity(0.18), radius: 10, y: 3)
-        }
-        .position(x: x, y: height * 0.5)
-    }
-
-    private func boundaryGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                position = min(max(value.location.x / max(width, 1), 0), 1)
-            }
-    }
-
-    private func adjustBoundary(_ direction: AccessibilityAdjustmentDirection) {
-        switch direction {
-        case .increment:
-            position = min(position + 0.1, 1)
-        case .decrement:
-            position = max(position - 0.1, 0)
-        @unknown default:
-            break
-        }
-    }
-
-    @ViewBuilder
-    private func comparisonImage(_ image: UIImage?) -> some View {
-        if let image {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-        } else {
-            ClayPalette.orangeRim
-        }
-    }
-}
-
-private enum RealityComparisonMode: Equatable {
-    case split
-    case blink
-
-    static var auditInitial: Self {
-        #if DEBUG
-        ProcessInfo.processInfo.environment["FUMIRA_AUDIT_COMPARISON_MODE"] == "blink"
-            ? .blink
-            : .split
-        #else
-        .split
-        #endif
-    }
-}
-
-/// Rule-of-thirds grid for still original ↔ generated comparison.
-private struct RealityComparisonGrid: View {
-    var body: some View {
-        Canvas { context, size in
-            let color = ClayPalette.warmWhite.opacity(0.38)
-            let thirdsX = [size.width / 3, size.width * 2 / 3]
-            let thirdsY = [size.height / 3, size.height * 2 / 3]
-            for x in thirdsX {
-                var path = Path()
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: x, y: size.height))
-                context.stroke(path, with: .color(color), lineWidth: 1)
-            }
-            for y in thirdsY {
-                var path = Path()
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: size.width, y: y))
-                context.stroke(path, with: .color(color), lineWidth: 1)
-            }
-        }
-    }
-}
-
-enum RealityAlignmentGeometry {
-    static func progress(
-        currentRoll: Double,
-        currentPitch: Double,
-        currentYaw: Double,
-        captured: CaptureMotionSample
-    ) -> CGFloat {
-        let roll = angularDistance(currentRoll, captured.roll)
-        let pitch = angularDistance(currentPitch, captured.pitch)
-        let yaw = angularDistance(currentYaw, captured.yaw)
-        let weightedDistance = sqrt(
-            roll * roll
-                + pitch * pitch
-                + yaw * yaw * 0.45
-        )
-        return CGFloat(min(max(1 - weightedDistance / 0.24, 0), 1))
-    }
-
-    static func angularDistance(_ lhs: Double, _ rhs: Double) -> Double {
-        var angle = lhs - rhs
-        while angle > .pi { angle -= .pi * 2 }
-        while angle < -.pi { angle += .pi * 2 }
-        return abs(angle)
     }
 }
 

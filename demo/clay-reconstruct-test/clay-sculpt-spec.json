@@ -1,0 +1,974 @@
+{
+  "schemaVersion": "1.0.0",
+  "targetName": "Clay Red Electric Moped",
+  "suitability": "pass",
+  "coordinateFrame": {
+    "handedness": "right",
+    "upAxis": "y",
+    "unit": "meter"
+  },
+  "silhouette": {
+    "style": "clay-rounded",
+    "complexity": "moderate"
+  },
+  "proceduralStrategy": [
+    "single-pass-blockout"
+  ],
+  "objectClass": {
+    "primaryDomain": "object",
+    "subType": "vehicle"
+  },
+  "complexity": "moderate",
+  "qualityContract": {
+    "fidelityTarget": "stylized-clay",
+    "styleGuide": "FUMIRA Clay3DStyle",
+    "qualityBar": "moderate",
+    "minimumSpecDepth": {
+      "structural": true,
+      "material": true,
+      "lighting": true
+    },
+    "featureGroups": [
+      {
+        "id": "body_shell",
+        "name": "Body shell",
+        "features": [
+          "rear cowling",
+          "front leg shield"
+        ]
+      },
+      {
+        "id": "seat_assembly",
+        "name": "Seat",
+        "features": [
+          "elongated seat cushion"
+        ]
+      },
+      {
+        "id": "wheel_system",
+        "name": "Wheels",
+        "features": [
+          "front wheel",
+          "rear wheel"
+        ]
+      },
+      {
+        "id": "handlebar_fork",
+        "name": "Handlebar assembly",
+        "features": [
+          "front fork",
+          "handlebars",
+          "mirrors"
+        ]
+      },
+      {
+        "id": "accessories",
+        "name": "Accessories",
+        "features": [
+          "front basket",
+          "rear rack",
+          "kickstand"
+        ]
+      }
+    ],
+    "constraints": [
+      "clay-non-metallic",
+      "clay-bevel-all-edges",
+      "clay-palette-only"
+    ]
+  },
+  "componentTree": [
+    {
+      "id": "body_shell",
+      "name": "Body Shell",
+      "level": "macro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.42,
+        "height": 0.32,
+        "depth": 0.65
+      },
+      "transform": {
+        "position": [
+          0,
+          0.28,
+          0.05
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_body",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Main red cowling covering the rear half of the moped"
+    },
+    {
+      "id": "front_shield",
+      "name": "Front Leg Shield",
+      "level": "macro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.38,
+        "height": 0.35,
+        "depth": 0.08
+      },
+      "transform": {
+        "position": [
+          0,
+          0.3,
+          -0.25
+        ],
+        "rotation": [
+          -0.15,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_body",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Vertical front panel protecting the rider's legs"
+    },
+    {
+      "id": "floorboard",
+      "name": "Floorboard",
+      "level": "meso",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.36,
+        "height": 0.03,
+        "depth": 0.35
+      },
+      "transform": {
+        "position": [
+          0,
+          0.12,
+          -0.08
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_dark",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Flat platform for the rider's feet"
+    },
+    {
+      "id": "seat",
+      "name": "Seat Cushion",
+      "level": "meso",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.28,
+        "height": 0.08,
+        "depth": 0.45
+      },
+      "transform": {
+        "position": [
+          0,
+          0.48,
+          0.1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_seat",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Elongated black seat cushion"
+    },
+    {
+      "id": "rear_wheel",
+      "name": "Rear Wheel",
+      "level": "meso",
+      "primitive": "cylinder",
+      "dimensions": {
+        "radius": 0.16,
+        "height": 0.08
+      },
+      "transform": {
+        "position": [
+          0,
+          0.16,
+          0.35
+        ],
+        "rotation": [
+          0,
+          0,
+          1.5708
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_wheel",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Rear wheel, oriented horizontally"
+    },
+    {
+      "id": "front_wheel",
+      "name": "Front Wheel",
+      "level": "meso",
+      "primitive": "cylinder",
+      "dimensions": {
+        "radius": 0.16,
+        "height": 0.08
+      },
+      "transform": {
+        "position": [
+          0,
+          0.16,
+          -0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          1.5708
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_wheel",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Front wheel, oriented horizontally"
+    },
+    {
+      "id": "front_fork",
+      "name": "Front Fork",
+      "level": "meso",
+      "primitive": "cylinder",
+      "dimensions": {
+        "radius": 0.02,
+        "height": 0.3
+      },
+      "transform": {
+        "position": [
+          0,
+          0.3,
+          -0.36
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_dark",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Vertical fork connecting front wheel to handlebars"
+    },
+    {
+      "id": "handlebar",
+      "name": "Handlebar",
+      "level": "meso",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.4,
+        "height": 0.03,
+        "depth": 0.03
+      },
+      "transform": {
+        "position": [
+          0,
+          0.5,
+          -0.34
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_dark",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Horizontal handlebar spanning the width"
+    },
+    {
+      "id": "front_basket",
+      "name": "Front Basket",
+      "level": "micro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.25,
+        "height": 0.1,
+        "depth": 0.18
+      },
+      "transform": {
+        "position": [
+          0,
+          0.42,
+          -0.42
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_dark",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Wire basket mounted on front"
+    },
+    {
+      "id": "rear_rack",
+      "name": "Rear Rack",
+      "level": "micro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.2,
+        "height": 0.02,
+        "depth": 0.15
+      },
+      "transform": {
+        "position": [
+          0,
+          0.46,
+          0.38
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_chrome",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Chrome rear grab rack"
+    },
+    {
+      "id": "headlight",
+      "name": "Headlight",
+      "level": "micro",
+      "primitive": "sphere",
+      "dimensions": {
+        "radius": 0.04
+      },
+      "transform": {
+        "position": [
+          0,
+          0.42,
+          -0.4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_light",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Small round headlight on the front"
+    },
+    {
+      "id": "taillight",
+      "name": "Taillight",
+      "level": "micro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 0.06,
+        "height": 0.04,
+        "depth": 0.02
+      },
+      "transform": {
+        "position": [
+          0,
+          0.38,
+          0.44
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_moped_taillight",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "Small red taillight at the rear"
+    }
+  ],
+  "materials": [
+    {
+      "id": "clay_moped_body",
+      "baseColor": "#FF672A",
+      "roughness": {
+        "base": 0.44,
+        "variation": 0.08
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.15
+      },
+      "clearcoatRoughness": {
+        "base": 0.6
+      },
+      "normal": {
+        "strength": 0.15
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.2
+      },
+      "colorVariation": {
+        "palette": [
+          "#FF672A"
+        ],
+        "amplitude": 0.05,
+        "heightCorrelation": 0.1
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "clay-base",
+          "frequency": 3,
+          "amplitude": 0.15,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "clay-base"
+        },
+        {
+          "id": "clay-grain",
+          "frequency": 18,
+          "amplitude": 0.06,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "grain",
+          "role": "clay-grain"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_seat",
+      "baseColor": "#202425",
+      "roughness": {
+        "base": 0.6,
+        "variation": 0.05
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.05
+      },
+      "clearcoatRoughness": {
+        "base": 0.8
+      },
+      "normal": {
+        "strength": 0.1
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.15
+      },
+      "colorVariation": {
+        "palette": [
+          "#202425"
+        ],
+        "amplitude": 0.02,
+        "heightCorrelation": 0.05
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "seat-base",
+          "frequency": 3,
+          "amplitude": 0.1,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "seat-base"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_wheel",
+      "baseColor": "#202425",
+      "roughness": {
+        "base": 0.76,
+        "variation": 0.1
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.0
+      },
+      "clearcoatRoughness": {
+        "base": 0.9
+      },
+      "normal": {
+        "strength": 0.2
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.25
+      },
+      "colorVariation": {
+        "palette": [
+          "#202425",
+          "#3A3E3F"
+        ],
+        "amplitude": 0.08,
+        "heightCorrelation": 0.15
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "tire-base",
+          "frequency": 3,
+          "amplitude": 0.2,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "tire-base"
+        },
+        {
+          "id": "tire-tread",
+          "frequency": 24,
+          "amplitude": 0.08,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "grain",
+          "role": "tire-tread"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_dark",
+      "baseColor": "#202425",
+      "roughness": {
+        "base": 0.52,
+        "variation": 0.06
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.1
+      },
+      "clearcoatRoughness": {
+        "base": 0.7
+      },
+      "normal": {
+        "strength": 0.12
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.18
+      },
+      "colorVariation": {
+        "palette": [
+          "#202425"
+        ],
+        "amplitude": 0.04,
+        "heightCorrelation": 0.08
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "dark-base",
+          "frequency": 3,
+          "amplitude": 0.12,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "dark-base"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_chrome",
+      "baseColor": "#CEC7B8",
+      "roughness": {
+        "base": 0.3,
+        "variation": 0.05
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.25
+      },
+      "clearcoatRoughness": {
+        "base": 0.4
+      },
+      "normal": {
+        "strength": 0.08
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.12
+      },
+      "colorVariation": {
+        "palette": [
+          "#CEC7B8"
+        ],
+        "amplitude": 0.03,
+        "heightCorrelation": 0.05
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "chrome-base",
+          "frequency": 3,
+          "amplitude": 0.08,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "chrome-base"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_light",
+      "baseColor": "#F2EEE5",
+      "roughness": {
+        "base": 0.2,
+        "variation": 0.03
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.3
+      },
+      "clearcoatRoughness": {
+        "base": 0.3
+      },
+      "normal": {
+        "strength": 0.05
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.1
+      },
+      "colorVariation": {
+        "palette": [
+          "#F2EEE5"
+        ],
+        "amplitude": 0.02,
+        "heightCorrelation": 0.03
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "light-base",
+          "frequency": 3,
+          "amplitude": 0.05,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "light-base"
+        }
+      ]
+    },
+    {
+      "id": "clay_moped_taillight",
+      "baseColor": "#CC2020",
+      "roughness": {
+        "base": 0.25,
+        "variation": 0.03
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.25
+      },
+      "clearcoatRoughness": {
+        "base": 0.35
+      },
+      "normal": {
+        "strength": 0.05
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.1
+      },
+      "colorVariation": {
+        "palette": [
+          "#CC2020"
+        ],
+        "amplitude": 0.02,
+        "heightCorrelation": 0.03
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "tail-base",
+          "frequency": 3,
+          "amplitude": 0.05,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "tail-base"
+        }
+      ]
+    }
+  ],
+  "buildPasses": [
+    {
+      "id": "blockout",
+      "componentRefs": [
+        "body_shell",
+        "front_shield",
+        "floorboard",
+        "seat",
+        "rear_wheel",
+        "front_wheel",
+        "front_fork",
+        "handlebar",
+        "front_basket",
+        "rear_rack",
+        "headlight",
+        "taillight"
+      ]
+    }
+  ],
+  "reviewHistory": [
+    {
+      "timestamp": "2026-08-01T07:47:04.324517+00:00",
+      "passId": "blockout",
+      "estimatedFidelity": 0.15,
+      "aiVisionScore": 0.15,
+      "visualAcceptanceThreshold": 0.7,
+      "layerScores": {
+        "silhouette": 0.1,
+        "component": 0.15,
+        "color": 0.35,
+        "material": 0.25,
+        "proportion": 0.1
+      },
+      "featureReviews": [
+        {
+          "id": "body_shape",
+          "score": 0.1,
+          "note": "Rectangular box instead of curved body"
+        },
+        {
+          "id": "wheels",
+          "score": 0.15,
+          "note": "Only one wheel partially visible"
+        },
+        {
+          "id": "handlebar",
+          "score": 0.15,
+          "note": "Flat gray platform, no structure"
+        }
+      ],
+      "action": "refine-code",
+      "summary": "Blockout pass: rectangular primitives don't capture moped silhouette",
+      "matched": [],
+      "mismatches": [],
+      "specFixes": [],
+      "codeFixes": [],
+      "evidence": [],
+      "visualEvidence": {
+        "referenceScreenshot": "",
+        "renderScreenshot": "/Users/yanghaoze/Documents/FUMIRA/demo/clay-reconstruct-test/render_screenshot.png",
+        "comparisonImage": "/Users/yanghaoze/Documents/FUMIRA/demo/clay-reconstruct-test/comparison.png",
+        "cameraView": "",
+        "notes": "",
+        "aiVisionNotes": ""
+      }
+    }
+  ],
+  "detailInventory": {
+    "targetMinDetails": 8,
+    "details": [
+      {
+        "zone": "body",
+        "feature": "rear cowling with rounded edges",
+        "level": "macro"
+      },
+      {
+        "zone": "body",
+        "feature": "front leg shield panel",
+        "level": "macro"
+      },
+      {
+        "zone": "body",
+        "feature": "flat floorboard platform",
+        "level": "meso"
+      },
+      {
+        "zone": "seat",
+        "feature": "elongated black cushion",
+        "level": "meso"
+      },
+      {
+        "zone": "wheels",
+        "feature": "two cylindrical wheels with tires",
+        "level": "meso"
+      },
+      {
+        "zone": "front",
+        "feature": "vertical fork and horizontal handlebar",
+        "level": "meso"
+      },
+      {
+        "zone": "front",
+        "feature": "wire basket",
+        "level": "micro"
+      },
+      {
+        "zone": "rear",
+        "feature": "chrome grab rack",
+        "level": "micro"
+      },
+      {
+        "zone": "front",
+        "feature": "round headlight",
+        "level": "micro"
+      },
+      {
+        "zone": "rear",
+        "feature": "small red taillight",
+        "level": "micro"
+      }
+    ]
+  },
+  "clayOverrides": {
+    "style": "soft-clay",
+    "roughness": 0.52,
+    "metalness": 0.0,
+    "clearcoat": 0.15,
+    "bevelRadius": 0.08,
+    "bevelSegments": 3,
+    "lighting": {
+      "primaryDirection": [
+        -0.4,
+        0.8,
+        0.6
+      ],
+      "ambientIntensity": 0.5,
+      "keyLightIntensity": 1.2,
+      "fillLightIntensity": 0.4
+    },
+    "contactShadow": {
+      "softness": 0.78,
+      "opacity": 0.24
+    }
+  },
+  "visualEvidence": [
+    {
+      "timestamp": "2026-08-01T07:47:04.324517+00:00",
+      "passId": "blockout",
+      "estimatedFidelity": 0.15,
+      "aiVisionScore": 0.15,
+      "visualAcceptanceThreshold": 0.7,
+      "layerScores": {
+        "silhouette": 0.1,
+        "component": 0.15,
+        "color": 0.35,
+        "material": 0.25,
+        "proportion": 0.1
+      },
+      "featureReviews": [
+        {
+          "id": "body_shape",
+          "score": 0.1,
+          "note": "Rectangular box instead of curved body"
+        },
+        {
+          "id": "wheels",
+          "score": 0.15,
+          "note": "Only one wheel partially visible"
+        },
+        {
+          "id": "handlebar",
+          "score": 0.15,
+          "note": "Flat gray platform, no structure"
+        }
+      ],
+      "referenceScreenshot": "",
+      "renderScreenshot": "/Users/yanghaoze/Documents/FUMIRA/demo/clay-reconstruct-test/render_screenshot.png",
+      "comparisonImage": "/Users/yanghaoze/Documents/FUMIRA/demo/clay-reconstruct-test/comparison.png",
+      "cameraView": "",
+      "notes": "",
+      "aiVisionNotes": ""
+    }
+  ],
+  "sculptPipeline": {
+    "passGateMode": "locked-sequential",
+    "passOrder": [
+      "blockout"
+    ],
+    "currentPass": "blockout",
+    "completedPasses": [],
+    "lastCompletedPass": "",
+    "blockedReason": "",
+    "nextRequiredEvidence": [
+      "browser render screenshot from your agent's browser/screenshot tool",
+      "single side-by-side full reference/render comparison sheet",
+      "all critical semantic feature scores at or above their thresholds",
+      "self-correction review appended with action=continue before the next pass"
+    ]
+  }
+}

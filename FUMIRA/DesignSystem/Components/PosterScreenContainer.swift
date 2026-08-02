@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PosterScreenContainer<Content: View>: View {
-    var background: Color = ClayPalette.charcoal
+    var background: Color = ClayPalette.cream
     @ViewBuilder var content: () -> Content
 
     var body: some View {

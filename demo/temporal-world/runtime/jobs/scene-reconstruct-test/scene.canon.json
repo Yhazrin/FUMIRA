@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "sceneId": "scene-reconstruct-test",
+  "entities": [
+    {
+      "id": "ground_platform",
+      "type": "terrain",
+      "label": "Ground Platform",
+      "position": [0, -0.05, 0],
+      "rotation": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "geometry": {
+        "builder": "ground-plane",
+        "parameters": { "width": 12, "depth": 12 }
+      },
+      "material": {
+        "color": "#8FCB7E",
+        "roughness": 0.76,
+        "metalness": 0,
+        "opacity": 1
+      },
+      "buildStatus": "blockout",
+      "confidence": 0.95
+    },
+    {
+      "id": "tree_01",
+      "type": "vegetation",
+      "label": "Clay Tree",
+      "position": [-1.8, 0, -0.5],
+      "rotation": [0, 0, 0],
+      "scale": 0.9,
+      "trunkHeight": 0.8,
+      "crownRadius": 0.65,
+      "geometry": {
+        "builder": "organic-tree",
+        "parameters": {
+          "trunkRadius": 0.12,
+          "trunkHeight": 0.8,
+          "crownRadius": 0.65
+        }
+      },
+      "material": {
+        "color": "#8FCB7E",
+        "roughness": 0.52,
+        "metalness": 0,
+        "clearcoat": 0.15,
+        "opacity": 1
+      },
+      "buildStatus": "blockout",
+      "confidence": 0.88
+    },
+    {
+      "id": "cube_01",
+      "type": "prop",
+      "label": "Clay Cube",
+      "position": [1.5, 0.5, 0.3],
+      "rotation": [0, 0.3, 0],
+      "scale": [1, 1, 1],
+      "geometry": {
+        "builder": "box",
+        "parameters": { "width": 1, "height": 1, "depth": 1 }
+      },
+      "material": {
+        "color": "#4A90D9",
+        "roughness": 0.52,
+        "metalness": 0,
+        "clearcoat": 0.15,
+        "opacity": 1
+      },
+      "buildStatus": "blockout",
+      "confidence": 0.92
+    }
+  ],
+  "camera": {
+    "position": [0, 5, 10],
+    "target": [0, 0, 0]
+  }
+}

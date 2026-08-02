@@ -17,7 +17,7 @@ struct ConnectionFeedbackView: View {
 
                 Text("已连接")
                     .font(ClayTypography.displaySmall)
-                    .foregroundStyle(ClayPalette.textOnDark)
+                    .foregroundStyle(ClayPalette.textPrimary)
 
                 connectionCard
                     .padding(.horizontal, ClaySpacing.xxl)

@@ -106,49 +106,68 @@ final class LiveBlowInputService: BlowInputProviding {
             return
         }
 
-        do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [])
-            try audioSession.setActive(true)
+        let engine = audioEngine
+        let session = audioSession
+        let clock = self.clock
 
-            let inputNode = audioEngine.inputNode
-            let format = inputNode.outputFormat(forBus: 0)
-            guard format.channelCount > 0, format.sampleRate > 0 else {
-                publishFallback(.inputUnavailable)
-                return
-            }
+        // Audio session + engine setup can block for 100-500 ms.
+        // Dispatch to a background queue so the main run loop stays responsive.
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try session.setCategory(.record, mode: .measurement, options: [])
+                try session.setActive(true)
 
-            let clock = self.clock
-            inputNode.installTap(
-                onBus: 0,
-                bufferSize: 1_024,
-                format: format
-            ) { [weak self, clock] buffer, _ in
-                let decibels = Self.decibels(in: buffer)
-                let timestamp = clock()
+                let inputNode = engine.inputNode
+                let format = inputNode.outputFormat(forBus: 0)
+                guard format.channelCount > 0, format.sampleRate > 0 else {
+                    Task { @MainActor [weak self] in
+                        self?.publishFallback(.inputUnavailable)
+                    }
+                    return
+                }
+
+                inputNode.installTap(
+                    onBus: 0,
+                    bufferSize: 1_024,
+                    format: format
+                ) { buffer, _ in
+                    let decibels = Self.decibels(in: buffer)
+                    let timestamp = clock()
+                    Task { @MainActor [weak self] in
+                        self?.publish(decibels: decibels, at: timestamp)
+                    }
+                }
+
+                engine.prepare()
+                try engine.start()
                 Task { @MainActor [weak self] in
-                    self?.publish(decibels: decibels, at: timestamp)
+                    guard let self, self.isStarted else { return }
+                    self.isTapInstalled = true
+                    self.setAvailability(.liveMicrophone)
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.publishFallback(.configurationFailed)
                 }
             }
-            isTapInstalled = true
-
-            audioEngine.prepare()
-            try audioEngine.start()
-            setAvailability(.liveMicrophone)
-        } catch {
-            publishFallback(.configurationFailed)
         }
     }
 
     private func stopLevelMonitoring() {
-        if isTapInstalled {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            isTapInstalled = false
+        let engine = audioEngine
+        let session = audioSession
+        let tapInstalled = isTapInstalled
+        isTapInstalled = false
+        DispatchQueue.global(qos: .utility).async {
+            if tapInstalled {
+                engine.inputNode.removeTap(onBus: 0)
+            }
+            if engine.isRunning {
+                engine.stop()
+            }
+            engine.reset()
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
         }
-        if audioEngine.isRunning {
-            audioEngine.stop()
-        }
-        audioEngine.reset()
-        try? audioSession.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func publish(decibels: Double, at timestamp: TimeInterval) {

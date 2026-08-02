@@ -1,0 +1,291 @@
+{
+  "id": "street-scene-reconstruct-v1",
+  "name": "Beijing Sidewalk — Street Scene Blockout",
+  "version": "1.0.0",
+  "palette": {
+    "charcoal": "#202425",
+    "warmWhite": "#F2EEE5",
+    "warmWhiteR": "#CEC7B8",
+    "orange": "#FF672A",
+    "orangeRim": "#C9441D",
+    "lime": "#B7D83D",
+    "limeRim": "#7E9A27",
+    "yellow": "#FFC52A",
+    "yellowRim": "#C18B14",
+    "ground": "#8FCB7E",
+    "road": "#9E9688",
+    "sidewalk": "#C8C0B2",
+    "grass": "#8FCB7E",
+    "trunk": "#5C4033",
+    "foliage1": "#668E47",
+    "foliage2": "#A8C95A",
+    "skin": "#F2D5B5",
+    "cloth1": "#263A5C",
+    "cloth2": "#202425"
+  },
+  "style": {
+    "clayMat": {
+      "roughness": 0.68,
+      "metalness": 0,
+      "flatShading": false
+    },
+    "fog": {
+      "color": "#DCE7D4",
+      "density": 0.012
+    },
+    "clearColor": "#EAF0E2"
+  },
+  "camera": {
+    "position": [7.2, 5.4, 10.6],
+    "target": [-0.1, 1.55, -0.55],
+    "fov": 34
+  },
+  "sceneGraph": {
+    "coordinateSystem": "sandbox-y-up",
+    "bounds": { "width": 13.5, "depth": 9.5, "groundY": 0 },
+    "layers": [
+      { "id": "foreground", "zRange": [1.2, 3.8], "priority": 1 },
+      { "id": "midground", "zRange": [-1.8, 1.2], "priority": 2 },
+      { "id": "background", "zRange": [-4.8, -1.8], "priority": 3 }
+    ],
+    "nodes": [
+      { "id": "tree-main", "role": "occluder-anchor", "layer": "midground", "footprint": [2.2, 1.8], "importance": 1.0 },
+      { "id": "utility-box", "role": "vertical-landmark", "layer": "background", "footprint": [1.5, 0.62], "importance": 0.82 },
+      { "id": "person-occluded", "role": "secondary-subject", "layer": "midground", "footprint": [0.62, 0.42], "importance": 0.58 },
+      { "id": "moped-foreground-red", "role": "recognition-anchor", "layer": "foreground", "footprint": [1.8, 0.8], "importance": 1.0 },
+      { "id": "moped-foreground-black", "role": "cluster-member", "layer": "foreground", "footprint": [1.55, 0.72], "importance": 0.72 },
+      { "id": "moped-mid-red", "role": "cluster-member", "layer": "midground", "footprint": [1.25, 0.62], "importance": 0.62 },
+      { "id": "green-fence", "role": "depth-plane", "layer": "background", "footprint": [4.0, 0.22], "importance": 0.48 },
+      { "id": "hedge-right", "role": "edge-frame", "layer": "midground", "footprint": [2.1, 1.0], "importance": 0.56 }
+    ],
+    "relations": [
+      { "type": "occludes", "from": "tree-main", "to": "person-occluded", "strength": 0.86 },
+      { "type": "supports", "from": "road-and-sidewalk", "to": "moped-foreground-red", "strength": 1.0 },
+      { "type": "clustered-with", "from": "moped-foreground-red", "to": "moped-foreground-black", "strength": 0.92 },
+      { "type": "clustered-with", "from": "moped-foreground-black", "to": "moped-mid-red", "strength": 0.74 },
+      { "type": "behind", "from": "utility-box", "to": "tree-main", "strength": 0.65 },
+      { "type": "frames", "from": "hedge-right", "to": "road-and-sidewalk", "strength": 0.7 }
+    ],
+    "evaluation": {
+      "target": "overall-recognizability",
+      "fixedView": true,
+      "checks": [
+        "foreground vehicle cluster occupies lower third",
+        "tree trunk splits the person and utility box",
+        "sidewalk recedes toward the upper-right",
+        "green hedge closes the right edge",
+        "warm clay palette remains legible at thumbnail size"
+      ]
+    }
+  },
+  "metadata": {
+    "sourceImage": "codex-clipboard-80f9fe01-ce5b-47eb-b293-4f27d9ecff1d.png",
+    "reconstructionMode": "scene-first-semantic-blockout",
+    "evaluationTarget": "overall-recognizability",
+    "qualityContract": {
+      "mustRead": [
+        "tree trunk and leafy canopy",
+        "elevated utility cabinet",
+        "partially occluded person",
+        "cluster of parked electric mopeds",
+        "sidewalk, curb, road and hedge depth layers"
+      ],
+      "knownLimits": [
+        "single view cannot recover hidden scooter sides",
+        "clay materials intentionally discard photographic texture",
+        "background signs and license plates are semantic hints, not literal text"
+      ]
+    }
+  },
+  "entities": [
+    {
+      "id": "road-and-sidewalk",
+      "category": "environment",
+      "type": "road",
+      "position": [0, 0, 0],
+      "size": [13.5, 0.05, 9.5],
+      "sidewalks": [
+        { "position": [3.9, 0.08, 0.2], "size": [5.0, 0.16, 9.0] },
+        { "position": [-5.1, 0.08, 0.2], "size": [1.3, 0.16, 9.0] }
+      ],
+      "grass": [
+        { "position": [6.25, 0.12, -0.5], "size": [0.7, 0.24, 8.4] }
+      ]
+    },
+    {
+      "id": "curb-right",
+      "category": "environment",
+      "type": "cube",
+      "position": [1.35, 0.2, 0.25],
+      "size": [0.24, 0.28, 8.7],
+      "material": { "color": "#B9AE9E", "roughness": 0.88 }
+    },
+    {
+      "id": "green-fence",
+      "category": "background",
+      "type": "cube",
+      "position": [4.2, 1.0, -3.35],
+      "size": [4.0, 2.0, 0.22],
+      "material": { "color": "#789E59", "roughness": 0.9 }
+    },
+    {
+      "id": "building-background",
+      "category": "background",
+      "type": "cube",
+      "position": [2.3, 2.1, -4.05],
+      "size": [6.8, 4.2, 0.5],
+      "material": { "color": "#D7D5C8", "roughness": 0.76 }
+    },
+    {
+      "id": "utility-box",
+      "category": "infrastructure",
+      "type": "utilityBox",
+      "position": [0.25, 0, -1.9],
+      "size": [1.5, 2.35, 0.62]
+    },
+    {
+      "id": "utility-pole",
+      "category": "infrastructure",
+      "type": "cube",
+      "position": [-0.7, 1.85, -1.9],
+      "size": [0.22, 4.4, 0.22],
+      "material": { "color": "#B8B5AA", "roughness": 0.84 }
+    },
+    {
+      "id": "tree-main",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [-1.8, 0.05, 0.05],
+      "scale": 4.2,
+      "trunkHeight": 1.25,
+      "crownRadius": 0.95
+    },
+    {
+      "id": "tree-mid",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [2.7, 0.02, -2.4],
+      "scale": 2.7,
+      "trunkHeight": 1.4,
+      "crownRadius": 0.8
+    },
+    {
+      "id": "tree-back",
+      "category": "vegetation",
+      "type": "tree",
+      "position": [5.2, 0, -4.0],
+      "scale": 3.2,
+      "trunkHeight": 1.2,
+      "crownRadius": 0.85
+    },
+    {
+      "id": "hedge-right",
+      "category": "vegetation",
+      "type": "hedge",
+      "position": [5.5, 0.08, 0.15],
+      "size": [2.1, 1.0, 1.0]
+    },
+    {
+      "id": "person-occluded",
+      "category": "character",
+      "type": "character",
+      "position": [-1.35, 0.05, 0.75],
+      "scale": 2.35,
+      "clothColor": "cloth1"
+    },
+    {
+      "id": "moped-foreground-red",
+      "category": "vehicle",
+      "type": "moped",
+      "position": [0.35, 0.02, 2.35],
+      "rotation": 0.08,
+      "scale": 1.55,
+      "material": { "color": "#B51F2A", "roughness": 0.58 }
+    },
+    {
+      "id": "moped-foreground-black",
+      "category": "vehicle",
+      "type": "moped",
+      "position": [1.45, 0.02, 1.65],
+      "rotation": -0.18,
+      "scale": 1.32,
+      "material": { "color": "#343638", "roughness": 0.62 }
+    },
+    {
+      "id": "moped-mid-red",
+      "category": "vehicle",
+      "type": "moped",
+      "position": [2.35, 0.02, 0.55],
+      "rotation": -0.38,
+      "scale": 1.05,
+      "material": { "color": "#A8282B", "roughness": 0.62 }
+    },
+    {
+      "id": "moped-mid-black",
+      "category": "vehicle",
+      "type": "moped",
+      "position": [2.8, 0.02, -0.15],
+      "rotation": -0.5,
+      "scale": 0.86,
+      "material": { "color": "#343638", "roughness": 0.68 }
+    },
+    {
+      "id": "moped-background",
+      "category": "vehicle",
+      "type": "moped",
+      "position": [0.9, 0.02, -1.45],
+      "rotation": -0.35,
+      "scale": 0.62,
+      "material": { "color": "#5C6060", "roughness": 0.75 }
+    },
+    {
+      "id": "street-signal",
+      "category": "infrastructure",
+      "type": "lampPost",
+      "position": [-4.05, 0, -2.8],
+      "scale": 1.65
+    },
+    {
+      "id": "street-sign",
+      "category": "infrastructure",
+      "type": "streetSign",
+      "position": [-3.5, 0, -2.15],
+      "rotation": 0.1
+    }
+  ],
+  "temporalSpec": {
+    "anchorYears": [
+      {
+        "year": 2026,
+        "entities": {
+          "tree-main": { "growth": 1.0, "crownVolume": 1.0 },
+          "tree-mid": { "growth": 1.0, "crownVolume": 1.0 },
+          "tree-back": { "growth": 1.0, "crownVolume": 1.0 },
+          "person-occluded": { "presence": 1.0 }
+        }
+      },
+      {
+        "year": 2040,
+        "entities": {
+          "tree-main": { "growth": 1.12, "crownVolume": 1.2 },
+          "tree-mid": { "growth": 1.1, "crownVolume": 1.18 },
+          "tree-back": { "growth": 1.08, "crownVolume": 1.12 },
+          "person-occluded": { "presence": 0.35 }
+        }
+      },
+      {
+        "year": 2080,
+        "entities": {
+          "tree-main": { "growth": 1.28, "crownVolume": 1.48 },
+          "tree-mid": { "growth": 1.25, "crownVolume": 1.42 },
+          "tree-back": { "growth": 1.2, "crownVolume": 1.35 },
+          "person-occluded": { "presence": 0.0 }
+        }
+      }
+    ],
+    "timelineIntervals": [
+      { "startYear": 2026, "endYear": 2040, "mode": "stable", "narrative": "Current sidewalk: scooters, shade and the utility cabinet anchor the frame." },
+      { "startYear": 2040, "endYear": 2080, "mode": "gradual", "narrative": "The canopy thickens while the human trace fades from the scene." }
+    ]
+  }
+}

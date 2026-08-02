@@ -1,0 +1,175 @@
+{
+  "schemaVersion": "1.0.0",
+  "targetName": "Clay Small Garage",
+  "suitability": "pass",
+  "coordinateFrame": {
+    "handedness": "right",
+    "upAxis": "y",
+    "unit": "meter"
+  },
+  "silhouette": {
+    "style": "clay-rounded",
+    "complexity": "simple"
+  },
+  "proceduralStrategy": [
+    "single-pass-blockout"
+  ],
+  "objectClass": {
+    "primaryDomain": "object",
+    "subType": "building"
+  },
+  "complexity": "simple",
+  "qualityContract": {
+    "fidelityTarget": "stylized-clay",
+    "styleGuide": "FUMIRA Clay3DStyle",
+    "minimumSpecDepth": {
+      "structural": true,
+      "material": true,
+      "lighting": false
+    },
+    "featureGroups": [
+      {
+        "id": "building_body",
+        "name": "body",
+        "features": [
+          "building base form"
+        ]
+      }
+    ],
+    "constraints": [
+      "clay-non-metallic",
+      "clay-bevel-all-edges",
+      "clay-palette-only"
+    ]
+  },
+  "componentTree": [
+    {
+      "id": "building_main_077229",
+      "name": "Small Garage",
+      "level": "macro",
+      "primitive": "box",
+      "dimensions": {
+        "width": 3.0,
+        "height": 1.0,
+        "depth": 2.0
+      },
+      "transform": {
+        "position": [
+          1.5,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": "clay_building_946510",
+      "topologyClass": "hard-surface",
+      "topologyRationale": "building default clay topology"
+    }
+  ],
+  "materials": [
+    {
+      "id": "clay_building_946510",
+      "baseColor": "#F2EEE5",
+      "roughness": {
+        "base": 0.52,
+        "variation": 0.08
+      },
+      "metalness": {
+        "base": 0.0
+      },
+      "clearcoat": {
+        "base": 0.15
+      },
+      "clearcoatRoughness": {
+        "base": 0.6
+      },
+      "normal": {
+        "strength": 0.15
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.2
+      },
+      "colorVariation": {
+        "palette": [
+          "#F2EEE5"
+        ],
+        "amplitude": 0.05,
+        "heightCorrelation": 0.1
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "clay-base",
+          "frequency": 3,
+          "amplitude": 0.15,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "smooth",
+          "role": "clay-base"
+        },
+        {
+          "id": "clay-grain",
+          "frequency": 18,
+          "amplitude": 0.06,
+          "stretch": [
+            1,
+            1
+          ],
+          "pattern": "grain",
+          "role": "clay-grain"
+        }
+      ]
+    }
+  ],
+  "buildPasses": [
+    {
+      "id": "blockout",
+      "componentRefs": [
+        "building_main_077229"
+      ]
+    }
+  ],
+  "reviewHistory": [],
+  "detailInventory": {
+    "targetMinDetails": 1,
+    "details": [
+      {
+        "zone": "body",
+        "feature": "building base form",
+        "level": "macro"
+      }
+    ]
+  },
+  "clayOverrides": {
+    "style": "soft-clay",
+    "roughness": 0.52,
+    "metalness": 0.0,
+    "clearcoat": 0.15,
+    "bevelRadius": 0.08,
+    "bevelSegments": 3,
+    "lighting": {
+      "primaryDirection": [
+        -0.4,
+        0.8,
+        0.6
+      ],
+      "ambientIntensity": 0.5,
+      "keyLightIntensity": 1.2,
+      "fillLightIntensity": 0.4
+    },
+    "contactShadow": {
+      "softness": 0.78,
+      "opacity": 0.24
+    }
+  }
+}

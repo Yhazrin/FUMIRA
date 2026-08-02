@@ -179,6 +179,7 @@ actor RemoteGenerationProvider: GenerationProvider {
             aspectRatio: Self.aspectRatio(for: request.photo),
             imageProvider: request.model.provider.imageGenerationRoute ?? "minimax",
             imageModel: Self.relayImageModel(for: request.model),
+            tier: request.tier.rawValue,
             requestId: requestId,
             structuredContext: StructuredContextDTO(
                 schemaVersion: "generation-context.v3",
@@ -410,6 +411,7 @@ private struct CreateGenerationRequest: Encodable {
     let aspectRatio: String
     let imageProvider: String
     let imageModel: String?
+    let tier: String
     let requestId: String
     let structuredContext: StructuredContextDTO
 }

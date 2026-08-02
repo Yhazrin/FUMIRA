@@ -188,6 +188,9 @@ let temporalEngine = null;
 console.log('Orchestrator pipeline initialized (mock mode:', !process.env.XIAOMI_API_KEY, ')');
 console.log('Jobs directory:', JOBS_DIR);
 
+// Global fixture store — loaded via POST /api/scene/fixture
+let globalSceneFixture = null;
+
 // ── Session Store ──────────────────────────────────────────
 const sessions = new Map();
 
@@ -430,6 +433,19 @@ app.post('/api/scene/load', async (req, reply) => {
   return { ok: true, entities: spec.entities.length, updates: updates.length };
 });
 
+// Load a fixture-format scene directly (bypasses SceneCompiler).
+// The fixture is stored per-session and served as-is to the desktop.
+app.post('/api/scene/fixture', async (req, reply) => {
+  const fixture = req.body;
+  if (!fixture || !fixture.entities) {
+    return reply.code(400).send({ error: 'Invalid fixture: missing entities' });
+  }
+  // Store as global fixture — served to all sessions
+  globalSceneFixture = fixture;
+  broadcastGlobal({ type: 'scene.ready' });
+  return { ok: true, entities: fixture.entities.length };
+});
+
 // Per-session scene endpoint — returns a SceneFixture for the desktop to render.
 // If the SceneCompiler has entities for this session, returns them as a fixture.
 // Otherwise returns 404 so the desktop shows its waiting state.
@@ -440,6 +456,11 @@ app.get('/api/scene/:sessionId', (req, reply) => {
   // If the session has a stored fixture, return it
   if (session.sceneFixture) {
     return session.sceneFixture;
+  }
+
+  // Check global fixture (loaded via POST /api/scene/fixture)
+  if (globalSceneFixture) {
+    return globalSceneFixture;
   }
 
   // Fall back to the compiler manifest — if it has entities, wrap as fixture

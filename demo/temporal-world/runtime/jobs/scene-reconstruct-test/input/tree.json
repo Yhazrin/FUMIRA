@@ -1,0 +1,13 @@
+{
+  "id": "tree_01",
+  "type": "tree",
+  "label": "Small Tree",
+  "position": [-1.5, 0, -0.5],
+  "rotation": [0, 0, 0],
+  "scale": 0.8,
+  "material": {
+    "color": "#7E9A27",
+    "roughness": 0.76,
+    "metalness": 0
+  }
+}

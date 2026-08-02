@@ -21,12 +21,12 @@ struct DisconnectedView: View {
 
                 Text("连接已断开")
                     .font(ClayTypography.displaySmall)
-                    .foregroundStyle(ClayPalette.textOnDark)
+                    .foregroundStyle(ClayPalette.textPrimary)
 
                 if let message {
                     Text(message)
                         .font(ClayTypography.body)
-                        .foregroundStyle(ClayPalette.textOnDark.opacity(0.72))
+                        .foregroundStyle(ClayPalette.textMuted)
                         .multilineTextAlignment(.leading)
                 }
 
@@ -49,14 +49,14 @@ struct DisconnectedView: View {
                     } label: {
                         Text("仅用手机体验")
                             .font(ClayTypography.bodyBold)
-                            .foregroundStyle(ClayPalette.textOnDark)
+                            .foregroundStyle(ClayPalette.textPrimary)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
                     }
                     .buttonStyle(.plain)
                     .overlay {
                         RoundedRectangle(cornerRadius: ClayShape.button, style: .continuous)
-                            .stroke(ClayPalette.warmWhite.opacity(0.24), lineWidth: 1.5)
+                            .stroke(ClayPalette.warmWhiteRim, lineWidth: 1.5)
                     }
                 }
             }

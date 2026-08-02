@@ -214,7 +214,7 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertEqual(model.phase, .result)
         XCTAssertEqual(model.generatedFrame?.sessionID, model.activeSessionID)
-        XCTAssertEqual(model.generatedFrame?.modelOptionID, "fumira.image.identity")
+        XCTAssertEqual(model.generatedFrame?.modelOptionID, GenerationTier.default.imageOptionID)
         XCTAssertEqual(model.generatedFrame?.time, model.capturedTargetTime)
         XCTAssertTrue(model.generatedFrame?.prompt.contains("mock-fallback") == true)
         XCTAssertTrue(model.generatedFrame?.prompt.contains("不能在改变一个主体后停止") == true)

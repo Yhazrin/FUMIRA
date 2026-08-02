@@ -1,0 +1,42 @@
+{
+  "id": "scene-msa142v1-321541",
+  "type": "full-reconstruction",
+  "status": "completed",
+  "input": {
+    "photoPath": "/Users/yanghaoze/Documents/FUMIRA/demo/k230-receiver/received/20260801_135617_0d7220af.jpg",
+    "source": "upload",
+    "priority": "normal"
+  },
+  "progress": {
+    "phase": "completed",
+    "percent": 100,
+    "message": "Job completed"
+  },
+  "result": {
+    "reviewReport": {
+      "passed": true,
+      "score": 0.87,
+      "issues": [
+        {
+          "entityId": "tree_pine_1",
+          "severity": "low",
+          "description": "Pine tree could use more crown detail",
+          "suggestion": "Add branch-level geometry"
+        }
+      ],
+      "suggestions": [
+        "Consider adding a small bench near the path"
+      ]
+    },
+    "artifacts": [
+      "output/blockout.json",
+      "state/canonical-scene.json",
+      "state/vision-analysis.json"
+    ]
+  },
+  "error": null,
+  "createdAt": 1785568047231,
+  "completedAt": 1785568047236,
+  "retryCount": 0,
+  "maxRetries": 2
+}

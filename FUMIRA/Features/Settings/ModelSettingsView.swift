@@ -29,6 +29,48 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    ForEach(ExperimentalFeature.allCases) { feature in
+                        Toggle(
+                            isOn: Binding(
+                                get: { model.experimental.isEnabled(feature) },
+                                set: { model.experimental.setEnabled($0, for: feature) }
+                            )
+                        ) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(feature.displayName)
+                                Text(feature.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .tint(ClayPalette.orange)
+                    }
+                } header: {
+                    Text("实验室")
+                } footer: {
+                    Text("默认只保留时间轨拖动与倾斜穿越两种时间交互。这里的选项是仍在评估中的玩法，开启后会出现在结果页。")
+                }
+
+                Section {
+                    ForEach(GenerationTier.ordered, id: \.self) { tier in
+                        GenerationTierRow(
+                            tier: tier,
+                            isSelected: model.modelConfiguration.tier == tier
+                        ) {
+                            Task { await model.selectTier(tier) }
+                        }
+                    }
+                } header: {
+                    Text("生成档位")
+                } footer: {
+                    Text(
+                        model.isTierImageModelOverridden
+                            ? "当前已在下方手动指定模型，档位只控制锚点数量与校验轮次。"
+                            : "档位决定生图模型、时间锚点数量与自动校验轮次。"
+                    )
+                }
+
+                Section {
                     Picker(
                         "生成服务",
                         selection: imageProviderBinding
@@ -142,7 +184,11 @@ struct SettingsView: View {
     }
 
     private var defaultAPIMartImageOptionID: String {
-        apiMartImageOptions.first?.id ?? "apimart.image.gpt-image-2"
+        let tierOption = GenerationTier.default.imageOptionID
+        if apiMartImageOptions.contains(where: { $0.id == tierOption }) {
+            return tierOption
+        }
+        return apiMartImageOptions.first?.id ?? tierOption
     }
 
     private func selectImageProvider(_ provider: AIProviderKind) async {
@@ -156,6 +202,47 @@ struct SettingsView: View {
         default:
             break
         }
+    }
+}
+
+private struct GenerationTierRow: View {
+    let tier: GenerationTier
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: tier.symbolName)
+                    .font(.body)
+                    .foregroundStyle(isSelected ? ClayPalette.orange : .secondary)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tier.displayName)
+                        .foregroundStyle(ClayPalette.charcoal)
+                    Text(tier.tagline)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("\(tier.anchorCount) 个锚点 · \(tier.estimatedSessionLabel) · \(tier.costLabel)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+
+                Spacer(minLength: 0)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ClayPalette.orange)
+                }
+            }
+            .padding(.vertical, 4)
+            .frame(minHeight: 44, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(tier.accessibilitySummary)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

@@ -4,6 +4,8 @@ export type GenerationStatus =
   | "succeeded"
   | "failed";
 
+export type { GenerationTier } from "./tiers.js";
+
 export type ImageGenerationProvider = "minimax" | "apimart";
 
 export type AspectRatio =
@@ -70,6 +72,8 @@ export interface LegacyGenerationBody {
   imageProvider?: ImageGenerationProvider;
   /** Optional APIMart vendor model id (e.g. gpt-image-2). Ignored for MiniMax. */
   imageModel?: string;
+  /** Quality tier; resolves model, validation and repair budget when unset fields remain. */
+  tier?: string;
   requestId: string;
   useSubjectReference?: boolean;
 }
@@ -84,6 +88,8 @@ export interface StructuredGenerationBody {
   imageProvider?: ImageGenerationProvider;
   /** Optional APIMart vendor model id (e.g. gpt-image-2). Ignored for MiniMax. */
   imageModel?: string;
+  /** Quality tier; resolves model, validation and repair budget when unset fields remain. */
+  tier?: string;
   requestId: string;
   useSubjectReference?: boolean;
 }
@@ -145,10 +151,16 @@ export interface GenerationRecord {
   resultRelativeUrl?: string;
   /** Optional URL of the post-repair image (relative to PUBLIC_BASE_URL). */
   repairedResultRelativeUrl?: string;
-  /** Number of repair attempts run so far; capped at 1 per generation. */
+  /** Number of repair attempts run so far; capped by the tier's repairRounds. */
   repairAttempts?: number;
+  /** Resolved quality tier for this generation. */
+  tier?: string;
   /** Last validation summary kept for admin telemetry; never returned to the app client. */
   validationSummary?: GenerationValidationResult;
+  /** Mean of the seven validation metrics for the image that was finally served. */
+  qualityScore?: number;
+  /** Per-round validation means, oldest first, for offline prompt A/B analysis. */
+  qualityHistory?: number[];
   errorCode?: string;
   userMessage?: string;
   retryable?: boolean;
@@ -171,6 +183,11 @@ export interface MiniMaxGenerateInput {
   generationId: string;
   /** APIMart vendor model; MiniMax adapters ignore this. */
   modelName?: string;
+  /**
+   * Rejected image from the previous repair round. Adapters that accept multiple
+   * reference images pass it alongside the source so the model can see what to fix.
+   */
+  priorAttemptDataUrl?: string;
 }
 
 export interface MiniMaxGenerateSuccess {
