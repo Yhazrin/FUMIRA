@@ -79,5 +79,6 @@ test-screenshots/
 .vscode/
 .cursor/
 **/.cursor/
+.github/
 *.swp
 *.swo
